@@ -1,5 +1,5 @@
 [package]
-name = "rust-block-format"
+name = "rust-cid"
 version = "0.1.0"
 authors = ["Aten <jincxmain@gmail.com>"]
 edition = "2018"
@@ -7,10 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thiserror = "1.0"
+thiserror = "1.0.6"
+integer-encoding = "1.0.7"
+varint = "0.9"
 
+cid = "0.3.1"
 multihash = "0.8.0"
-
-# local crate
-primitives = { path = "../primitives" }
-rust-cid = { path = "../cid" }
