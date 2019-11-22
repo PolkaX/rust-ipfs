@@ -1,0 +1,6 @@
+/target
+**/*.rs.bk
+
+# for IDE
+.idea/
+.vscode/
