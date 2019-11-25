@@ -9,74 +9,18 @@ mod error;
 mod to_cid;
 mod version;
 
+use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
+use std::fmt;
+use std::io::Cursor;
+use thiserror::Error;
+use varint::VARINT_64_MAX_BYTES;
+
+use multihash::{Hash as MHashEnum, Multihash};
+
 pub use codec::Codec;
 pub use error::{Error, Result};
 pub use to_cid::ToCid;
 pub use version::Version;
-
-use integer_encoding::{VarIntReader, VarIntWriter};
-use std::fmt;
-use std::io::Cursor;
-
-use integer_encoding::VarInt;
-use thiserror::Error;
-use varint::VARINT_64_MAX_BYTES;
-
-//#[derive(Error, Debug)]
-//pub enum CidError {
-//    #[error("Invalid hash bytes for cidv0, code:{}, digest len:{}", .0.name(), .1)]
-//    InvalidCidV0(MHashEnum, usize),
-//
-//    // multi hash
-//    #[error("[Multihash]This type is not supported yet")]
-//    UnsupportedType,
-//
-//    #[error("[Multihash]Not matching input length")]
-//    BadInputLength,
-//
-//    #[error("[Multihash]Found unknown code")]
-//    UnknownCode,
-//}
-//
-//impl From<MHashError> for CidError {
-//    fn from(e: MHashError) -> Self {
-//        match e {
-//            MHashError::UnsupportedType => CidError::UnsupportedType,
-//            MHashError::BadInputLength => CidError::BadInputLength,
-//            MHashError::UnknownCode => CidError::UnknownCode,
-//        }
-//    }
-//}
-//
-//pub fn new_cid_v0(mhash: Vec<u8>) -> Result<Cid, CidError> {
-//    let multi_hash: Multihash = decode(&mhash).map_err(CidError::from)?;
-//    if multi_hash.alg != MHashEnum::SHA2256 || multi_hash.digest.len() != 32 {
-//        return Err(CidError::InvalidCidV0(multi_hash.alg, multi_hash.digest.len()));
-//    }
-//
-//    Ok(Cid::new(
-//        Codec::DagProtobuf,
-//        Version::V0,
-//        &mhash,
-//    ))
-//}
-//
-//pub fn new_cid_v1(codec: Codec, mhash: Vec<u8>) -> Result<Cid, CidError> {
-//    let hashlen = mhash.len();
-//    // two 8 bytes (max) numbers plus hash
-//    let mut buf = vec![0_u8; 2 * VARINT_64_MAX_BYTES + hashlen];
-//    let mut n = 1_u64.encode_var(&mut buf);
-//    let codec_type: u64 = codec.into();
-//    n += codec_type.encode_var(&mut buf[n..]);
-//
-//    buf[n..n + hashlen].copy_from_slice(&mhash);
-//
-//    Ok(Cid::new(
-//        codec,
-//        Version::V1,
-//        &buf[..n + hashlen],
-//    ))
-//}
 
 /// Representation of a CID.
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -91,7 +35,7 @@ pub struct Cid {
 pub struct Prefix {
     pub version: Version,
     pub codec: Codec,
-    pub mh_type: multihash::Hash,
+    pub mh_type: MHashEnum,
     pub mh_len: usize,
 }
 
@@ -99,8 +43,8 @@ impl Cid {
     /// Create a new CID.
     pub fn new(codec: Codec, version: Version, hash: &[u8]) -> Cid {
         Cid {
-            version: version,
-            codec: codec,
+            version,
+            codec,
             hash: hash.into(),
         }
     }
@@ -169,7 +113,7 @@ impl Cid {
 
     pub fn prefix(&self) -> Prefix {
         // Unwrap is safe, as this should have been validated on creation
-        let mh = multihash::Multihash::from_bytes(self.hash.clone()).unwrap();
+        let mh = Multihash::from_bytes(self.hash.clone()).unwrap();
 
         Prefix {
             version: self.version,
@@ -203,7 +147,7 @@ impl Prefix {
         let version = Version::from(raw_version)?;
         let codec = Codec::from(raw_codec)?;
 
-        let mh_type = multihash::Hash::from_code(raw_mh_type as u16).ok_or(Error::UnknownCodec)?;
+        let mh_type = MHashEnum::from_code(raw_mh_type as u16).ok_or(Error::UnknownCodec)?;
 
         let mh_len = cur.read_varint()?;
 
@@ -226,4 +170,33 @@ impl Prefix {
 
         res
     }
+}
+
+pub fn new_cid_v0(mhash: Vec<u8>) -> Result<Cid> {
+    let multi_hash: Multihash = Multihash::from_bytes(mhash)?;
+    if multi_hash.algorithm() != MHashEnum::SHA2256 || multi_hash.digest().len() != 32 {
+        return Err(Error::InvalidCidV0(
+            multi_hash.algorithm(),
+            multi_hash.digest().len(),
+        ));
+    }
+
+    Ok(Cid::new(
+        Codec::DagProtobuf,
+        Version::V0,
+        multi_hash.as_bytes(),
+    ))
+}
+
+pub fn new_cid_v1(codec: Codec, mhash: Vec<u8>) -> Result<Cid> {
+    let hashlen = mhash.len();
+    // two 8 bytes (max) numbers plus hash
+    let mut buf = vec![0_u8; 2 * VARINT_64_MAX_BYTES + hashlen];
+    let mut n = 1_u64.encode_var(&mut buf);
+    let codec_type: u64 = codec.into();
+    n += codec_type.encode_var(&mut buf[n..]);
+
+    buf[n..n + hashlen].copy_from_slice(&mhash);
+
+    Ok(Cid::new(codec, Version::V1, &buf[..n + hashlen]))
 }

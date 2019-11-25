@@ -1,14 +1,17 @@
-use std::{error, fmt, io};
+use std::io;
 use thiserror::Error;
 
 use multibase;
-use multihash;
+use multihash::Hash as MHashEnum;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 /// Error types
 #[derive(Error, PartialEq, Eq, Clone, Debug)]
 pub enum Error {
+    #[error("Invalid hash bytes for cidv0, code:{:?}, digest len:{}", .0, .1)]
+    InvalidCidV0(MHashEnum, usize),
+
     #[error("Unknown codec")]
     UnknownCodec,
     #[error("Input too short")]
