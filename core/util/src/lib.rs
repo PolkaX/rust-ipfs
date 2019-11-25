@@ -4,11 +4,7 @@
 //! Shareable rust-ipfs common tools.
 use multihash::{encode, Hash as MHashEnum};
 
-
-pub fn hash() -> Vec<u8> {
-
-}
-
+pub fn hash() -> Vec<u8> {}
 
 #[cfg(test)]
 mod tests {

@@ -17,6 +17,6 @@ pub struct BasicBlock {
 
 impl BasicBlock {
     pub fn new(data: Bytes) -> BasicBlock {
-        BasicBlock { data, cid: }
+        //        BasicBlock { data, cid: }
     }
 }

@@ -1,26 +1,25 @@
 // Copyright 2019-2020 PolkaX.
 // This file is part of rust-ipfs.
 
+mod codec;
+mod error;
 /// ! Implementation of [cid](https://github.com/ipld/cid) in Rust.
 /// Fork from project [rust-cid](https://github.com/multiformats/rust-cid)
 /// But we provide more useful functions.
-
 mod to_cid;
-mod error;
-mod codec;
 mod version;
 
-pub use to_cid::ToCid;
-pub use version::Version;
 pub use codec::Codec;
 pub use error::{Error, Result};
+pub use to_cid::ToCid;
+pub use version::Version;
 
 use integer_encoding::{VarIntReader, VarIntWriter};
 use std::fmt;
 use std::io::Cursor;
 
-use thiserror::Error;
 use integer_encoding::VarInt;
+use thiserror::Error;
 use varint::VARINT_64_MAX_BYTES;
 
 //#[derive(Error, Debug)]
@@ -79,7 +78,6 @@ use varint::VARINT_64_MAX_BYTES;
 //    ))
 //}
 
-
 /// Representation of a CID.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Cid {
@@ -114,12 +112,13 @@ impl Cid {
 
     /// Create a new CID from a prefix and some data.
     pub fn new_from_prefix(prefix: &Prefix, data: &[u8]) -> Cid {
-        let mut hash = multihash::encode(prefix.mh_type, data).unwrap();
-        hash.truncate(prefix.mh_len + 2);
+        let hash = multihash::encode(prefix.mh_type, data).unwrap();
+        let mut hash_vec = hash.into_bytes();
+        hash_vec.truncate(prefix.mh_len + 2);
         Cid {
             version: prefix.version,
             codec: prefix.codec.to_owned(),
-            hash: hash.into(),
+            hash: hash_vec,
         }
     }
 
@@ -175,8 +174,8 @@ impl Cid {
         Prefix {
             version: self.version,
             codec: self.codec.to_owned(),
-            mh_type: mh.alg,
-            mh_len: mh.digest.len(),
+            mh_type: mh.algorithm(),
+            mh_len: mh.digest().len(),
         }
     }
 }

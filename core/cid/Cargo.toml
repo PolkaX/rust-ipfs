@@ -10,6 +10,7 @@ edition = "2018"
 thiserror = "1.0.6"
 integer-encoding = "1.0.7"
 varint = "0.9"
+hex = "0.4"
 
 multibase = "0.6.0"
 multihash = { package = "parity-multihash", git = "https://github.com/libp2p/rust-libp2p" }
