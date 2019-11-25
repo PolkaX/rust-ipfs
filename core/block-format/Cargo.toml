@@ -9,8 +9,7 @@ edition = "2018"
 [dependencies]
 thiserror = "1.0"
 
-multihash = "0.8.0"
-
+multihash = { package = "parity-multihash", git = "https://github.com/libp2p/rust-libp2p" }
 # local crate
 primitives = { path = "../primitives" }
 rust-cid = { path = "../cid" }
