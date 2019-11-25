@@ -1,14 +1,12 @@
-extern crate cid;
-extern crate multihash;
-
-use cid::{Cid, Codec, Error, Prefix, Version};
 use std::collections::HashMap;
+
+use rust_cid::{Cid, Codec, Error, Prefix, Version};
 
 #[test]
 fn basic_marshalling() {
     let h = multihash::encode(multihash::Hash::SHA2256, b"beep boop").unwrap();
 
-    let cid = Cid::new(Codec::DagProtobuf, Version::V1, &h);
+    let cid = Cid::new(Codec::DagProtobuf, Version::V1, h.as_bytes());
 
     let data = cid.to_bytes();
     let out = Cid::from(data).unwrap();
@@ -43,13 +41,13 @@ fn from_str() {
     assert_eq!(cid.version, Version::V0);
 
     let bad = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zIII".parse::<Cid>();
-    assert_eq!(bad, Err(Error::ParsingError));
+    assert_eq!(bad, Err(Error::ParsingError(format!("Multibase, reason: Invalid base string"))));
 }
 
 #[test]
 fn v0_error() {
     let bad = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zIII";
-    assert_eq!(Cid::from(bad), Err(Error::ParsingError));
+    assert_eq!(Cid::from(bad), Err(Error::ParsingError(format!("Multibase, reason: Invalid base string"))));
 }
 
 #[test]
@@ -57,7 +55,7 @@ fn prefix_roundtrip() {
     let data = b"awesome test content";
     let h = multihash::encode(multihash::Hash::SHA2256, data).unwrap();
 
-    let cid = Cid::new(Codec::DagProtobuf, Version::V1, &h);
+    let cid = Cid::new(Codec::DagProtobuf, Version::V1, h.as_bytes());
     let prefix = cid.prefix();
 
     let cid2 = Cid::new_from_prefix(&prefix, data);

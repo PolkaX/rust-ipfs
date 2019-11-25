@@ -30,19 +30,19 @@ impl From<io::Error> for Error {
 
 impl From<multibase::Error> for Error {
     fn from(e: multibase::Error) -> Error {
-        Error::ParsingError(format!("Multibase, reason:{}", e))
+        Error::ParsingError(format!("Multibase, reason: {}", e))
     }
 }
 
 impl From<multihash::EncodeError> for Error {
     fn from(e: multihash::EncodeError) -> Error {
-        Error::ParsingError(format!("Multihash EncodeError, reason:{}", e))
+        Error::ParsingError(format!("Multihash EncodeError, reason: {}", e))
     }
 }
 
 impl From<multihash::DecodeError> for Error {
     fn from(e: multihash::DecodeError) -> Error {
-        Error::ParsingError(format!("Multihash DecodeError, reason:{}", e))
+        Error::ParsingError(format!("Multihash DecodeError, reason: {}", e))
     }
 }
 
