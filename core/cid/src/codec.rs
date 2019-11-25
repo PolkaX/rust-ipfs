@@ -33,9 +33,13 @@ macro_rules! build_codec_enum {
 
 build_codec_enum! {
     0x55 => Raw,
+
     0x70 => DagProtobuf,
     0x71 => DagCBOR,
+    0x72 => Libp2pKey,
+
     0x78 => GitRaw,
+
     0x90 => EthereumBlock,
     0x91 => EthereumBlockList,
     0x92 => EthereumTxTrie,
@@ -49,5 +53,10 @@ build_codec_enum! {
     0xb1 => BitcoinTx,
     0xc0 => ZcashBlock,
     0xc1 => ZcashTx,
+    0xe0 => DecredBlock,
+    0xe1 => DecredTx,
+    0xf0 => DashBlock,
+    0xf1 => DashTx,
+
     0x0129 => DagJSON,
 }
