@@ -12,6 +12,9 @@ pub enum Error {
     #[error("Invalid hash bytes for cidv0, code:{:?}, digest len:{}", .0, .1)]
     InvalidCidV0(MHashEnum, usize),
 
+    #[error("Invalid v0 prefix")]
+    InvalidV0Prefix,
+
     #[error("Unknown codec")]
     UnknownCodec,
     #[error("Input too short")]

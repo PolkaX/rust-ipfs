@@ -9,13 +9,12 @@ mod error;
 mod to_cid;
 mod version;
 
-use integer_encoding::{VarInt, VarIntReader, VarIntWriter};
+use integer_encoding::{VarIntReader, VarIntWriter};
 use std::fmt;
 use std::io::Cursor;
 use thiserror::Error;
-use varint::VARINT_64_MAX_BYTES;
 
-use multihash::{Hash as MHashEnum, Multihash};
+pub use multihash::{Hash as MHashEnum, Multihash};
 
 pub use codec::Codec;
 pub use error::{Error, Result};
@@ -170,33 +169,31 @@ impl Prefix {
 
         res
     }
+
+    /// Sum uses the information in a prefix to perform a multihash.Sum()
+    /// and return a newly constructed Cid with the resulting multihash.
+    pub fn sum(&self, data: &[u8]) -> Result<Cid> {
+        if self.version == Version::V0 && (self.mh_type != MHashEnum::SHA2256 || self.mh_len != 32)
+        {
+            return Err(Error::InvalidV0Prefix);
+        }
+
+        let mhash = multihash::encode(self.mh_type, data)?;
+        match self.version {
+            Version::V0 => new_cid_v0(mhash),
+            Version::V1 => new_cid_v1(self.codec, mhash),
+        }
+    }
 }
 
-pub fn new_cid_v0(mhash: Vec<u8>) -> Result<Cid> {
-    let multi_hash: Multihash = Multihash::from_bytes(mhash)?;
-    if multi_hash.algorithm() != MHashEnum::SHA2256 || multi_hash.digest().len() != 32 {
-        return Err(Error::InvalidCidV0(
-            multi_hash.algorithm(),
-            multi_hash.digest().len(),
-        ));
+pub fn new_cid_v0(mhash: Multihash) -> Result<Cid> {
+    if mhash.algorithm() != MHashEnum::SHA2256 || mhash.digest().len() != 32 {
+        return Err(Error::InvalidCidV0(mhash.algorithm(), mhash.digest().len()));
     }
 
-    Ok(Cid::new(
-        Codec::DagProtobuf,
-        Version::V0,
-        multi_hash.as_bytes(),
-    ))
+    Ok(Cid::new(Codec::DagProtobuf, Version::V0, mhash.as_bytes()))
 }
 
-pub fn new_cid_v1(codec: Codec, mhash: Vec<u8>) -> Result<Cid> {
-    let hashlen = mhash.len();
-    // two 8 bytes (max) numbers plus hash
-    let mut buf = vec![0_u8; 2 * VARINT_64_MAX_BYTES + hashlen];
-    let mut n = 1_u64.encode_var(&mut buf);
-    let codec_type: u64 = codec.into();
-    n += codec_type.encode_var(&mut buf[n..]);
-
-    buf[n..n + hashlen].copy_from_slice(&mhash);
-
-    Ok(Cid::new(codec, Version::V1, &buf[..n + hashlen]))
+pub fn new_cid_v1(codec: Codec, mhash: Multihash) -> Result<Cid> {
+    Ok(Cid::new(codec, Version::V1, mhash.as_bytes()))
 }

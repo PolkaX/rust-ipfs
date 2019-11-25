@@ -16,11 +16,6 @@ version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "bit_utils"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -361,6 +356,7 @@ dependencies = [
  "multihash 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "primitives 0.1.0",
  "rust-cid 0.1.0",
+ "rust-ipfs-util 0.1.0",
  "thiserror 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -373,7 +369,6 @@ dependencies = [
  "multibase 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-multihash 0.2.0 (git+https://github.com/libp2p/rust-libp2p)",
  "thiserror 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "varint 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -384,7 +379,7 @@ version = "0.1.0"
 name = "rust-ipfs-util"
 version = "0.1.0"
 dependencies = [
- "multihash 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parity-multihash 0.2.0 (git+https://github.com/libp2p/rust-libp2p)",
 ]
 
 [[package]]
@@ -521,14 +516,6 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "varint"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bit_utils 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "winapi"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -551,7 +538,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum arrayref 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "0d382e583f07208808f6b1249e60848879ba3543f57c32277bf52d69c2f0f0ee"
 "checksum autocfg 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "1d49d90015b3c36167a20fe2810c5cd875ad504b39cff3d4eae7977e6b7c1cb2"
 "checksum base-x 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "1b20b618342cf9891c292c4f5ac2cde7287cc5c87e87e9c769d617793607dec1"
-"checksum bit_utils 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f8114dca45a04a4bdaf03de9976a3131cf954827757f971d84cd431a9f2cc26d"
 "checksum bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 "checksum blake2 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "94cb07b0da6a73955f8fb85d24c466778e70cda767a568229b104f0264089330"
 "checksum block-buffer 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a076c298b9ecdb530ed9d967e74a6027d6a7478924520acddcddc24c1c8ab3ab"
@@ -608,7 +594,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum typenum 1.11.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6d2783fe2d6b8c1101136184eb41be8b1ad379e4657050b8aaff0c79ee7575f9"
 "checksum unicode-xid 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
 "checksum unsigned-varint 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a7f0023a96687fe169081e8adce3f65e3874426b7886e9234d490af2dc077959"
-"checksum varint 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c37be5674e0be9c72790681999b0e6f09f03d3fc5d8904cfe2db615aad65887b"
 "checksum winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "8093091eeb260906a183e6ae1abdba2ef5ef2257a21801128899c3fc699229c6"
 "checksum winapi-i686-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 "checksum winapi-x86_64-pc-windows-gnu 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
