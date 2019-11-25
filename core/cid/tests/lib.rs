@@ -6,7 +6,7 @@ use rust_cid::{new_cid_v0, new_cid_v1, Cid, Codec, Error, MHashEnum, Prefix, Ver
 fn basic_marshalling() {
     let h = multihash::encode(multihash::Hash::SHA2256, b"beep boop").unwrap();
 
-    let cid = Cid::new(Codec::DagProtobuf, Version::V1, h.as_bytes());
+    let cid = Cid::new(Codec::DagProtobuf, Version::V1, h);
 
     let data = cid.to_bytes();
     let out = Cid::from(data).unwrap();
@@ -20,6 +20,28 @@ fn basic_marshalling() {
 }
 
 #[test]
+fn test_read_cids_from_buffer() {
+    let cid_strs = vec![
+        (
+            multibase::Base::Base32Lower,
+            "bafkreie5qrjvaw64n4tjm6hbnm7fnqvcssfed4whsjqxzslbd3jwhsk3mm",
+        ),
+        (
+            multibase::Base::Base58BTC,
+            "Qmf5Qzp6nGBku7CEn2UQx4mgN8TW69YUok36DrGa6NN893",
+        ),
+        (
+            multibase::Base::Base58BTC,
+            "zb2rhZi1JR4eNc2jBGaRYJKYM8JEB4ovenym8L1CmFsRAytkz",
+        ),
+    ];
+    for (base, cs) in cid_strs {
+        let cid = cs.parse::<Cid>().unwrap();
+        assert_eq!(cid.to_string_by_base(base), cs)
+    }
+}
+
+#[test]
 fn empty_string() {
     assert_eq!(Cid::from(""), Err(Error::InputTooShort));
 }
@@ -29,7 +51,7 @@ fn v0_handling() {
     let old = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n";
     let cid = Cid::from(old).unwrap();
 
-    assert_eq!(cid.version, Version::V0);
+    assert_eq!(cid.version(), Version::V0);
     assert_eq!(cid.to_string(), old);
 }
 
@@ -38,7 +60,7 @@ fn from_str() {
     let cid: Cid = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n"
         .parse()
         .unwrap();
-    assert_eq!(cid.version, Version::V0);
+    assert_eq!(cid.version(), Version::V0);
 
     let bad = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zIII".parse::<Cid>();
     assert_eq!(
@@ -65,10 +87,10 @@ fn prefix_roundtrip() {
     let data = b"awesome test content";
     let h = multihash::encode(multihash::Hash::SHA2256, data).unwrap();
 
-    let cid = Cid::new(Codec::DagProtobuf, Version::V1, h.as_bytes());
+    let cid = Cid::new(Codec::DagProtobuf, Version::V1, h);
     let prefix = cid.prefix();
 
-    let cid2 = Cid::new_from_prefix(&prefix, data);
+    let cid2 = Cid::new_from_prefix(&prefix, data).unwrap();
 
     assert_eq!(cid, cid2);
 
@@ -90,7 +112,7 @@ fn from() {
 
     for case in cases {
         let cid = Cid::from(case).unwrap();
-        assert_eq!(cid.version, Version::V0);
+        assert_eq!(cid.version(), Version::V0);
         assert_eq!(cid.to_string(), the_hash);
     }
 }
@@ -105,7 +127,7 @@ fn test_hash() {
         mh_len: 32,
     };
     let mut map = HashMap::new();
-    let cid = Cid::new_from_prefix(&prefix, &data);
+    let cid = Cid::new_from_prefix(&prefix, &data).unwrap();
     map.insert(cid.clone(), data.clone());
     assert_eq!(&data, map.get(&cid).unwrap());
 }

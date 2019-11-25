@@ -49,7 +49,7 @@ impl ToCid for str {
         let (_, decoded) = if Version::is_v0_str(hash) {
             // TODO: could avoid the roundtrip here and just use underlying
             // base-x base58btc decoder here.
-            let hash = multibase::Base::Base58btc.code().to_string() + &hash;
+            let hash = multibase::Base::Base58BTC.code().to_string() + &hash;
 
             multibase::decode(hash)
         } else {
@@ -79,9 +79,9 @@ impl ToCid for [u8] {
     fn to_cid(&self) -> Result<Cid> {
         if Version::is_v0_binary(self) {
             // Verify that hash can be decoded, this is very cheap
-            let _ = multihash::Multihash::from_bytes(self.to_vec())?;
+            let hash = multihash::Multihash::from_bytes(self.to_vec())?;
 
-            Ok(Cid::new(Codec::DagProtobuf, Version::V0, self))
+            Ok(Cid::new(Codec::DagProtobuf, Version::V0, hash))
         } else {
             let mut cur = Cursor::new(self);
             let raw_version = cur.read_varint()?;
@@ -93,9 +93,9 @@ impl ToCid for [u8] {
             let hash = &self[cur.position() as usize..];
 
             // Verify that hash can be decoded, this is very cheap
-            let _ = multihash::Multihash::from_bytes(hash.to_vec())?;
+            let multihash = multihash::Multihash::from_bytes(hash.to_vec())?;
 
-            Ok(Cid::new(codec, version, hash))
+            Ok(Cid::new(codec, version, multihash))
         }
     }
 }

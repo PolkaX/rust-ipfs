@@ -12,8 +12,8 @@ mod version;
 use integer_encoding::{VarIntReader, VarIntWriter};
 use std::fmt;
 use std::io::Cursor;
-use thiserror::Error;
 
+use multibase::Base;
 pub use multihash::{Hash as MHashEnum, Multihash};
 
 pub use codec::Codec;
@@ -24,9 +24,9 @@ pub use version::Version;
 /// Representation of a CID.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Cid {
-    pub version: Version,
-    pub codec: Codec,
-    pub hash: Vec<u8>,
+    version: Version,
+    codec: Codec,
+    hash: Multihash,
 }
 
 /// Prefix represents all metadata of a CID, without the actual content.
@@ -40,11 +40,11 @@ pub struct Prefix {
 
 impl Cid {
     /// Create a new CID.
-    pub fn new(codec: Codec, version: Version, hash: &[u8]) -> Cid {
+    pub fn new(codec: Codec, version: Version, hash: Multihash) -> Cid {
         Cid {
             version,
             codec,
-            hash: hash.into(),
+            hash,
         }
     }
 
@@ -54,21 +54,17 @@ impl Cid {
     }
 
     /// Create a new CID from a prefix and some data.
-    pub fn new_from_prefix(prefix: &Prefix, data: &[u8]) -> Cid {
-        let hash = multihash::encode(prefix.mh_type, data).unwrap();
-        let mut hash_vec = hash.into_bytes();
-        hash_vec.truncate(prefix.mh_len + 2);
-        Cid {
+    pub fn new_from_prefix(prefix: &Prefix, data: &[u8]) -> Result<Cid> {
+        let hash = multihash::encode(prefix.mh_type, data).map_err(Error::from)?;
+        Ok(Cid {
             version: prefix.version,
             codec: prefix.codec.to_owned(),
-            hash: hash_vec,
-        }
+            hash,
+        })
     }
 
     fn to_string_v0(&self) -> String {
-        use multibase::{encode, Base};
-
-        let mut string = encode(Base::Base58btc, self.hash.as_slice());
+        let mut string = multibase::encode(Base::Base58BTC, self.hash.as_bytes());
 
         // Drop the first character as v0 does not know
         // about multibase
@@ -77,28 +73,30 @@ impl Cid {
         string
     }
 
-    fn to_string_v1(&self) -> String {
-        use multibase::{encode, Base};
-
-        encode(Base::Base58btc, self.to_bytes().as_slice())
+    fn to_string_v1(&self, base: Base) -> String {
+        multibase::encode(base, self.to_bytes().as_slice())
     }
 
     pub fn to_string(&self) -> String {
+        self.to_string_by_base(multibase::Base::Base32Lower)
+    }
+
+    pub fn to_string_by_base(&self, v1_base: Base) -> String {
         match self.version {
             Version::V0 => self.to_string_v0(),
-            Version::V1 => self.to_string_v1(),
+            Version::V1 => self.to_string_v1(v1_base),
         }
     }
 
     fn to_bytes_v0(&self) -> Vec<u8> {
-        self.hash.clone()
+        self.hash.as_bytes().to_vec()
     }
 
     fn to_bytes_v1(&self) -> Vec<u8> {
         let mut res = Vec::with_capacity(16);
         res.write_varint(u64::from(self.version)).unwrap();
         res.write_varint(u64::from(self.codec)).unwrap();
-        res.extend_from_slice(&self.hash);
+        res.extend_from_slice(self.hash.as_bytes());
 
         res
     }
@@ -112,7 +110,7 @@ impl Cid {
 
     pub fn prefix(&self) -> Prefix {
         // Unwrap is safe, as this should have been validated on creation
-        let mh = Multihash::from_bytes(self.hash.clone()).unwrap();
+        let mh = self.multihash();
 
         Prefix {
             version: self.version,
@@ -120,6 +118,18 @@ impl Cid {
             mh_type: mh.algorithm(),
             mh_len: mh.digest().len(),
         }
+    }
+
+    pub fn multihash(&self) -> Multihash {
+        self.hash.clone()
+    }
+
+    pub fn version(&self) -> Version {
+        self.version
+    }
+
+    pub fn codec(&self) -> Codec {
+        self.codec
     }
 }
 
@@ -191,9 +201,9 @@ pub fn new_cid_v0(mhash: Multihash) -> Result<Cid> {
         return Err(Error::InvalidCidV0(mhash.algorithm(), mhash.digest().len()));
     }
 
-    Ok(Cid::new(Codec::DagProtobuf, Version::V0, mhash.as_bytes()))
+    Ok(Cid::new(Codec::DagProtobuf, Version::V0, mhash))
 }
 
 pub fn new_cid_v1(codec: Codec, mhash: Multihash) -> Result<Cid> {
-    Ok(Cid::new(codec, Version::V1, mhash.as_bytes()))
+    Ok(Cid::new(codec, Version::V1, mhash))
 }

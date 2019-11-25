@@ -3,7 +3,7 @@ mod error;
 use multihash;
 
 use primitives::Bytes;
-use rust_cid::{new_cid_v0, Cid};
+use rust_cid::{new_cid_v0, Cid, Multihash};
 
 pub use error::BlockFormatError;
 use ipfs_util::hash;
@@ -34,5 +34,9 @@ impl BasicBlock {
         }
 
         Ok(BasicBlock { data, cid })
+    }
+
+    pub fn multihash(&self) -> Multihash {
+        self.cid.multihash()
     }
 }
