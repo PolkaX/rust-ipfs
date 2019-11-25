@@ -14,3 +14,5 @@ multihash = "0.8.0"
 # local crate
 primitives = { path = "../primitives" }
 rust-cid = { path = "../cid" }
+
+ipfs-util = { package = "rust-ipfs-util", path = "../util" }

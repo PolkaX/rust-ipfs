@@ -2,9 +2,13 @@
 // This file is part of rust-ipfs.
 
 //! Shareable rust-ipfs common tools.
-use multihash::{encode, Hash as MHashEnum};
+use multihash::{encode, Hash as MHashEnum, Multihash};
 
-pub fn hash() -> Vec<u8> {}
+const DEFAULT_IPFS_HASH: MHashEnum = MHashEnum::SHA2256;
+
+pub fn hash(data: &[u8]) -> Multihash {
+    encode(DEFAULT_IPFS_HASH, data).expect("multihash failed to hash using SHA2_256.")
+}
 
 #[cfg(test)]
 mod tests {
