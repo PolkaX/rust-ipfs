@@ -29,6 +29,12 @@ impl From<Vec<u8>> for Bytes {
     }
 }
 
+impl From<&[u8]> for Bytes {
+    fn from(s: &[u8]) -> Self {
+        Bytes(s.to_vec())
+    }
+}
+
 impl Deref for Bytes {
     type Target = [u8];
     fn deref(&self) -> &[u8] {

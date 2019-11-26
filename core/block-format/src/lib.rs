@@ -1,4 +1,6 @@
 mod error;
+#[cfg(test)]
+mod tests;
 
 use multihash;
 
@@ -7,6 +9,7 @@ use rust_cid::{new_cid_v0, Cid, Multihash};
 
 pub use error::BlockFormatError;
 use ipfs_util::hash;
+use std::fmt::{Debug, Formatter, Error, Display};
 
 pub struct BasicBlock {
     cid: Cid,
@@ -38,5 +41,25 @@ impl BasicBlock {
 
     pub fn multihash(&self) -> Multihash {
         self.cid.multihash()
+    }
+
+    pub fn raw_data(&self) -> &Bytes {
+        &self.data
+    }
+
+    pub fn cid(&self) -> &Cid {
+        &self.cid
+    }
+}
+
+impl Debug for BasicBlock {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "[Block {:?}]", self)
+    }
+}
+
+impl Display for BasicBlock {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        Debug::fmt(self, f)
     }
 }
