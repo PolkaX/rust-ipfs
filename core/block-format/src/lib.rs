@@ -2,14 +2,13 @@ mod error;
 #[cfg(test)]
 mod tests;
 
-use multihash;
+use std::fmt::{Debug, Display, Error, Formatter};
 
+use ipfs_util::hash;
 use primitives::Bytes;
 use rust_cid::{new_cid_v0, Cid, Multihash};
 
 pub use error::BlockFormatError;
-use ipfs_util::hash;
-use std::fmt::{Debug, Formatter, Error, Display};
 
 pub struct BasicBlock {
     cid: Cid,

@@ -51,10 +51,14 @@ impl From<multihash::DecodeError> for Error {
 
 impl From<multihash::DecodeOwnedError> for Error {
     fn from(e: multihash::DecodeOwnedError) -> Error {
+        let mut buf = String::new();
+        buf.extend("0x".chars());
+        for i in e.data {
+            buf.extend(format!("{:02x}", i).chars());
+        }
         Error::ParsingError(format!(
-            "Multihash DecodeOwnedError, reason:{}, data: 0x{:}",
-            e.error,
-            hex::encode(e.data)
+            "Multihash DecodeOwnedError, reason:{}, data: {:}",
+            e.error, buf
         ))
     }
 }
