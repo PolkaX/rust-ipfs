@@ -11,6 +11,9 @@ edition = "2018"
 
 [workspace]
 members = [
+    "core/multibase",
+    "core/cid",
+    "core/primitives",
     "core/ipld/format",
     "core/block-format",
     "core/util",
