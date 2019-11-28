@@ -8,5 +8,9 @@ pub enum BlockFormatError {
     WrongHash(Cid, Cid),
 
     #[error("Cid Error {0}")]
-    CidError(CidErr),
+    CidError(
+        #[from]
+        #[source]
+        CidErr,
+    ),
 }

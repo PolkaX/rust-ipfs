@@ -640,7 +640,10 @@ dependencies = [
 name = "rust-ipld-format"
 version = "0.1.0"
 dependencies = [
+ "parity-multihash 0.2.0 (git+https://github.com/libp2p/rust-libp2p)",
  "rust-block-format 0.1.0",
+ "rust-cid 0.1.0",
+ "thiserror 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
