@@ -1,7 +1,9 @@
 use std::fmt::{Debug, Error, Formatter};
 
 mod error;
+mod merkledag;
 mod navipld;
+mod walker;
 
 #[cfg(test)]
 mod tests;
@@ -11,10 +13,10 @@ pub use error::*;
 pub trait Resolver {
     /// `resolve` resolves a path through this node, stopping at any link boundary
     /// and returning the object found as well as the remaining path to traverse
-    fn resolve(path: &[String]) -> Vec<String>;
+    fn resolve(&self, path: &[String]) -> Vec<String>;
     /// `tree` lists all paths within the object under 'path', and up to the given depth.
     /// To list the entire object (similar to `find .`) pass "" and -1
-    fn tree(path: &str, depth: i32) -> Vec<String>;
+    fn tree(&self, path: &str, depth: i32) -> Vec<String>;
 }
 
 /// Node must support deep copy
@@ -46,10 +48,15 @@ pub struct Link {
 /// NodeStat is a statistics object for a Node. Mostly sizes.
 pub struct NodeStat {
     hash: multihash::Multihash,
+    /// number of links in link table
     num_links: usize,
+    /// size of the raw, encoded data
     block_size: usize,
+    /// size of the links segment
     links_size: usize,
+    /// size of the data segment
     data_size: usize,
+    /// cumulative size of object and its references
     cumulative_size: usize,
 }
 
