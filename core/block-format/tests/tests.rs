@@ -1,4 +1,4 @@
-use crate::*;
+use rust_block_format::BasicBlock;
 use rust_cid::MHashEnum;
 
 #[test]
