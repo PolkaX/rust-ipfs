@@ -4,13 +4,12 @@ version = "0.1.0"
 authors = ["Aten <jincxmain@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 thiserror = "1.0"
+bytes = { version = "0.5", features = ["serde"] }
 
-# local crate
-primitives = { path = "../primitives" }
 rust-cid = { path = "../cid" }
-
 ipfs-util = { package = "rust-ipfs-util", path = "../util" }
+
+[dev-dependencies]
+multihash = { package = "parity-multihash", version = "0.2" }
