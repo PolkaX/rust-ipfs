@@ -42,12 +42,14 @@ impl BasicBlock {
     pub fn multihash(&self) -> Multihash {
         self.cid.multihash()
     }
+}
 
-    pub fn raw_data(&self) -> &Bytes {
+impl Block for BasicBlock {
+    fn raw_data(&self) -> &Bytes {
         &self.data
     }
 
-    pub fn cid(&self) -> &Cid {
+    fn cid(&self) -> &Cid {
         &self.cid
     }
 }

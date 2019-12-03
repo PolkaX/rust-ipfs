@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Error, Formatter};
 
+pub mod coding;
 mod error;
 mod merkledag;
 mod navipld;
@@ -23,7 +24,7 @@ pub trait Resolver {
 /// Node is the base interface all IPLD nodes must implement.
 ///
 /// Nodes are **Immutable** and all methods defined on the interface are
-pub trait Node: Resolver + block_format::Block + Clone {
+pub trait Node: Resolver + block_format::Block {
     /// `resolve_link` is a helper function that calls resolve and asserts the
     /// output is a link
     fn resolve_link(&self, path: &str, depth: i32) -> Vec<String>;
