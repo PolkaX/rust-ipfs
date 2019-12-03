@@ -23,4 +23,14 @@ impl<N: Node, NG: NodeGetter<N>> NavigableIPLDNode<N, NG> {
     }
 
     //    fn fetch_child(&self)
+
+    /// returns the IPLD `Node` wrapped into this structure.
+    pub fn get_ipld_node(&self) -> &N {
+        &self.node
+    }
+
+    /// returning the number of links (of child nodes) in this node.
+    pub fn child_total(&self) -> usize {
+        self.node.links().len()
+    }
 }
