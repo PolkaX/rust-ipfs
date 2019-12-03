@@ -34,7 +34,7 @@ impl Walker {
     }
 
     fn extend_path(&mut self, child: Box<dyn NavigableNode>) {
-        self.current_depth += 1;
+        self.current_depth.map(|ref mut dep| *dep += 1);
 
         
     }
