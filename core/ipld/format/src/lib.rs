@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Error, Formatter};
 
 pub mod coding;
+mod daghelpers;
 mod error;
 mod merkledag;
 mod navipld;
