@@ -55,7 +55,7 @@ impl Cid {
 
     /// Create a new CID from a prefix and some data.
     pub fn new_from_prefix(prefix: &Prefix, data: &[u8]) -> Result<Cid> {
-        let hash = multihash::encode(prefix.mh_type, data).map_err(Error::from)?;
+        let hash = multihash::encode(prefix.mh_type, data)?;
         Ok(Cid {
             version: prefix.version,
             codec: prefix.codec.to_owned(),

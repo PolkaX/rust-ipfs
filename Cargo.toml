@@ -6,4 +6,5 @@ members = [
     "core/ipld/format",
     "core/block-format",
     "core/util",
+    "core/merkledag",
 ]

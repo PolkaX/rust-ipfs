@@ -6,6 +6,11 @@ use rust_cid::{new_cid_v0, Cid, Multihash};
 
 use crate::error::BlockFormatError;
 
+pub trait Block {
+    fn raw_data(&self) -> &Bytes;
+    fn cid(&self) -> &Cid;
+}
+
 pub struct BasicBlock {
     cid: Cid,
     data: Bytes,
@@ -37,12 +42,14 @@ impl BasicBlock {
     pub fn multihash(&self) -> Multihash {
         self.cid.multihash()
     }
+}
 
-    pub fn raw_data(&self) -> &Bytes {
+impl Block for BasicBlock {
+    fn raw_data(&self) -> &Bytes {
         &self.data
     }
 
-    pub fn cid(&self) -> &Cid {
+    fn cid(&self) -> &Cid {
         &self.cid
     }
 }

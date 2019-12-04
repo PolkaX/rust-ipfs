@@ -7,5 +7,9 @@ pub enum BlockFormatError {
     #[error("data did not match given hash, fst: {0}, snd: {1}")]
     WrongHash(Cid, Cid),
     #[error("Cid Error {0}")]
-    CidError(CidErr),
+    CidError(
+        #[from]
+        #[source]
+        CidErr,
+    ),
 }
