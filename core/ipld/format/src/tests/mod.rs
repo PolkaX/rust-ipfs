@@ -1,11 +1,14 @@
 mod test_coding;
+mod test_dag_walker;
 
 use block_format::{BasicBlock, Block};
 use bytes::Bytes;
 use cid::{Cid, Codec, MHashEnum, Prefix, Version};
 
 use crate::error::*;
+use crate::walker::NavigableNode;
 use crate::{FormatError, Link, Node, NodeStat, Resolver};
+use std::sync::Arc;
 
 struct EmptyNode {
     cid: Cid,
@@ -62,5 +65,23 @@ impl Resolver for EmptyNode {
 
     fn tree(&self, path: &str, depth: i32) -> Vec<String> {
         unimplemented!()
+    }
+}
+
+struct N {
+    inner: EmptyNode,
+    child: Vec<Arc<dyn NavigableNode>>,
+}
+
+impl NavigableNode for N {
+    fn child_total(&self) -> usize {
+        self.child.len()
+    }
+
+    fn fetch_child(&self, child_index: usize) -> Result<Arc<dyn NavigableNode>> {
+        self.child
+            .get(child_index)
+            .map(|d| d.clone())
+            .ok_or(FormatError::NoChild(child_index))
     }
 }

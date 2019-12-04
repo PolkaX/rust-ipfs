@@ -1,39 +1,38 @@
+use std::sync::Arc;
+
 use crate::error::*;
+use crate::Node;
 
 pub struct Walker {
-    path: Vec<Box<dyn NavigableNode>>,
-    current_depth: Option<usize>,
-    child_index: Vec<usize>,
-    pause_requested: bool,
+    stack: Vec<Arc<dyn NavigableNode>>,
 }
 
-trait NavigableNode {
+pub trait NavigableNode {
     fn child_total(&self) -> usize;
-    fn fetch_child(&self, child_index: usize) -> Result<Box<dyn NavigableNode>>;
+    fn fetch_child(&self, child_index: usize) -> Result<Arc<dyn NavigableNode>>;
 }
 
 impl Walker {
-    pub fn new_walker(root: Box<dyn NavigableNode>) -> Walker {
-        Walker {
-            path: vec![root],
-            // None is "on top" of the root node
-            current_depth: None,
-            child_index: vec![0],
-            pause_requested: false,
-        }
+    pub fn new(root: Arc<dyn NavigableNode>) -> Walker {
+        Walker { stack: vec![root] }
     }
 
     /// ActiveNode returns the `NavigableNode` that `Walker` is pointing
     /// to at the moment. It changes when `up` or `down` is called.
-    pub fn active_node(&self) -> Result<&Box<dyn NavigableNode>> {
-        let dep = self.current_depth.ok_or(FormatError::DepthNotInit)?;
-        Ok(self
-            .path
-            .get(dep)
-            .ok_or(FormatError::DepthError(dep, self.path.len()))?)
+    pub fn active_node(&self) -> Result<&Arc<dyn NavigableNode>> {
+        self.stack.last().ok_or(FormatError::NextNoChild)
     }
+}
 
-    fn extend_path(&mut self, child: Box<dyn NavigableNode>) {
-        self.current_depth.map(|ref mut dep| *dep += 1);
+impl Iterator for Walker {
+    type Item = Arc<dyn NavigableNode>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let node = self.stack.pop()?;
+        for i in (0..node.child_total()).rev() {
+            let node = node.fetch_child(i).ok()?;
+            self.stack.push(node);
+        }
+        Some(node)
     }
 }
