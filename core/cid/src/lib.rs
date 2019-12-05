@@ -1,11 +1,12 @@
 // Copyright 2019-2020 PolkaX.
 // This file is part of rust-ipfs.
 
+//! Implementation of [cid](https://github.com/ipld/cid) in Rust.
+//! Fork from project [rust-cid](https://github.com/multiformats/rust-cid)
+//! But we provide more useful functions.
+
 mod codec;
 mod error;
-/// ! Implementation of [cid](https://github.com/ipld/cid) in Rust.
-/// Fork from project [rust-cid](https://github.com/multiformats/rust-cid)
-/// But we provide more useful functions.
 mod to_cid;
 mod version;
 
