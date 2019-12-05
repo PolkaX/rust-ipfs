@@ -1,40 +1,34 @@
-use base_x;
-use std::{error, fmt};
-
-/// Error types
+/// The custom error type
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Error {
-    UnknownBase,
-    InvalidBaseString,
+    /// Unknown base code
+    UnknownBase(u8),
+    /// Invalid character
+    InvalidCharacter,
 }
 
-pub type Result<T> = ::std::result::Result<T, Error>;
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(error::Error::description(self))
-    }
-}
-
-impl error::Error for Error {
-    fn description(&self) -> &str {
-        use Error::*;
-
-        match *self {
-            UnknownBase => "Unknown base",
-            InvalidBaseString => "Invalid base string",
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::UnknownBase(code) => write!(f, "Unknown base code: {}", code),
+            Error::InvalidCharacter => write!(f, "Invalid character"),
         }
     }
 }
 
-impl From<base_x::DecodeError> for Error {
-    fn from(_: base_x::DecodeError) -> Self {
-        Self::InvalidBaseString
+impl std::error::Error for Error {}
+
+impl From<bs58::decode::Error> for Error {
+    fn from(_: bs58::decode::Error) -> Self {
+        Error::InvalidCharacter
     }
 }
 
-impl From<base64::DecodeError> for Error {
-    fn from(_: base64::DecodeError) -> Self {
-        Self::InvalidBaseString
+impl From<data_encoding::DecodeError> for Error {
+    fn from(_: data_encoding::DecodeError) -> Self {
+        Error::InvalidCharacter
     }
 }
+
+/// The custom result type
+pub type Result<T> = std::result::Result<T, Error>;
