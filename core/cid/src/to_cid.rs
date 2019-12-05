@@ -1,8 +1,7 @@
-use integer_encoding::VarIntReader;
-use multibase;
-use multihash;
 use std::io::Cursor;
 use std::str::FromStr;
+
+use integer_encoding::VarIntReader;
 
 use crate::{Cid, Codec, Error, Result, Version};
 
@@ -49,7 +48,7 @@ impl ToCid for str {
         let (_, decoded) = if Version::is_v0_str(hash) {
             // TODO: could avoid the roundtrip here and just use underlying
             // base-x base58btc decoder here.
-            let hash = multibase::Base::Base58BTC.code().to_string() + &hash;
+            let hash = multibase::Base::Base58Btc.code().to_string() + &hash;
 
             multibase::decode(hash)
         } else {

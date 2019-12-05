@@ -1,9 +1,9 @@
-/// The custom error type
+/// The custom error type for `multibase`.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Error {
-    /// Unknown base code
+    /// Unknown base code.
     UnknownBase(u8),
-    /// Invalid character
+    /// Invalid character.
     InvalidCharacter,
 }
 
@@ -30,5 +30,5 @@ impl From<data_encoding::DecodeError> for Error {
     }
 }
 
-/// The custom result type
+/// The custom result type for `multibase`
 pub type Result<T> = std::result::Result<T, Error>;
