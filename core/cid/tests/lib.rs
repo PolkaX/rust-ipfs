@@ -27,11 +27,11 @@ fn test_read_cids_from_buffer() {
             "bafkreie5qrjvaw64n4tjm6hbnm7fnqvcssfed4whsjqxzslbd3jwhsk3mm",
         ),
         (
-            multibase::Base::Base58BTC,
+            multibase::Base::Base58Btc,
             "Qmf5Qzp6nGBku7CEn2UQx4mgN8TW69YUok36DrGa6NN893",
         ),
         (
-            multibase::Base::Base58BTC,
+            multibase::Base::Base58Btc,
             "zb2rhZi1JR4eNc2jBGaRYJKYM8JEB4ovenym8L1CmFsRAytkz",
         ),
     ];

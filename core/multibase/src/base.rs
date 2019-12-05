@@ -11,14 +11,14 @@ macro_rules! base_enum {
         }
 
         impl Base {
-            /// Get the corresponding base code.
+            /// Get the code corresponding to the base algorithm.
             pub fn code(&self) -> u8 {
                 match self {
                     $( Self::$base => $code, )*
                 }
             }
 
-            /// Returns the algorithm corresponding to a code, or `None` if no algorithm is matching.
+            /// Returns the algorithm corresponding to a code, or `Error` if no algorithm is matching.
             pub fn from_code(code: u8) -> Result<Self> {
         	    match code {
                     $( $code => Ok(Self::$base), )*
@@ -26,14 +26,14 @@ macro_rules! base_enum {
         	    }
             }
 
-            /// Encode with the given byte slice.
+            /// Encode the given byte slice to base string.
             pub fn encode<I: AsRef<[u8]>>(&self, input: I) -> String {
                 match self {
                     $( Self::$base => $base::encode(input), )*
                 }
             }
 
-            /// Decode with the given string.
+            /// Decode the base string.
             pub fn decode<I: AsRef<[u8]>>(&self, input: I) -> Result<Vec<u8>> {
                 match self {
                     $( Self::$base => $base::decode(input), )*
@@ -44,47 +44,47 @@ macro_rules! base_enum {
 }
 
 base_enum! {
-    /// 8-bit binary (encoder and decoder keeps data unmodified)
+    /// 8-bit binary (encoder and decoder keeps data unmodified).
     b'\0' => Identity,
-    /// Base2 (alphabet: 01)
+    /// Base2 (alphabet: 01).
     b'0' => Base2,
-    /// Base8 (alphabet: 01234567)
+    /// Base8 (alphabet: 01234567).
     b'7' => Base8,
-    /// Base10 (alphabet: 0123456789)
+    /// Base10 (alphabet: 0123456789).
     b'9' => Base10,
-    /// Base16 lower hexadecimal (alphabet: 0123456789abcdef)
+    /// Base16 lower hexadecimal (alphabet: 0123456789abcdef).
     b'f' => Base16Lower,
-    /// Base16 upper hexadecimal (alphabet: 0123456789ABCDEF)
+    /// Base16 upper hexadecimal (alphabet: 0123456789ABCDEF).
     b'F' => Base16Upper,
-     /// Base32, rfc4648 no padding (alphabet: abcdefghijklmnopqrstuvwxyz234567)
+     /// Base32, rfc4648 no padding (alphabet: abcdefghijklmnopqrstuvwxyz234567).
     b'b' => Base32Lower,
-    /// Base32, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567)
+    /// Base32, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567).
     b'B' => Base32Upper,
-    /// Base32, rfc4648 with padding (alphabet: abcdefghijklmnopqrstuvwxyz234567)
+    /// Base32, rfc4648 with padding (alphabet: abcdefghijklmnopqrstuvwxyz234567).
     b'c' => Base32PadLower,
-    /// Base32, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567)
+    /// Base32, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567).
     b'C' => Base32PadUpper,
-    /// Base32hex, rfc4648 no padding (alphabet: 0123456789abcdefghijklmnopqrstuv)
+    /// Base32hex, rfc4648 no padding (alphabet: 0123456789abcdefghijklmnopqrstuv).
     b'v' => Base32HexLower,
-    /// Base32hex, rfc4648 no padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV)
+    /// Base32hex, rfc4648 no padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV).
     b'V' => Base32HexUpper,
-    /// Base32hex, rfc4648 with padding (alphabet: 0123456789abcdefghijklmnopqrstuv)
+    /// Base32hex, rfc4648 with padding (alphabet: 0123456789abcdefghijklmnopqrstuv).
     b't' => Base32HexPadLower,
-    /// Base32hex, rfc4648 with padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV)
+    /// Base32hex, rfc4648 with padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV).
     b'T' => Base32HexPadUpper,
-    /// z-base-32 (used by Tahoe-LAFS) (alphabet: ybndrfg8ejkmcpqxot1uwisza345h769)
+    /// z-base-32 (used by Tahoe-LAFS) (alphabet: ybndrfg8ejkmcpqxot1uwisza345h769).
     b'h' => Base32Z,
-    /// Base58 flicker (alphabet: 123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ)
+    /// Base58 flicker (alphabet: 123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ).
     b'Z' => Base58Flickr,
-    /// Base58 bitcoin (alphabet: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz)
+    /// Base58 bitcoin (alphabet: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz).
     b'z' => Base58Btc,
-    /// Base64, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/)
+    /// Base64, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/).
     b'm' => Base64,
-    /// Base64, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/)
+    /// Base64, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/).
     b'M' => Base64Pad,
-    /// Base64 url, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_)
+    /// Base64 url, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_).
     b'u' => Base64Url,
-    /// Base64 url, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_)
+    /// Base64 url, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_).
     b'U' => Base64UrlPad,
 }
 
@@ -96,9 +96,9 @@ trait BaseCodec {
     fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>>;
 }
 
-/// Identity, 8-bit binary (encoder and decoder keeps data unmodified)
+/// Identity, 8-bit binary (encoder and decoder keeps data unmodified).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Identity;
+struct Identity;
 
 impl BaseCodec for Identity {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -110,9 +110,9 @@ impl BaseCodec for Identity {
     }
 }
 
-/// Base2 (alphabet: 01)
+/// Base2 (alphabet: 01).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base2;
+struct Base2;
 
 impl BaseCodec for Base2 {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -124,9 +124,9 @@ impl BaseCodec for Base2 {
     }
 }
 
-/// Base8 (alphabet: 01234567)
+/// Base8 (alphabet: 01234567).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base8;
+struct Base8;
 
 impl BaseCodec for Base8 {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -138,9 +138,9 @@ impl BaseCodec for Base8 {
     }
 }
 
-/// Base10 (alphabet: 0123456789)
+/// Base10 (alphabet: 0123456789).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base10;
+struct Base10;
 
 impl BaseCodec for Base10 {
     fn encode<I: AsRef<[u8]>>(_input: I) -> String {
@@ -152,9 +152,9 @@ impl BaseCodec for Base10 {
     }
 }
 
-/// Base16 lower hexadecimal (alphabet: 0123456789abcdef)
+/// Base16 lower hexadecimal (alphabet: 0123456789abcdef).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base16Lower;
+struct Base16Lower;
 
 impl BaseCodec for Base16Lower {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -166,9 +166,9 @@ impl BaseCodec for Base16Lower {
     }
 }
 
-/// Base16 upper hexadecimal (alphabet: 0123456789ABCDEF)
+/// Base16 upper hexadecimal (alphabet: 0123456789ABCDEF).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base16Upper;
+struct Base16Upper;
 
 impl BaseCodec for Base16Upper {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -180,9 +180,9 @@ impl BaseCodec for Base16Upper {
     }
 }
 
-/// Base32, rfc4648 no padding (alphabet: abcdefghijklmnopqrstuvwxyz234567)
+/// Base32, rfc4648 no padding (alphabet: abcdefghijklmnopqrstuvwxyz234567).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32Lower;
+struct Base32Lower;
 
 impl BaseCodec for Base32Lower {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -195,9 +195,9 @@ impl BaseCodec for Base32Lower {
     }
 }
 
-/// Base32, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567)
+/// Base32, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32Upper;
+struct Base32Upper;
 
 impl BaseCodec for Base32Upper {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -209,9 +209,9 @@ impl BaseCodec for Base32Upper {
     }
 }
 
-/// Base32, rfc4648 with padding (alphabet: abcdefghijklmnopqrstuvwxyz234567)
+/// Base32, rfc4648 with padding (alphabet: abcdefghijklmnopqrstuvwxyz234567).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32PadLower;
+struct Base32PadLower;
 
 impl BaseCodec for Base32PadLower {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -224,9 +224,9 @@ impl BaseCodec for Base32PadLower {
     }
 }
 
-/// Base32, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567)
+/// Base32, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32PadUpper;
+struct Base32PadUpper;
 
 impl BaseCodec for Base32PadUpper {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -238,9 +238,9 @@ impl BaseCodec for Base32PadUpper {
     }
 }
 
-/// Base32hex, rfc4648 no padding (alphabet: 0123456789abcdefghijklmnopqrstuv)
+/// Base32hex, rfc4648 no padding (alphabet: 0123456789abcdefghijklmnopqrstuv).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32HexLower;
+struct Base32HexLower;
 
 impl BaseCodec for Base32HexLower {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -253,9 +253,9 @@ impl BaseCodec for Base32HexLower {
     }
 }
 
-/// Base32hex, rfc4648 no padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV)
+/// Base32hex, rfc4648 no padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32HexUpper;
+struct Base32HexUpper;
 
 impl BaseCodec for Base32HexUpper {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -267,9 +267,9 @@ impl BaseCodec for Base32HexUpper {
     }
 }
 
-/// Base32hex, rfc4648 with padding (alphabet: 0123456789abcdefghijklmnopqrstuv)
+/// Base32hex, rfc4648 with padding (alphabet: 0123456789abcdefghijklmnopqrstuv).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32HexPadLower;
+struct Base32HexPadLower;
 
 impl BaseCodec for Base32HexPadLower {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -282,9 +282,9 @@ impl BaseCodec for Base32HexPadLower {
     }
 }
 
-/// Base32hex, rfc4648 with padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV)
+/// Base32hex, rfc4648 with padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32HexPadUpper;
+struct Base32HexPadUpper;
 
 impl BaseCodec for Base32HexPadUpper {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -296,9 +296,9 @@ impl BaseCodec for Base32HexPadUpper {
     }
 }
 
-/// z-base-32 (used by Tahoe-LAFS) (alphabet: ybndrfg8ejkmcpqxot1uwisza345h769)
+/// z-base-32 (used by Tahoe-LAFS) (alphabet: ybndrfg8ejkmcpqxot1uwisza345h769).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base32Z;
+struct Base32Z;
 
 impl BaseCodec for Base32Z {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -310,9 +310,9 @@ impl BaseCodec for Base32Z {
     }
 }
 
-/// Base58 flicker (alphabet: 123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ)
+/// Base58 flicker (alphabet: 123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base58Flickr;
+struct Base58Flickr;
 
 impl BaseCodec for Base58Flickr {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -328,9 +328,9 @@ impl BaseCodec for Base58Flickr {
     }
 }
 
-/// Base58 bitcoin (alphabet: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz)
+/// Base58 bitcoin (alphabet: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base58Btc;
+struct Base58Btc;
 
 impl BaseCodec for Base58Btc {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -346,9 +346,9 @@ impl BaseCodec for Base58Btc {
     }
 }
 
-/// Base64, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/)
+/// Base64, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base64;
+struct Base64;
 
 impl BaseCodec for Base64 {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -360,9 +360,9 @@ impl BaseCodec for Base64 {
     }
 }
 
-/// Base64, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/)
+/// Base64, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base64Pad;
+struct Base64Pad;
 
 impl BaseCodec for Base64Pad {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -374,9 +374,9 @@ impl BaseCodec for Base64Pad {
     }
 }
 
-/// Base64 url, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_)
+/// Base64 url, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base64Url;
+struct Base64Url;
 
 impl BaseCodec for Base64Url {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {
@@ -388,9 +388,9 @@ impl BaseCodec for Base64Url {
     }
 }
 
-/// Base64 url, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_)
+/// Base64 url, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_).
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub struct Base64UrlPad;
+struct Base64UrlPad;
 
 impl BaseCodec for Base64UrlPad {
     fn encode<I: AsRef<[u8]>>(input: I) -> String {

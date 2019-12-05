@@ -1,9 +1,7 @@
-use std::io;
-
 use multihash::Hash as MHashEnum;
 use thiserror::Error;
 
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Error types
 #[derive(Error, Debug)]
@@ -22,8 +20,8 @@ pub enum Error {
     InvalidCidVersion,
 }
 
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Error {
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Error {
         Error::ParsingError(Box::new(e))
     }
 }

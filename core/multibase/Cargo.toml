@@ -1,14 +1,13 @@
 [package]
 name = "rust-multibase"
 version = "0.1.0"
-authors = ["koushiro <koushiro.cqx@gmail.com>"]
+authors = ["PolkaX <https://github.com/PolkaX>"]
 edition = "2018"
 
-license = "MIT"
-readme = "README.md"
+license = "MIT/Apache-2.0"
 repository = "https://github.com/PolkaX/rust-ipfs"
 description = "Implementation of the multibase format"
-keywords = ["multibase", "ipfs"]
+keywords = ["ipfs", "multiformat", "multibase"]
 
 [dependencies]
 data-encoding = "2.1"

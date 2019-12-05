@@ -1,8 +1,13 @@
 [package]
 name = "rust-cid"
 version = "0.1.0"
-authors = ["Aten <jincxmain@gmail.com>"]
+authors = ["PolkaX <https://github.com/PolkaX>"]
 edition = "2018"
+
+license = "MIT/Apache-2.0"
+repository = "https://github.com/PolkaX/rust-ipfs"
+description = "Implementation of the cid"
+keywords = ["ipfs", "cid"]
 
 [dependencies]
 thiserror = "1.0"
