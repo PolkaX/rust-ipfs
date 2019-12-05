@@ -1,44 +1,47 @@
-/// ! # multibase
-/// !
-/// ! Implementation of [multibase](https://github.com/multiformats/multibase) in Rust.
+//! # rust-multibase
+//!
+//! Implementation of [multibase](https://github.com/multiformats/multibase) in Rust.
+
+#![deny(missing_docs)]
+
 mod base;
+mod encoding;
 mod error;
 
-pub use base::Base;
-pub use error::{Error, Result};
+pub use self::base::Base;
+pub use self::error::{Error, Result};
 
-/// Decode the string.
+/// Decode the base string .
 ///
 /// # Examples
 ///
 /// ```
 /// use rust_multibase::{Base, decode};
 ///
-/// assert_eq!(decode("zCn8eVZg").unwrap(),
-///            (Base::Base58BTC, b"hello".to_vec()));
+/// assert_eq!(
+///     decode("zCn8eVZg").unwrap(),
+///     (Base::Base58Btc, b"hello".to_vec()),
+/// );
 /// ```
-pub fn decode<T: AsRef<str>>(input: T) -> Result<(Base, Vec<u8>)> {
+pub fn decode<I: AsRef<[u8]>>(input: I) -> Result<(Base, Vec<u8>)> {
     let input = input.as_ref();
-    let code = input.chars().next().ok_or(Error::InvalidBaseString)?;
-    let base = Base::from_code(code)?;
-    let content = &input[code.len_utf8()..];
-    let decoded = base.decode(content)?;
+    let code = input.iter().next().ok_or(Error::InvalidCharacter)?;
+    let base = Base::from_code(*code)?;
+    let decoded = base.decode(&input[1..])?;
     Ok((base, decoded))
 }
 
-/// Encode with the given string
+/// Encode the given byte slice to base string.
 ///
 /// # Examples
 ///
 /// ```
 /// use rust_multibase::{Base, encode};
 ///
-/// assert_eq!(encode(Base::Base58BTC, b"hello"),
-///            "zCn8eVZg");
+/// assert_eq!(encode(Base::Base58Btc, b"hello"), "zCn8eVZg");
 /// ```
-pub fn encode<T: AsRef<[u8]>>(base: Base, input: T) -> String {
-    let input = input.as_ref();
-    let mut encoded = base.encode(input.as_ref());
-    encoded.insert(0, base.code());
+pub fn encode<I: AsRef<[u8]>>(base: Base, input: I) -> String {
+    let mut encoded = base.encode(input);
+    encoded.insert(0, base.code().into());
     encoded
 }
