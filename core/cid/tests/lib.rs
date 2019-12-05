@@ -43,7 +43,7 @@ fn test_read_cids_from_buffer() {
 
 #[test]
 fn empty_string() {
-    assert_eq!(Cid::from(""), Err(Error::InputTooShort));
+    assert!(Cid::from("").is_err());
 }
 
 #[test]
@@ -63,23 +63,13 @@ fn from_str() {
     assert_eq!(cid.version(), Version::V0);
 
     let bad = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zIII".parse::<Cid>();
-    assert_eq!(
-        bad,
-        Err(Error::ParsingError(format!(
-            "Multibase, reason: Invalid base string"
-        )))
-    );
+    assert!(bad.is_err());
 }
 
 #[test]
 fn v0_error() {
     let bad = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zIII";
-    assert_eq!(
-        Cid::from(bad),
-        Err(Error::ParsingError(format!(
-            "Multibase, reason: Invalid base string"
-        )))
-    );
+    assert!(Cid::from(bad).is_err());
 }
 
 #[test]

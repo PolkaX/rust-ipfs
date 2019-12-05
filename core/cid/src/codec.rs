@@ -2,7 +2,7 @@ use crate::{Error, Result};
 
 macro_rules! build_codec_enum {
     {$( $val:expr => $var:ident, )*} => {
-        #[derive(PartialEq, Eq, Clone, Copy, Debug)]
+        #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
         pub enum Codec {
             $( $var, )*
         }
