@@ -1,14 +1,18 @@
 [package]
 name = "rust-ipld-format"
 version = "0.1.0"
-authors = ["Aten <jincxmain@gmail.com>"]
+authors = ["PolkaX <https://github.com/PolkaX>"]
 edition = "2018"
+
+license = "MIT/Apache-2.0"
+repository = "https://github.com/PolkaX/rust-ipfs"
+description = "Implementation of the ipld format"
+keywords = ["ipfs", "ipld", "format"]
 
 [dependencies]
 thiserror = "1.0"
-lazy_static = "1.3"
-
-multihash = { package = "parity-multihash", git = "https://github.com/libp2p/rust-libp2p" }
+lazy_static = "1.4"
+multihash = { package = "parity-multihash", version = "0.2" }
 
 block-format = { package = "rust-block-format", path = "../../block-format" }
 cid = { package = "rust-cid", path = "../../cid" }

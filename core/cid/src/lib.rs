@@ -1,25 +1,26 @@
 // Copyright 2019-2020 PolkaX.
 // This file is part of rust-ipfs.
 
+//! Implementation of [cid](https://github.com/ipld/cid) in Rust.
+//! Fork from project [rust-cid](https://github.com/multiformats/rust-cid)
+//! But we provide more useful functions.
+
 mod codec;
 mod error;
-/// ! Implementation of [cid](https://github.com/ipld/cid) in Rust.
-/// Fork from project [rust-cid](https://github.com/multiformats/rust-cid)
-/// But we provide more useful functions.
 mod to_cid;
 mod version;
 
-use integer_encoding::{VarIntReader, VarIntWriter};
 use std::fmt;
 use std::io::Cursor;
 
+use integer_encoding::{VarIntReader, VarIntWriter};
 use multibase::Base;
 pub use multihash::{Hash as MHashEnum, Multihash};
 
-pub use codec::Codec;
-pub use error::{Error, Result};
-pub use to_cid::ToCid;
-pub use version::Version;
+pub use self::codec::Codec;
+pub use self::error::{Error, Result};
+pub use self::to_cid::ToCid;
+pub use self::version::Version;
 
 /// Representation of a CID.
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -64,10 +65,9 @@ impl Cid {
     }
 
     fn to_string_v0(&self) -> String {
-        let mut string = multibase::encode(Base::Base58BTC, self.hash.as_bytes());
+        let mut string = multibase::encode(Base::Base58Btc, self.hash.as_bytes());
 
-        // Drop the first character as v0 does not know
-        // about multibase
+        // Drop the first character as v0 does not know about multibase
         string.remove(0);
 
         string
@@ -161,10 +161,10 @@ impl Prefix {
         let mh_len = cur.read_varint()?;
 
         Ok(Prefix {
-            version: version,
-            codec: codec,
-            mh_type: mh_type,
-            mh_len: mh_len,
+            version,
+            codec,
+            mh_type,
+            mh_len,
         })
     }
 

@@ -1,69 +1,40 @@
-use crate::{Error, Result};
-use std::str;
-
-trait BaseImpl {
-    /// Encode a byte slice.
-    fn encode(input: &[u8]) -> String;
-
-    /// Decode a string.
-    fn decode(input: &str) -> Result<Vec<u8>>;
-}
-
-macro_rules! base_x {
-    ($name:ident, $alphabet:expr) => {
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-        pub struct $name;
-
-        impl $name {
-            /// Get the matching alphabet.
-            fn alphabet() -> &'static [u8] {
-                $alphabet
-            }
-        }
-
-        impl BaseImpl for $name {
-            fn encode(input: &[u8]) -> String {
-                let alphabet = Self::alphabet();
-                base_x::encode(alphabet, input)
-            }
-
-            fn decode(input: &str) -> Result<Vec<u8>> {
-                let alphabet = Self::alphabet();
-                let decoded = base_x::decode(alphabet, input)?;
-                Ok(decoded)
-            }
-        }
-    };
-}
+use crate::error::{Error, Result};
 
 macro_rules! base_enum {
-    ( $($code:expr => $base:ident,)* ) => {
-        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    ( $(#[$attr:meta] $code:expr => $base:ident,)* ) => {
+        /// List of types currently supported in the multibase spec.
+        ///
+        /// Not all base types are supported by this library.
+        #[derive(PartialEq, Eq, Clone, Copy, Debug)]
         pub enum Base {
-            $( $base, )*
+            $( #[$attr] $base, )*
         }
 
         impl Base {
-            pub fn from_code(code: char) -> Result<Self> {
-        	match code {
-                    $( $code => Ok(Self::$base), )*
-            	    _ => Err(Error::UnknownBase),
-        	}
-            }
-
-            pub fn code(&self) -> char {
+            /// Get the code corresponding to the base algorithm.
+            pub fn code(&self) -> u8 {
                 match self {
                     $( Self::$base => $code, )*
                 }
             }
 
-            pub fn encode(&self, input: &[u8]) -> String {
+            /// Returns the algorithm corresponding to a code, or `Error` if no algorithm is matching.
+            pub fn from_code(code: u8) -> Result<Self> {
+        	    match code {
+                    $( $code => Ok(Self::$base), )*
+            	    _ => Err(Error::UnknownBase(code)),
+        	    }
+            }
+
+            /// Encode the given byte slice to base string.
+            pub fn encode<I: AsRef<[u8]>>(&self, input: I) -> String {
                 match self {
                     $( Self::$base => $base::encode(input), )*
                 }
             }
 
-            pub fn decode(&self, input: &str) -> Result<Vec<u8>> {
+            /// Decode the base string.
+            pub fn decode<I: AsRef<[u8]>>(&self, input: I) -> Result<Vec<u8>> {
                 match self {
                     $( Self::$base => $base::decode(input), )*
                 }
@@ -72,221 +43,363 @@ macro_rules! base_enum {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Identity;
-
-impl BaseImpl for Identity {
-    fn encode(input: &[u8]) -> String {
-        format!("{:}{:}", '\0', unsafe { str::from_utf8_unchecked(input) })
-    }
-
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        Ok(input[1..].as_bytes().to_vec())
-    }
-}
-
-// binary has 1 and 0
-//base_x!(Base2, b"01");
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base2;
-
-impl BaseImpl for Base2 {
-    fn encode(input: &[u8]) -> String {
-        let mut dst = vec!['\0'; input.len() * 8];
-        for (i, b) in input.iter().enumerate() {
-            for j in 0..8 {
-                if b & (1 << (7 - j)) == 0 {
-                    dst[i * 8 + j] = '0'
-                } else {
-                    dst[i * 8 + j] = '1'
-                }
-            }
-        }
-        dst.into_iter().collect()
-    }
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        let s = if (input.len() & 7) != 0 {
-            let mut s = vec!['0'; 8 - input.len() & 7];
-            s.extend(input.chars());
-            s
-        } else {
-            input.chars().into_iter().collect()
-        };
-
-        let mut buf = vec![];
-        for i in (0..s.len()).step_by(8) {
-            let num_binanry: String = s[i..i + 8].into_iter().collect();
-            let s = u8::from_str_radix(&num_binanry, 2).map_err(|_| Error::InvalidBaseString)?;
-            buf.push(s);
-        }
-
-        Ok(buf)
-    }
-}
-
-// highest char in octal
-base_x!(Base8, b"01234567");
-// highest char in decimal
-base_x!(Base10, b"0123456789");
-// highest char in hex
-base_x!(Base16Upper, b"0123456789ABCDEF");
-base_x!(Base16Lower, b"0123456789abcdef");
-// highest letter
-base_x!(
-    Base58Flickr,
-    b"123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ"
-);
-// highest letter
-base_x!(
-    Base58BTC,
-    b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-);
-
-/// rfc4648 no padding
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base32Lower;
-
-impl BaseImpl for Base32Lower {
-    fn encode(input: &[u8]) -> String {
-        Base32UpperNoPad::encode(input).to_ascii_lowercase()
-    }
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        let upper = input.to_ascii_uppercase();
-        Base32UpperNoPad::decode(&upper)
-    }
-}
-
-/// rfc4648 no padding
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base32UpperNoPad;
-
-impl BaseImpl for Base32UpperNoPad {
-    fn encode(input: &[u8]) -> String {
-        base32::encode(base32::Alphabet::RFC4648 { padding: false }, input)
-    }
-
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        if let Some(result) = base32::decode(base32::Alphabet::RFC4648 { padding: false }, input) {
-            Ok(result)
-        } else {
-            Err(Error::InvalidBaseString)
-        }
-    }
-}
-
-/// rfc4648 with padding
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base32LowerPad;
-
-impl BaseImpl for Base32LowerPad {
-    fn encode(input: &[u8]) -> String {
-        Base32UpperPad::encode(input).to_ascii_lowercase()
-    }
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        let upper = input.to_ascii_uppercase();
-        Base32UpperPad::decode(&upper)
-    }
-}
-
-/// rfc4648 with padding
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base32UpperPad;
-
-impl BaseImpl for Base32UpperPad {
-    fn encode(input: &[u8]) -> String {
-        base32::encode(base32::Alphabet::RFC4648 { padding: true }, input)
-    }
-
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        if let Some(result) = base32::decode(base32::Alphabet::RFC4648 { padding: true }, input) {
-            Ok(result)
-        } else {
-            Err(Error::InvalidBaseString)
-        }
-    }
-}
-
-/// rfc4648 no padding
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base64UpperNoPad;
-
-impl BaseImpl for Base64UpperNoPad {
-    fn encode(input: &[u8]) -> String {
-        base64::encode_config(input, base64::STANDARD_NO_PAD)
-    }
-
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        let result = base64::decode_config(input, base64::STANDARD_NO_PAD)?;
-        Ok(result)
-    }
-}
-
-/// rfc4648 with padding
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base64UpperPad;
-
-impl BaseImpl for Base64UpperPad {
-    fn encode(input: &[u8]) -> String {
-        base64::encode_config(input, base64::STANDARD)
-    }
-
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        let result = base64::decode_config(input, base64::STANDARD)?;
-        Ok(result)
-    }
-}
-
-/// rfc4648 no padding
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base64UrlUpperNoPad;
-
-impl BaseImpl for Base64UrlUpperNoPad {
-    fn encode(input: &[u8]) -> String {
-        base64::encode_config(input, base64::URL_SAFE_NO_PAD)
-    }
-
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        let result = base64::decode_config(input, base64::URL_SAFE_NO_PAD)?;
-        Ok(result)
-    }
-}
-
-/// rfc4648 with padding
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Base64UrlUpperPad;
-
-impl BaseImpl for Base64UrlUpperPad {
-    fn encode(input: &[u8]) -> String {
-        base64::encode_config(input, base64::URL_SAFE)
-    }
-
-    fn decode(input: &str) -> Result<Vec<u8>> {
-        let result = base64::decode_config(input, base64::URL_SAFE)?;
-        Ok(result)
-    }
-}
-
 base_enum! {
-    '\0' => Identity,
-    '0' => Base2,
-    '7' => Base8,
-    '9' => Base10,
-    'f' => Base16Lower,
-    'F' => Base16Upper,
-    'b' => Base32Lower,
-    'B' => Base32UpperNoPad,
-    'c' => Base32LowerPad,
-    'C' => Base32UpperPad,
-//    'v' => Base32HexLower,
-//    'V' => Base32HexUpper,
-//    't' => Base32HexLowerPad,
-//    'T' => Base32HexUpperPad,
-    'z' => Base58BTC,
-    'Z' => Base58Flickr,
-    'm' => Base64UpperNoPad,
-    'M' => Base64UpperPad,
-    'u' => Base64UrlUpperNoPad,
-    'U' => Base64UrlUpperPad,
+    /// 8-bit binary (encoder and decoder keeps data unmodified).
+    b'\0' => Identity,
+    /// Base2 (alphabet: 01).
+    b'0' => Base2,
+    /// Base8 (alphabet: 01234567).
+    b'7' => Base8,
+    /// Base10 (alphabet: 0123456789).
+    b'9' => Base10,
+    /// Base16 lower hexadecimal (alphabet: 0123456789abcdef).
+    b'f' => Base16Lower,
+    /// Base16 upper hexadecimal (alphabet: 0123456789ABCDEF).
+    b'F' => Base16Upper,
+     /// Base32, rfc4648 no padding (alphabet: abcdefghijklmnopqrstuvwxyz234567).
+    b'b' => Base32Lower,
+    /// Base32, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567).
+    b'B' => Base32Upper,
+    /// Base32, rfc4648 with padding (alphabet: abcdefghijklmnopqrstuvwxyz234567).
+    b'c' => Base32PadLower,
+    /// Base32, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567).
+    b'C' => Base32PadUpper,
+    /// Base32hex, rfc4648 no padding (alphabet: 0123456789abcdefghijklmnopqrstuv).
+    b'v' => Base32HexLower,
+    /// Base32hex, rfc4648 no padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV).
+    b'V' => Base32HexUpper,
+    /// Base32hex, rfc4648 with padding (alphabet: 0123456789abcdefghijklmnopqrstuv).
+    b't' => Base32HexPadLower,
+    /// Base32hex, rfc4648 with padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV).
+    b'T' => Base32HexPadUpper,
+    /// z-base-32 (used by Tahoe-LAFS) (alphabet: ybndrfg8ejkmcpqxot1uwisza345h769).
+    b'h' => Base32Z,
+    /// Base58 flicker (alphabet: 123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ).
+    b'Z' => Base58Flickr,
+    /// Base58 bitcoin (alphabet: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz).
+    b'z' => Base58Btc,
+    /// Base64, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/).
+    b'm' => Base64,
+    /// Base64, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/).
+    b'M' => Base64Pad,
+    /// Base64 url, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_).
+    b'u' => Base64Url,
+    /// Base64 url, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_).
+    b'U' => Base64UrlPad,
+}
+
+trait BaseCodec {
+    /// Encode with the given byte slice.
+    fn encode<I: AsRef<[u8]>>(input: I) -> String;
+
+    /// Decode with the given byte slice.
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>>;
+}
+
+/// Identity, 8-bit binary (encoder and decoder keeps data unmodified).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Identity;
+
+impl BaseCodec for Identity {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        unsafe { String::from_utf8_unchecked(input.as_ref().to_vec()) }
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(input.as_ref().to_vec())
+    }
+}
+
+/// Base2 (alphabet: 01).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base2;
+
+impl BaseCodec for Base2 {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        crate::encoding::BASE2.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(crate::encoding::BASE2.decode(input.as_ref())?)
+    }
+}
+
+/// Base8 (alphabet: 01234567).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base8;
+
+impl BaseCodec for Base8 {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        crate::encoding::BASE8.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(crate::encoding::BASE8.decode(input.as_ref())?)
+    }
+}
+
+/// Base10 (alphabet: 0123456789).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base10;
+
+impl BaseCodec for Base10 {
+    fn encode<I: AsRef<[u8]>>(_input: I) -> String {
+        unimplemented!("Base10 encoding is unimplemented")
+    }
+
+    fn decode<I: AsRef<[u8]>>(_input: I) -> Result<Vec<u8>> {
+        unimplemented!("Base10 encoding is unimplemented")
+    }
+}
+
+/// Base16 lower hexadecimal (alphabet: 0123456789abcdef).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base16Lower;
+
+impl BaseCodec for Base16Lower {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::HEXLOWER.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::HEXLOWER.decode(input.as_ref())?)
+    }
+}
+
+/// Base16 upper hexadecimal (alphabet: 0123456789ABCDEF).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base16Upper;
+
+impl BaseCodec for Base16Upper {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::HEXUPPER.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::HEXUPPER.decode(input.as_ref())?)
+    }
+}
+
+/// Base32, rfc4648 no padding (alphabet: abcdefghijklmnopqrstuvwxyz234567).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32Lower;
+
+impl BaseCodec for Base32Lower {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        Base32Upper::encode(input).to_ascii_lowercase()
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        let upper = input.as_ref().to_ascii_uppercase();
+        Base32Upper::decode(upper)
+    }
+}
+
+/// Base32, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32Upper;
+
+impl BaseCodec for Base32Upper {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::BASE32_NOPAD.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE32_NOPAD.decode(input.as_ref())?)
+    }
+}
+
+/// Base32, rfc4648 with padding (alphabet: abcdefghijklmnopqrstuvwxyz234567).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32PadLower;
+
+impl BaseCodec for Base32PadLower {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        Base32PadUpper::encode(input).to_ascii_lowercase()
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        let upper = input.as_ref().to_ascii_uppercase();
+        Base32PadUpper::decode(upper)
+    }
+}
+
+/// Base32, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZ234567).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32PadUpper;
+
+impl BaseCodec for Base32PadUpper {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::BASE32.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE32.decode(input.as_ref())?)
+    }
+}
+
+/// Base32hex, rfc4648 no padding (alphabet: 0123456789abcdefghijklmnopqrstuv).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32HexLower;
+
+impl BaseCodec for Base32HexLower {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        Base32HexUpper::encode(input).to_ascii_lowercase()
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        let upper = input.as_ref().to_ascii_uppercase();
+        Base32HexUpper::decode(upper)
+    }
+}
+
+/// Base32hex, rfc4648 no padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32HexUpper;
+
+impl BaseCodec for Base32HexUpper {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::BASE32HEX_NOPAD.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE32HEX_NOPAD.decode(input.as_ref())?)
+    }
+}
+
+/// Base32hex, rfc4648 with padding (alphabet: 0123456789abcdefghijklmnopqrstuv).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32HexPadLower;
+
+impl BaseCodec for Base32HexPadLower {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        Base32HexPadUpper::encode(input).to_ascii_lowercase()
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        let upper = input.as_ref().to_ascii_uppercase();
+        Base32HexPadUpper::decode(upper)
+    }
+}
+
+/// Base32hex, rfc4648 with padding (alphabet: 0123456789ABCDEFGHIJKLMNOPQRSTUV).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32HexPadUpper;
+
+impl BaseCodec for Base32HexPadUpper {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::BASE32HEX.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE32HEX.decode(input.as_ref())?)
+    }
+}
+
+/// z-base-32 (used by Tahoe-LAFS) (alphabet: ybndrfg8ejkmcpqxot1uwisza345h769).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base32Z;
+
+impl BaseCodec for Base32Z {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        crate::encoding::BASE32Z.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(crate::encoding::BASE32Z.decode(input.as_ref())?)
+    }
+}
+
+/// Base58 flicker (alphabet: 123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base58Flickr;
+
+impl BaseCodec for Base58Flickr {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        bs58::encode(input)
+            .with_alphabet(bs58::alphabet::FLICKR)
+            .into_string()
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(bs58::decode(input)
+            .with_alphabet(bs58::alphabet::FLICKR)
+            .into_vec()?)
+    }
+}
+
+/// Base58 bitcoin (alphabet: 123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base58Btc;
+
+impl BaseCodec for Base58Btc {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        bs58::encode(input)
+            .with_alphabet(bs58::alphabet::BITCOIN)
+            .into_string()
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(bs58::decode(input)
+            .with_alphabet(bs58::alphabet::BITCOIN)
+            .into_vec()?)
+    }
+}
+
+/// Base64, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base64;
+
+impl BaseCodec for Base64 {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::BASE64_NOPAD.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE64_NOPAD.decode(input.as_ref())?)
+    }
+}
+
+/// Base64, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base64Pad;
+
+impl BaseCodec for Base64Pad {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::BASE64.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE64.decode(input.as_ref())?)
+    }
+}
+
+/// Base64 url, rfc4648 no padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base64Url;
+
+impl BaseCodec for Base64Url {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::BASE64URL_NOPAD.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE64URL_NOPAD.decode(input.as_ref())?)
+    }
+}
+
+/// Base64 url, rfc4648 with padding (alphabet: ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_).
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+struct Base64UrlPad;
+
+impl BaseCodec for Base64UrlPad {
+    fn encode<I: AsRef<[u8]>>(input: I) -> String {
+        data_encoding::BASE64URL.encode(input.as_ref())
+    }
+
+    fn decode<I: AsRef<[u8]>>(input: I) -> Result<Vec<u8>> {
+        Ok(data_encoding::BASE64URL.decode(input.as_ref())?)
+    }
 }
 
 #[cfg(test)]
@@ -294,65 +407,107 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_identity() {
+        assert_eq!(Identity::encode(b"foo"), "foo");
+        assert_eq!(Identity::decode("foo").unwrap(), b"foo".to_vec());
+    }
+
+    #[test]
     fn test_base2() {
-        assert_eq!(Base2::encode(b"f"), "01100110");
-        assert_eq!(&Base2::decode("01100110").unwrap(), b"f");
+        assert_eq!(Base2::encode(b"foo"), "011001100110111101101111");
+        assert_eq!(
+            Base2::decode("011001100110111101101111").unwrap(),
+            b"foo".to_vec()
+        );
+    }
+
+    #[test]
+    fn test_base8() {
+        assert_eq!(Base8::encode(b"foo"), "31467557");
+        assert_eq!(Base8::decode("31467557").unwrap(), b"foo".to_vec());
     }
 
     #[test]
     fn test_base16() {
-        assert_eq!(Base16Lower::encode(b"f"), "66");
-        assert_eq!(&Base16Lower::decode("66").unwrap(), b"f");
+        assert_eq!(Base16Lower::encode(b"foo"), "666f6f");
+        assert_eq!(Base16Lower::decode("666f6f").unwrap(), b"foo".to_vec());
+
+        assert_eq!(Base16Upper::encode(b"foo"), "666F6F");
+        assert_eq!(Base16Upper::decode("666F6F").unwrap(), b"foo".to_vec());
     }
 
     #[test]
     fn test_base32() {
-        assert_eq!(Base32UpperNoPad::encode(b"f"), "MY");
-        assert_eq!(&Base32UpperNoPad::decode("MY").unwrap(), b"f");
+        assert_eq!(Base32Lower::encode(b"foo"), "mzxw6");
+        assert_eq!(Base32Lower::decode("mzxw6").unwrap(), b"foo".to_vec());
+
+        assert_eq!(Base32Upper::encode(b"foo"), "MZXW6");
+        assert_eq!(Base32Upper::decode("MZXW6").unwrap(), b"foo".to_vec());
+
+        assert_eq!(Base32HexLower::encode(b"foo"), "cpnmu");
+        assert_eq!(Base32HexLower::decode("cpnmu").unwrap(), b"foo".to_vec());
+
+        assert_eq!(Base32HexUpper::encode(b"foo"), "CPNMU");
+        assert_eq!(Base32HexUpper::decode("CPNMU").unwrap(), b"foo".to_vec());
+    }
+
+    #[test]
+    fn test_base32_padding() {
+        assert_eq!(Base32PadLower::encode(b"foo"), "mzxw6===");
+        assert_eq!(Base32PadLower::decode("mzxw6===").unwrap(), b"foo".to_vec());
+
+        assert_eq!(Base32PadUpper::encode(b"foo"), "MZXW6===");
+        assert_eq!(Base32PadUpper::decode("MZXW6===").unwrap(), b"foo".to_vec());
+
+        assert_eq!(Base32HexPadLower::encode(b"foo"), "cpnmu===");
+        assert_eq!(
+            Base32HexPadLower::decode("cpnmu===").unwrap(),
+            b"foo".to_vec()
+        );
+
+        assert_eq!(Base32HexPadUpper::encode(b"foo"), "CPNMU===");
+        assert_eq!(
+            Base32HexPadUpper::decode("CPNMU===").unwrap(),
+            b"foo".to_vec()
+        );
+    }
+
+    #[test]
+    fn test_base32z() {
+        assert_eq!(Base32Z::encode(b"foo"), "c3zs6");
+        assert_eq!(Base32Z::decode("c3zs6").unwrap(), b"foo".to_vec());
     }
 
     #[test]
     fn test_base58() {
-        assert_eq!(Base58BTC::encode(b"f"), "2m");
-        assert_eq!(&Base58BTC::decode("2m").unwrap(), b"f");
+        assert_eq!(Base58Flickr::encode(b"foo"), "ApAP");
+        assert_eq!(Base58Flickr::decode("ApAP").unwrap(), b"foo".to_vec());
+
+        assert_eq!(Base58Btc::encode(b"foo"), "bQbp");
+        assert_eq!(Base58Btc::decode("bQbp").unwrap(), b"foo".to_vec());
     }
 
     #[test]
     fn test_base64() {
-        assert_eq!(Base64UpperNoPad::encode(b"f"), "Zg");
-        assert_eq!(&Base64UpperNoPad::decode("Zg").unwrap(), b"f");
+        assert_eq!(Base64::encode(b"foo"), "Zm9v");
+        assert_eq!(Base64::decode("Zm9v").unwrap(), b"foo".to_vec());
+
+        assert_eq!(Base64Url::encode(b"foo"), "Zm9v");
+        assert_eq!(Base64Url::decode("Zm9v").unwrap(), b"foo".to_vec());
     }
 
     #[test]
-    fn test_encode_padding() {
-        assert_eq!(Base32UpperNoPad::encode(b"foo"), "MZXW6");
-        assert_eq!(Base32UpperPad::encode(b"foo"), "MZXW6===");
-
-        assert_eq!(Base32UpperNoPad::encode(b"foob"), "MZXW6YQ");
-        assert_eq!(Base32UpperPad::encode(b"foob"), "MZXW6YQ=");
-
-        assert_eq!(Base32UpperNoPad::encode(b"fooba"), "MZXW6YTB");
-        assert_eq!(Base32UpperPad::encode(b"fooba"), "MZXW6YTB");
-
-        assert_eq!(Base32UpperNoPad::encode(b"foobar"), "MZXW6YTBOI");
-        assert_eq!(Base32UpperPad::encode(b"foobar"), "MZXW6YTBOI======");
-    }
-
-    #[test]
-    fn test_decode_padding() {
-        assert_eq!(&Base32UpperNoPad::decode("MZXW6").unwrap(), b"foo");
-        assert_eq!(&Base32UpperPad::decode("MZXW6===").unwrap(), b"foo");
-
-        assert_eq!(&Base32UpperNoPad::decode("MZXW6YQ").unwrap(), b"foob");
-        assert_eq!(&Base32UpperPad::decode("MZXW6YQ=").unwrap(), b"foob");
-
-        assert_eq!(&Base32UpperNoPad::decode("MZXW6YTB").unwrap(), b"fooba");
-        assert_eq!(&Base32UpperPad::decode("MZXW6YTB").unwrap(), b"fooba");
-
-        assert_eq!(&Base32UpperNoPad::decode("MZXW6YTBOI").unwrap(), b"foobar");
+    fn test_base64_padding() {
+        assert_eq!(Base64Pad::encode(b"foopadding"), "Zm9vcGFkZGluZw==");
         assert_eq!(
-            &Base32UpperPad::decode("MZXW6YTBOI=====").unwrap(),
-            b"foobar"
+            Base64Pad::decode("Zm9vcGFkZGluZw==").unwrap(),
+            b"foopadding".to_vec()
+        );
+
+        assert_eq!(Base64UrlPad::encode(b"foopadding"), "Zm9vcGFkZGluZw==");
+        assert_eq!(
+            Base64UrlPad::decode("Zm9vcGFkZGluZw==").unwrap(),
+            b"foopadding".to_vec()
         );
     }
 }
