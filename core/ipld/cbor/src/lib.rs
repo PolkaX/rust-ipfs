@@ -10,13 +10,13 @@ use cid::{Cid, ToCid};
 use ipld_format::{FormatError, Link, Node as NodeT, Resolver};
 
 pub use crate::error::*;
-use serde_json::Value;
+use serde_json::Value as JValue;
+
+use serde_cbor::Value as CValue;
 
 pub enum Object {
-    Map(HashMap<String, Object>),
-    Vec(Vec<Object>),
     Cid(Cid),
-    Value(String),
+    Value(CValue),
 }
 
 pub fn from_json(json_str: &str) -> Result<()> {
@@ -25,40 +25,40 @@ pub fn from_json(json_str: &str) -> Result<()> {
     Ok(())
 }
 
-fn convert_to_cbor(value: Value) -> Result<Object> {
+fn convert_to_cbor(value: JValue) -> Result<Object> {
     let mut value = value;
 
-    match value {
-        Value::Object(map) => {
-            if map.len() == 0 {
-                return Ok(Object::Map(HashMap::new()));
-            }
-            if map.len() == 1 {
-                if let Some(link) = map.get("/") {
-                    let s = link.as_str().ok_or(CborError::NotLink)?;
-                    let cid = s.to_cid()?;
-                    return Ok(Object::Cid(cid));
-                }
-            }
-            let mut new_map = HashMap::new();
-            for (key, value) in map {
-                let v = convert_to_cbor(value)?;
-                new_map.insert(key, v);
-            }
-            return Ok(Object::Map(new_map));
-        }
-        Value::Array(v) => {
-            if v.len() == 0 {
-                return Ok(Object::Vec(vec![]));
-            }
-            let mut new_vec = vec![];
-            for i in v {
-                new_vec.push(convert_to_cbor(i)?);
-            }
-            return Ok(Object::Vec(new_vec));
-        }
-        _ => Ok(Object::Value(value.to_string())),
-    }
+    //    match value {
+    //        Value::Object(map) => {
+    //            if map.len() == 0 {
+    //                return Ok(Object::Map(HashMap::new()));
+    //            }
+    //            if map.len() == 1 {
+    //                if let Some(link) = map.get("/") {
+    //                    let s = link.as_str().ok_or(CborError::NotLink)?;
+    //                    let cid = s.to_cid()?;
+    //                    return Ok(Object::Cid(cid));
+    //                }
+    //            }
+    //            let mut new_map = HashMap::new();
+    //            for (key, value) in map {
+    //                let v = convert_to_cbor(value)?;
+    //                new_map.insert(key, v);
+    //            }
+    //            return Ok(Object::Map(new_map));
+    //        }
+    //        Value::Array(v) => {
+    //            if v.len() == 0 {
+    //                return Ok(Object::Vec(vec![]));
+    //            }
+    //            let mut new_vec = vec![];
+    //            for i in v {
+    //                new_vec.push(convert_to_cbor(i)?);
+    //            }
+    //            return Ok(Object::Vec(new_vec));
+    //        }
+    //        _ => Ok(Object::Value(value.to_string())),
+    //    }
 }
 
 /// Node represents an IPLD node.
