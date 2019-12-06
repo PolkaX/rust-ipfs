@@ -5,6 +5,7 @@
 //! Fork from project [rust-cid](https://github.com/multiformats/rust-cid)
 //! But we provide more useful functions.
 
+mod cbor_impl;
 mod codec;
 mod error;
 mod to_cid;
@@ -17,6 +18,7 @@ use integer_encoding::{VarIntReader, VarIntWriter};
 use multibase::Base;
 pub use multihash::{Hash as MHashEnum, Multihash};
 
+pub use self::cbor_impl::CID_CBOR_TAG;
 pub use self::codec::Codec;
 pub use self::error::{Error, Result};
 pub use self::to_cid::ToCid;
