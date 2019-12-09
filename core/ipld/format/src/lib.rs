@@ -42,9 +42,9 @@ pub trait Node: Resolver + block_format::Block {
 
 /// Link represents an IPFS Merkle DAG Link between Nodes.
 pub struct Link {
-    name: String,
-    size: u64,
-    cid: cid::Cid,
+    pub name: String,
+    pub size: u64,
+    pub cid: cid::Cid,
 }
 
 /// NodeStat is a statistics object for a Node. Mostly sizes.

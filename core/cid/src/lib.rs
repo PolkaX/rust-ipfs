@@ -51,6 +51,18 @@ impl Cid {
         }
     }
 
+    pub fn new_cid_v0(mhash: Multihash) -> Result<Cid> {
+        if mhash.algorithm() != MHashEnum::SHA2256 || mhash.digest().len() != 32 {
+            return Err(Error::InvalidCidV0(mhash.algorithm(), mhash.digest().len()));
+        }
+
+        Ok(Cid::new(Codec::DagProtobuf, Version::V0, mhash))
+    }
+
+    pub fn new_cid_v1(codec: Codec, mhash: Multihash) -> Result<Cid> {
+        Ok(Cid::new(codec, Version::V1, mhash))
+    }
+
     /// Create a new CID from raw data (binary or multibase encoded string)
     pub fn from<T: ToCid>(data: T) -> Result<Cid> {
         data.to_cid()
@@ -192,20 +204,8 @@ impl Prefix {
 
         let mhash = multihash::encode(self.mh_type, data)?;
         match self.version {
-            Version::V0 => new_cid_v0(mhash),
-            Version::V1 => new_cid_v1(self.codec, mhash),
+            Version::V0 => Cid::new_cid_v0(mhash),
+            Version::V1 => Cid::new_cid_v1(self.codec, mhash),
         }
     }
-}
-
-pub fn new_cid_v0(mhash: Multihash) -> Result<Cid> {
-    if mhash.algorithm() != MHashEnum::SHA2256 || mhash.digest().len() != 32 {
-        return Err(Error::InvalidCidV0(mhash.algorithm(), mhash.digest().len()));
-    }
-
-    Ok(Cid::new(Codec::DagProtobuf, Version::V0, mhash))
-}
-
-pub fn new_cid_v1(codec: Codec, mhash: Multihash) -> Result<Cid> {
-    Ok(Cid::new(codec, Version::V1, mhash))
 }

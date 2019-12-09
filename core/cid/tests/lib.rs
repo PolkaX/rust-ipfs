@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use rust_cid::{new_cid_v0, new_cid_v1, Cid, Codec, Error, MHashEnum, Prefix, Version};
+use rust_cid::{Cid, Codec, Error, MHashEnum, Prefix, Version};
 
 #[test]
 fn basic_marshalling() {
@@ -153,7 +153,7 @@ fn test_new_prefix_v0() {
 
     // Construct c2
     let mhash = multihash::encode(MHashEnum::SHA2256, data).unwrap();
-    let c2 = new_cid_v0(mhash).unwrap();
+    let c2 = Cid::new_cid_v0(mhash).unwrap();
     assert_eq!(c1, c2);
     assert_eq!(c1.prefix(), c2.prefix());
 }
@@ -190,7 +190,7 @@ fn test_invalid_v0_prefix() {
 fn test_prefix_roundtrip() {
     let data = b"this is some test content";
     let mhash = multihash::encode(MHashEnum::SHA2256, data.as_ref()).unwrap();
-    let c1 = new_cid_v1(Codec::DagCBOR, mhash).unwrap();
+    let c1 = Cid::new_cid_v1(Codec::DagCBOR, mhash).unwrap();
 
     let prefix = c1.prefix();
     let c2 = prefix.sum(data.as_ref()).unwrap();
