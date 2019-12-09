@@ -15,9 +15,9 @@ use crate::version::Version;
 pub struct Cid {
     /// The version of CID.
     version: Version,
-    /// The Codec of CID.
+    /// The codec of CID.
     codec: Codec,
-    /// The Hash of CID.
+    /// The hash of CID.
     hash: Multihash,
 }
 
