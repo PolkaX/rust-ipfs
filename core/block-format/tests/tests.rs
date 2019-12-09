@@ -1,7 +1,7 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
+use cid::Hash;
 use rust_block_format::{BasicBlock, Block};
-use rust_cid::Hash;
 
 #[test]
 fn test_blocks_basic() {

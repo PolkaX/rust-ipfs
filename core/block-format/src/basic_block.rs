@@ -3,8 +3,8 @@
 use std::fmt::{Debug, Display, Error, Formatter};
 
 use bytes::Bytes;
+use cid::{new_cid_v0, Cid, Multihash};
 use ipfs_util::hash;
-use rust_cid::{new_cid_v0, Cid, Multihash};
 
 use crate::error::BlockFormatError;
 

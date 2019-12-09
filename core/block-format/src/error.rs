@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-use rust_cid::{Cid, Error as CidErr};
+use cid::{Cid, Error as CidErr};
 
 #[derive(Error, Debug)]
 pub enum BlockFormatError {

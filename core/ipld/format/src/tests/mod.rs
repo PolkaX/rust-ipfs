@@ -3,7 +3,7 @@ mod test_dag_walker;
 
 use block_format::{BasicBlock, Block};
 use bytes::Bytes;
-use cid::{Cid, Codec, MHashEnum, Prefix, Version};
+use cid::{Cid, Codec, Hash, Prefix, Version};
 
 use crate::error::*;
 use crate::walker::NavigableNode;
@@ -20,7 +20,7 @@ impl EmptyNode {
         let p = Prefix {
             version: Version::V1,
             codec: Codec::Raw,
-            mh_type: MHashEnum::Identity,
+            mh_type: Hash::Identity,
             mh_len: 0,
         };
         EmptyNode {
