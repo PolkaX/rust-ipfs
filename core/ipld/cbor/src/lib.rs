@@ -32,12 +32,19 @@ pub enum Obj {
     Cid(Cid),
 }
 
-pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<()> {
+/// Node represents an IPLD node.
+pub struct Node {
+    obj: Obj,
+    tree: Vec<String>,
+    links: Vec<Link>,
+    raw: Bytes,
+    cid: Cid,
+}
+
+pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<Node> {
     let obj = serde_json::from_str::<Obj>(json_str)?;
-
     let obj = convert_to_cborish_obj(obj)?;
-
-    Ok(())
+    wrap_obj(obj, hash_type)
 }
 
 fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
@@ -72,7 +79,7 @@ fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
     }
 }
 
-fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<()> {
+fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<Node> {
     let data = serde_cbor::to_vec(&obj)?;
 
     let hash = multihash::encode(hash_type, &data)?;
@@ -80,14 +87,21 @@ fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<()> {
     let c = Cid::new_cid_v1(Codec::DagCBOR, hash)?;
 
     let block = BasicBlock::new_with_cid(data.into(), c)?;
-    Ok(())
+    new_node(&block, obj)
 }
 
-//fn new_node(block: &dyn Block, obj: Obj) -> Result<Node> {
-//
-//}
+fn new_node(block: &dyn Block, obj: Obj) -> Result<Node> {
+    let (tree, links) = compute(&obj)?;
+    Ok(Node {
+        obj,
+        tree,
+        links,
+        raw: block.raw_data().clone(),
+        cid: block.cid().clone(),
+    })
+}
 
-fn compute(obj: &Obj) -> Result<()> {
+fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
     let mut tree = vec![];
     let mut links = vec![];
     let mut func = |name: String, obj: &Obj| {
@@ -105,8 +119,8 @@ fn compute(obj: &Obj) -> Result<()> {
         }
         Ok(())
     };
-    traverse(obj, "".to_string(), &mut func);
-    Ok(())
+    traverse(obj, "".to_string(), &mut func)?;
+    Ok((tree, links))
 }
 
 fn traverse<F>(obj: &Obj, cur: String, f: &mut F) -> Result<()>
@@ -131,15 +145,6 @@ where
         }
         _ => Ok(()),
     }
-}
-
-/// Node represents an IPLD node.
-pub struct Node {
-    obj: Obj,
-    tree: Vec<String>,
-    links: Vec<Link>,
-    raw: Bytes,
-    cid: Cid,
 }
 
 //impl Resolver for Node {
