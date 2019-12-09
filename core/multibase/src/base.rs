@@ -20,7 +20,7 @@ macro_rules! build_base_enum {
                 }
             }
 
-            /// Returns the algorithm corresponding to a code, or `Error` if no algorithm is matching.
+            /// Convert a number to the matching base algorithm, or `Error` if no algorithm is matching.
             pub fn from(raw: u8) -> Result<Self> {
         	    match raw {
                     $( $code => Ok(Self::$base), )*
