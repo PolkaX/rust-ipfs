@@ -24,7 +24,7 @@ fn test_decode() {
     let p = Prefix {
         version: Version::V1,
         codec: Codec::Raw,
-        mh_type: MHashEnum::Identity,
+        mh_type: Hash::Identity,
         mh_len: 0,
     };
     let id = p.sum(b"").unwrap();
