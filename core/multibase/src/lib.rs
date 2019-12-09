@@ -33,7 +33,7 @@ pub fn decode<I: AsRef<[u8]>>(input: I) -> Result<(Base, Vec<u8>)> {
     Ok((base, decoded))
 }
 
-/// Decode the base58btc string for cid-v0 specially.
+/// Decode the base58btc string for CIDv0 specially.
 ///
 /// # Examples
 ///
@@ -66,7 +66,7 @@ pub fn encode<I: AsRef<[u8]>>(base: Base, input: I) -> String {
     encoded
 }
 
-/// Encode the given byte slice to base58btc string for cid-v0 specially.
+/// Encode the given byte slice to base58btc string for CIDv0 specially.
 ///
 /// # Examples
 ///

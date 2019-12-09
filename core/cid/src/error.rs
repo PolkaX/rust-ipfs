@@ -10,7 +10,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     /// Invalid format of CID version0.
-    #[error("Invalid hash bytes for cidv0, hash: {0:?}, hash len: {1}")]
+    #[error("Invalid hash bytes for CIDv0, hash: {0:?}, hash len: {1}")]
     InvalidCidV0(Hash, usize),
     /// Invalid prefix of CID version0.
     #[error("Invalid v0 prefix")]
