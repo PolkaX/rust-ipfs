@@ -3,10 +3,10 @@
 use multihash::Hash;
 use thiserror::Error;
 
-/// The custom result type for `cid`.
+/// The custom result type for `CID`.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// The custom error type for `cid`.
+/// The custom error type for `CID`.
 #[derive(Error, Debug)]
 pub enum Error {
     /// Invalid format of CID version0.
