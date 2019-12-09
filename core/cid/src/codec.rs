@@ -18,7 +18,7 @@ macro_rules! build_codec_enum {
                 }
             }
 
-            /// Returns the codec corresponding to a code, or `Error` if no codec is matching.
+            /// Convert a number to the matching codec, or `Error` if no codec is matching.
             pub fn from(raw: u16) -> Result<Self> {
         	    match raw {
                     $( $code => Ok(Self::$codec), )*
