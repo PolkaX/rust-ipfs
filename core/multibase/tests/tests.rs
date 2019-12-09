@@ -1,14 +1,18 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use rust_multibase::Base::*;
 use rust_multibase::{decode, encode, Base};
 
 #[test]
 fn test_bases_code() {
+    let code: u8 = Base2.into();
+    assert_eq!(code, b'0');
     assert_eq!(Base2.code(), b'0');
 }
 
 #[test]
 fn test_bases_from_code() {
-    assert_eq!(Base::from_code(b'0').unwrap(), Base2);
+    assert_eq!(Base::from(b'0').unwrap(), Base2);
 }
 
 #[test]

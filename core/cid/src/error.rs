@@ -1,23 +1,35 @@
-use multihash::Hash as MHashEnum;
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
+use multihash::Hash;
 use thiserror::Error;
 
+/// The custom result type for `cid`.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Error types
+/// The custom error type for `cid`.
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Invalid hash bytes for cidv0, code:{:?}, digest len:{}", .0, .1)]
-    InvalidCidV0(MHashEnum, usize),
+    /// Invalid format of CID version0.
+    #[error("Invalid hash bytes for cidv0, hash: {0:?}, hash len: {1}")]
+    InvalidCidV0(Hash, usize),
+    /// Invalid prefix of CID version0.
     #[error("Invalid v0 prefix")]
     InvalidV0Prefix,
-    #[error("Unknown codec")]
-    UnknownCodec,
-    #[error("Input too short")]
+    /// Invalid version of CID.
+    #[error("Unrecognized CID version: {0}")]
+    InvalidCidVersion(u8),
+    /// Unknown codec.
+    #[error("Unknown codec: {0}")]
+    UnknownCodec(u16),
+    /// Unknown hash.
+    #[error("Unknown hash: {0}")]
+    UnknownHash(u16),
+    /// Input data is too short.
+    #[error("Input is too short")]
     InputTooShort,
+    /// Multihash parse failure.
     #[error("Failed to parse multihash: {0}")]
     ParsingError(#[source] Box<dyn std::error::Error + Send>),
-    #[error("Unrecognized CID version")]
-    InvalidCidVersion,
 }
 
 impl From<std::io::Error> for Error {

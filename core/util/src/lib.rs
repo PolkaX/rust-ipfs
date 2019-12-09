@@ -1,5 +1,4 @@
-// Copyright 2019-2020 PolkaX.
-// This file is part of rust-ipfs.
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 //! Shareable rust-ipfs common tools.
 use multihash::{encode, Hash as MHashEnum, Multihash};

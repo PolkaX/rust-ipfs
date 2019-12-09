@@ -1,5 +1,7 @@
-use rust_block_format::BasicBlock;
-use rust_cid::MHashEnum;
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
+use rust_block_format::{BasicBlock, Block};
+use rust_cid::Hash;
 
 #[test]
 fn test_blocks_basic() {
@@ -23,7 +25,7 @@ fn test_hash() {
     let data = b"some other data";
     let block = BasicBlock::new(data.as_ref().into());
 
-    let hash = multihash::encode(MHashEnum::SHA2256, data.as_ref()).unwrap();
+    let hash = multihash::encode(Hash::SHA2256, data.as_ref()).unwrap();
 
     assert_eq!(block.multihash(), hash);
 }

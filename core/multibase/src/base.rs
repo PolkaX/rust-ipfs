@@ -1,6 +1,8 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use crate::error::{Error, Result};
 
-macro_rules! base_enum {
+macro_rules! build_base_enum {
     ( $(#[$attr:meta] $code:expr => $base:ident,)* ) => {
         /// List of types currently supported in the multibase spec.
         ///
@@ -19,10 +21,10 @@ macro_rules! base_enum {
             }
 
             /// Returns the algorithm corresponding to a code, or `Error` if no algorithm is matching.
-            pub fn from_code(code: u8) -> Result<Self> {
-        	    match code {
+            pub fn from(raw: u8) -> Result<Self> {
+        	    match raw {
                     $( $code => Ok(Self::$base), )*
-            	    _ => Err(Error::UnknownBase(code)),
+            	    _ => Err(Error::UnknownBase(raw)),
         	    }
             }
 
@@ -40,10 +42,18 @@ macro_rules! base_enum {
                 }
             }
         }
+
+        impl From<Base> for u8 {
+            fn from(base: Base) -> Self {
+                match base {
+                    $( Base::$base => $code, )*
+                }
+            }
+        }
     }
 }
 
-base_enum! {
+build_base_enum! {
     /// 8-bit binary (encoder and decoder keeps data unmodified).
     b'\0' => Identity,
     /// Base2 (alphabet: 01).

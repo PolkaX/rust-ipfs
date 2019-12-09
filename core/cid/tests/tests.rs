@@ -1,12 +1,16 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use std::collections::HashMap;
 
-use rust_cid::{new_cid_v0, new_cid_v1, Cid, Codec, Error, MHashEnum, Prefix, Version};
+use rust_cid::{
+    new_cid_v0, new_cid_v1, new_prefix_v0, new_prefix_v1, Cid, Codec, Hash, Prefix, Version,
+};
 
 #[test]
 fn basic_marshalling() {
     let h = multihash::encode(multihash::Hash::SHA2256, b"beep boop").unwrap();
 
-    let cid = Cid::new(Codec::DagProtobuf, Version::V1, h);
+    let cid = Cid::new(Version::V1, Codec::DagProtobuf, h);
 
     let data = cid.to_bytes();
     let out = Cid::from(data).unwrap();
@@ -77,7 +81,7 @@ fn prefix_roundtrip() {
     let data = b"awesome test content";
     let h = multihash::encode(multihash::Hash::SHA2256, data).unwrap();
 
-    let cid = Cid::new(Codec::DagProtobuf, Version::V1, h);
+    let cid = Cid::new(Version::V1, Codec::DagProtobuf, h);
     let prefix = cid.prefix();
 
     let cid2 = Cid::new_from_prefix(&prefix, data).unwrap();
@@ -122,28 +126,10 @@ fn test_hash() {
     assert_eq!(&data, map.get(&cid).unwrap());
 }
 
-fn new_prefix_v0(hash: MHashEnum) -> Prefix {
-    Prefix {
-        version: Version::V0,
-        codec: Codec::DagProtobuf,
-        mh_type: hash,
-        mh_len: hash.size() as usize,
-    }
-}
-
-fn new_prefix_v1(codec: Codec, hash: MHashEnum) -> Prefix {
-    Prefix {
-        version: Version::V1,
-        codec,
-        mh_type: hash,
-        mh_len: hash.size() as usize,
-    }
-}
-
 #[test]
 fn test_new_prefix_v0() {
     let data = b"this is some test content";
-    let prefix = new_prefix_v0(MHashEnum::SHA2256);
+    let prefix = new_prefix_v0(Hash::SHA2256);
 
     // Construct c1
     let c1 = prefix.sum(data.as_ref()).unwrap();
@@ -152,7 +138,7 @@ fn test_new_prefix_v0() {
     }
 
     // Construct c2
-    let mhash = multihash::encode(MHashEnum::SHA2256, data).unwrap();
+    let mhash = multihash::encode(Hash::SHA2256, data).unwrap();
     let c2 = new_cid_v0(mhash).unwrap();
     assert_eq!(c1, c2);
     assert_eq!(c1.prefix(), c2.prefix());
@@ -162,19 +148,19 @@ fn test_new_prefix_v0() {
 fn test_invalid_v0_prefix() {
     let tests = vec![
         Prefix {
-            mh_type: MHashEnum::SHA2256,
+            mh_type: Hash::SHA2256,
             mh_len: 31,
             version: Version::V0,
             codec: Codec::DagProtobuf,
         },
         Prefix {
-            mh_type: MHashEnum::SHA2256,
+            mh_type: Hash::SHA2256,
             mh_len: 33,
             version: Version::V0,
             codec: Codec::DagProtobuf,
         },
         Prefix {
-            mh_type: MHashEnum::SHA2512,
+            mh_type: Hash::SHA2512,
             mh_len: 32,
             version: Version::V0,
             codec: Codec::DagProtobuf,
@@ -187,18 +173,33 @@ fn test_invalid_v0_prefix() {
 }
 
 #[test]
+fn test_new_prefix_v1() {
+    let data = b"this is some test content";
+    let prefix = new_prefix_v1(Codec::DagCBOR, Hash::SHA2256);
+
+    // Construct c1
+    let c1 = prefix.sum(data.as_ref()).unwrap();
+    if c1.prefix() != prefix {
+        panic!("prefix not preserved")
+    }
+
+    // Construct c2
+    let mhash = multihash::encode(Hash::SHA2256, data).unwrap();
+    let c2 = new_cid_v1(Codec::DagCBOR, mhash).unwrap();
+    assert_eq!(c1, c2);
+    assert_eq!(c1.prefix(), c2.prefix());
+}
+
+#[test]
 fn test_prefix_roundtrip() {
     let data = b"this is some test content";
-    let mhash = multihash::encode(MHashEnum::SHA2256, data.as_ref()).unwrap();
+    let mhash = multihash::encode(Hash::SHA2256, data.as_ref()).unwrap();
     let c1 = new_cid_v1(Codec::DagCBOR, mhash).unwrap();
 
-    let prefix = c1.prefix();
-    let c2 = prefix.sum(data.as_ref()).unwrap();
+    let prefix1 = c1.prefix();
+    let c2 = prefix1.sum(data.as_ref()).unwrap();
     assert_eq!(c1, c2);
 
-    let prefix_bytes = prefix.as_bytes();
-
-    let prefix2 = Prefix::new_from_bytes(prefix_bytes.as_slice()).unwrap();
-
-    assert_eq!(prefix, prefix2)
+    let prefix2 = Prefix::new_from_bytes(&prefix1.as_bytes()).unwrap();
+    assert_eq!(prefix1, prefix2)
 }
