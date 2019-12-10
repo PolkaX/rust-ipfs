@@ -1,36 +1,23 @@
 mod error;
+mod localcid;
+mod obj;
 
-use std::collections::{BTreeMap, HashMap};
 use std::result;
 use std::str::FromStr;
 
-use bytes::Bytes;
-use serde::{Deserialize, Serialize};
-use serde_cbor::Value as CValue;
-use serde_json::Value as JValue;
+use either::*;
 
-use cid::{Cid, Codec, ToCid};
+use bytes::Bytes;
+
+use cid::{Cid, Codec};
 use multihash::Hash as MHashEnum;
 
 use block_format::{BasicBlock, Block};
-use ipld_format::{FormatError, Link, Node as NodeT, Resolver};
+use ipld_format::{FormatError, Link, Node as NodeT, NodeStat, Resolver};
 
 pub use crate::error::*;
-use std::rc::Rc;
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(untagged)]
-pub enum Obj {
-    Null,
-    Bool(bool),
-    Integer(i128),
-    Float(f64),
-    Bytes(Vec<u8>),
-    Text(String),
-    Array(Vec<Obj>),
-    Map(BTreeMap<String, Obj>),
-    Cid(Cid),
-}
+pub use crate::localcid::LocalCid;
+pub use crate::obj::{convert_to_cborish_obj, convert_to_jsonish_obj, Obj};
 
 /// Node represents an IPLD node.
 pub struct Node {
@@ -41,42 +28,147 @@ pub struct Node {
     cid: Cid,
 }
 
-pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<Node> {
-    let obj = serde_json::from_str::<Obj>(json_str)?;
-    let obj = convert_to_cborish_obj(obj)?;
-    wrap_obj(obj, hash_type)
+impl Node {
+    fn new_node(block: &dyn Block, obj: Obj) -> Result<Node> {
+        let (tree, links) = compute(&obj)?;
+        Ok(Node {
+            obj,
+            tree,
+            links,
+            raw: block.raw_data().clone(),
+            cid: block.cid().clone(),
+        })
+    }
 }
 
-fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
-    let mut value = value;
-    match value {
-        Obj::Map(map) => {
-            if map.len() == 1 {
-                if let Some(link) = map.get("/") {
-                    if let Obj::Text(s) = link {
-                        let cid = s.to_cid()?;
-                        return Ok(Obj::Cid(cid));
-                    } else {
-                        return Err(CborError::NotLink);
+impl Block for Node {
+    fn raw_data(&self) -> &Bytes {
+        &self.raw
+    }
+
+    fn cid(&self) -> &Cid {
+        &self.cid
+    }
+}
+
+impl Resolver for Node {
+    type Output = Either<Link, Obj>;
+    /// Resolve resolves a given path, and returns the object found at the end, as well
+    /// as the possible tail of the path that was not resolved.
+    fn resolve(&self, path: &[String]) -> result::Result<(Self::Output, Vec<String>), FormatError> {
+        let mut cur = &self.obj;
+        for (index, val) in path.iter().enumerate() {
+            match cur {
+                Obj::Map(m) => {
+                    cur = m
+                        .get(val)
+                        .ok_or(FormatError::Other(Box::new(CborError::NoSuchLink(
+                            val.clone(),
+                        ))))?;
+                }
+                Obj::Array(arr) => {
+                    let index =
+                        usize::from_str(val).map_err(|e| FormatError::Other(Box::new(e)))?;
+                    cur = arr.get(index).ok_or(FormatError::Other(Box::new(
+                        CborError::NoSuchLink(format!("array index out of range[{}]", index)),
+                    )))?;
+                }
+                Obj::Cid(cid) => {
+                    let link = Link::new_default(cid.0.clone());
+                    return Ok((
+                        Left(link),
+                        path.iter().skip(index).map(|s| s.clone()).collect(),
+                    ));
+                }
+                _ => return Err(FormatError::Other(Box::new(CborError::NoLinks))),
+            }
+        }
+        if let Obj::Cid(cid) = cur {
+            let link = Link::new_default(cid.0.clone());
+            return Ok((Left(link), vec![]));
+        }
+        let jsonish =
+            convert_to_jsonish_obj(cur.clone()).map_err(|e| FormatError::Other(Box::new(e)))?;
+        Ok((Right(jsonish), vec![]))
+    }
+
+    /// Tree returns a flattend array of paths at the given path for the given depth.
+    fn tree(&self, path: &str, depth: Option<usize>) -> Vec<String> {
+        if path == "" && depth.is_none() {
+            return self.tree.clone();
+        }
+        let mut out = vec![];
+        for t in self.tree.iter() {
+            if !t.starts_with(path) {
+                continue;
+            }
+            // start from path lenght
+            // e.g. tree item like "123/123", path is "123", then start from "/123"
+            let s: String = t.chars().skip(path.len()).collect();
+            let sub = s.trim_start_matches("/");
+            if sub == "" {
+                // means do not
+                continue;
+            }
+
+            match depth {
+                None => {
+                    // means not filter by depth
+                    out.push(sub.to_string());
+                    continue;
+                }
+                Some(dep) => {
+                    // for example sub like "123/123/123", and depth is 2, would not peek
+                    let parts = sub.split("/").collect::<Vec<_>>();
+                    if parts.len() <= dep {
+                        out.push(sub.to_string());
                     }
                 }
             }
-            let mut new_map = BTreeMap::new();
-            for (key, value) in map {
-                let v = convert_to_cborish_obj(value)?;
-                new_map.insert(key, v);
-            }
-            return Ok(Obj::Map(new_map));
         }
-        Obj::Array(v) => {
-            let mut new_vec = vec![];
-            for i in v {
-                new_vec.push(convert_to_cborish_obj(i)?);
-            }
-            return Ok(Obj::Array(new_vec));
-        }
-        _ => return Ok(value),
+        out
     }
+}
+
+impl NodeT for Node {
+    fn resolve_link(&self, path: &[String]) -> result::Result<(Link, Vec<String>), FormatError> {
+        let (either, rest) = self.resolve(path)?;
+
+        match either {
+            Left(link) => Ok((link, rest)),
+            Right(_) => Err(FormatError::Other(Box::new(CborError::NonLink))),
+        }
+    }
+
+    fn links(&self) -> Vec<&Link> {
+        self.links.iter().collect()
+    }
+
+    /// Stat returns stats about the Node.
+    fn stat(&self) -> result::Result<&NodeStat, FormatError> {
+        // TODO: implement?
+        unimplemented!()
+    }
+
+    // Size returns the size of the binary representation of the Node.
+    fn size(&self) -> u64 {
+        self.raw_data().len() as u64
+    }
+}
+
+pub fn to_json(node: &Node) -> Result<String> {
+    // drop other info
+    let obj = node.obj.clone();
+    let json_obj = convert_to_jsonish_obj(obj)?;
+    let s = serde_json::to_string(&json_obj)?;
+    Ok(s)
+}
+
+pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<Node> {
+    let obj = serde_json::from_str::<Obj>(json_str)?;
+    let obj = convert_to_cborish_obj(obj)?;
+    // need to generate other info
+    wrap_obj(obj, hash_type)
 }
 
 fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<Node> {
@@ -87,18 +179,7 @@ fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<Node> {
     let c = Cid::new_cid_v1(Codec::DagCBOR, hash)?;
 
     let block = BasicBlock::new_with_cid(data.into(), c)?;
-    new_node(&block, obj)
-}
-
-fn new_node(block: &dyn Block, obj: Obj) -> Result<Node> {
-    let (tree, links) = compute(&obj)?;
-    Ok(Node {
-        obj,
-        tree,
-        links,
-        raw: block.raw_data().clone(),
-        cid: block.cid().clone(),
-    })
+    Node::new_node(&block, obj)
 }
 
 fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
@@ -111,11 +192,7 @@ fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
             tree.push(name);
         }
         if let Obj::Cid(cid) = obj {
-            links.push(Link {
-                name: "".to_string(),
-                size: 0,
-                cid: cid.clone(),
-            })
+            links.push(Link::new_default(cid.0.clone()))
         }
         Ok(())
     };
@@ -145,6 +222,16 @@ where
         }
         _ => Ok(()),
     }
+}
+
+fn decode_block(block: &dyn Block) -> Result<Node> {
+    let obj: Obj = serde_cbor::from_slice(block.raw_data())?;
+    Node::new_node(block, obj)
+}
+
+pub fn decode_block_for_coding(block: &dyn Block) -> Result<Box<dyn NodeT>> {
+    let n = decode_block(block).map(|n| Box::new(n))?;
+    Ok(n)
 }
 
 //impl Resolver for Node {

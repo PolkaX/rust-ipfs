@@ -40,6 +40,25 @@ pub enum CborError {
         EncodeError,
     ),
 
+    #[error("no such link found, path: {0}")]
+    NoSuchLink(String),
+
+    #[error("non-link found at given path")]
+    NonLink,
+
+    #[error("link value should have been bytes or cid")]
+    InvalidLink,
+
+    #[error("tried to resolve through object that had no links")]
+    NoLinks,
+
     #[error("link should have been a string")]
-    NotLink,
+    NonStringLink,
+
+    #[error("other error: {0}")]
+    Other(
+        #[from]
+        #[source]
+        Box<dyn ::std::error::Error>,
+    ),
 }

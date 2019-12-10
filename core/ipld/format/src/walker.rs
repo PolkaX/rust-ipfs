@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use crate::error::*;
-use crate::Node;
 
 pub struct Walker {
     stack: Vec<Arc<dyn NavigableNode>>,
