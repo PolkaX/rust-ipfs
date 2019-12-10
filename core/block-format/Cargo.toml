@@ -13,7 +13,7 @@ keywords = ["ipfs", "block-format"]
 thiserror = "1.0"
 bytes = { version = "0.5", features = ["serde"] }
 
-rust-cid = { path = "../cid" }
+cid = { package = "rust-cid", path = "../cid" }
 ipfs-util = { package = "rust-ipfs-util", path = "../util" }
 
 [dev-dependencies]
