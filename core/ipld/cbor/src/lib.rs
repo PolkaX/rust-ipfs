@@ -102,12 +102,20 @@ impl Resolver for Node {
             if !t.starts_with(path) {
                 continue;
             }
-            // start from path lenght
-            // e.g. tree item like "123/123", path is "123", then start from "/123"
-            let s: String = t.chars().skip(path.len()).collect();
-            let sub = s.trim_start_matches("/");
+            // start from path length.
+            // e.g. tree item like "123456/123", path is "123", then s would be "/123"
+            // `skip_while` would ignore first chars until meet "/"
+            // `skip_while` plus `trim_start_matches` would equal to `strings.TrimLeft` in GO
+            // but `s` is allocated, use char.utf8_len to peek slice for `t` could avoid allocate.
+            let s: String = t
+                .chars()
+                .skip(path.len())
+                .skip_while(|c| *c != '/')
+                .collect();
+            // "/123/123" would be "123/123", "//123/123" would be "123/123"
+            let sub = s.trim_start_matches('/');
             if sub == "" {
-                // means do not
+                // means current tree have no child
                 continue;
             }
 
@@ -119,7 +127,7 @@ impl Resolver for Node {
                 }
                 Some(dep) => {
                     // for example sub like "123/123/123", and depth is 2, would not peek
-                    let parts = sub.split("/").collect::<Vec<_>>();
+                    let parts = sub.split('/').collect::<Vec<_>>();
                     if parts.len() <= dep {
                         out.push(sub.to_string());
                     }
@@ -233,49 +241,3 @@ pub fn decode_block_for_coding(block: &dyn Block) -> Result<Box<dyn NodeT>> {
     let n = decode_block(block).map(|n| Box::new(n))?;
     Ok(n)
 }
-
-//impl Resolver for Node {
-//    fn resolve(&self, path: &[String]) -> result::Result<Vec<String>,  FormatError>{
-//        let mut cur: &Object = &self.obj;
-//        for (i, s) in path.iter().enumerate() {
-//            match cur {
-//                Obj::Map(m) => {
-//                    let next = m.get(s).ok_or(FormatError::NoSuchLink)?;
-//                    cur = next;
-//                }
-//                Obj::Vec(v) => {
-//                    let n = i32::from_str(s).map_err(|e| FormatError::Other(Box::new(e)))?;
-//                    let n = n as usize;
-//                    let next = v.get(n).ok_or(FormatError::NoSuchLink)?;
-//                    cur = next;
-//                }
-//                Cid => {
-//
-//                }
-//            }
-//        }
-//        Ok(vec![])
-//    }
-//
-//    fn tree(&self, path: &str, depth: i32) -> Vec<String> {
-//        unimplemented!()
-//    }
-//}
-
-//impl<T> NodeT for Node<T> {
-//    fn resolve_link(&self, path: &str, depth: i32) -> Vec<String> {
-//        unimplemented!()
-//    }
-//
-//    fn links(&self) -> Vec<&Link> {
-//        unimplemented!()
-//    }
-//
-//    fn stat(&self) -> Result<&NodeStat, FormatError> {
-//        unimplemented!()
-//    }
-//
-//    fn size(&self) -> u64 {
-//        unimplemented!()
-//    }
-//}
