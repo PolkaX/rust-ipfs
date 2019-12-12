@@ -42,6 +42,7 @@ pub trait Node: block_format::Block {
 }
 
 /// Link represents an IPFS Merkle DAG Link between Nodes.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link {
     pub name: String,
     pub size: u64,

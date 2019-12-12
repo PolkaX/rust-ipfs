@@ -12,10 +12,19 @@ either = "1.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 bytes = { version = "0.5", features = ["serde"] }
+num-bigint = { version = "0.2.3", optional = true }
+
 multihash = { package = "parity-multihash", version = "0.2" }
 
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag" }
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
 
 ipld-format = { package = "rust-ipld-format", path = "../format" }
 block-format = { package = "rust-block-format", path = "../../block-format" }
 cid = { package = "rust-cid", path = "../../cid" }
+
+[dev-dependencies]
+util = { package = "rust-ipfs-util", path = "../../util" }
+
+[features]
+bench = []
+bigint = [ "num-bigint" ]

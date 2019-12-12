@@ -1,12 +1,15 @@
-use serde::{Deserialize, Serialize};
+use std::borrow::Borrow;
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::ops::{Deref, DerefMut};
 
 use cid::ToCid;
+use serde::{Deserialize, Serialize};
 
 use crate::error::*;
 use crate::localcid::LocalCid;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum Obj {
     Null,
@@ -16,8 +19,59 @@ pub enum Obj {
     Bytes(Vec<u8>),
     Text(String),
     Array(Vec<Obj>),
-    Map(BTreeMap<String, Obj>),
+    Map(BTreeMap<SortedStr, Obj>),
     Cid(LocalCid),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct SortedStr(pub String);
+
+impl Borrow<str> for SortedStr {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for SortedStr {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for SortedStr {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for SortedStr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Ord for SortedStr {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.len() != other.len() {
+            self.0.len().cmp(&other.0.len())
+        } else {
+            self.0.cmp(&other.0)
+        }
+    }
+}
+
+impl PartialOrd for SortedStr {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl From<String> for SortedStr {
+    fn from(s: String) -> Self {
+        SortedStr(s)
+    }
 }
 
 pub fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
@@ -54,8 +108,8 @@ pub fn convert_to_jsonish_obj(value: Obj) -> Result<Obj> {
             Obj::Cid(local_cid) => {
                 let link = Obj::Text(local_cid.0.to_string());
                 let mut map = BTreeMap::new();
-                map.insert("/".to_string(), link);
-                *obj = Obj::Map(map);
+                map.insert("/".to_string().into(), link);
+                *obj = Obj::Map(map.into());
                 Ok(())
             }
             Obj::Map(ref mut map) => {

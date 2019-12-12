@@ -19,7 +19,8 @@ impl Serialize for LocalCid {
         // add 0 at start
         let mut b = vec![0_u8];
         b.extend(self.0.to_bytes());
-        s.serialize_cbor_tagged(CID_CBOR_TAG, &b)
+        let bytes = serde_cbor::Value::Bytes(b);
+        s.serialize_cbor_tagged(CID_CBOR_TAG, &bytes)
     }
 }
 
@@ -29,7 +30,13 @@ impl<'de> Deserialize<'de> for LocalCid {
         D: Deserializer<'de>,
     {
         deserializer.expect_cbor_tag(CID_CBOR_TAG)?;
-        let res = Vec::<u8>::deserialize(deserializer)?;
+
+        let res = if let serde_cbor::Value::Bytes(b) = serde_cbor::Value::deserialize(deserializer)?
+        {
+            b
+        } else {
+            panic!("Should not happen! serde_cbor::Value must be Bytes type")
+        };
 
         if res.len() == 0 {
             return Err(D::Error::custom(format!("Value was empty")));
@@ -42,5 +49,11 @@ impl<'de> Deserialize<'de> for LocalCid {
         let cid = Cid::from(res)
             .map_err(|e| D::Error::custom(format!("Cid deserialize failed: {:}", e)))?;
         Ok(LocalCid(cid))
+    }
+}
+
+impl From<Cid> for LocalCid {
+    fn from(cid: Cid) -> Self {
+        LocalCid(cid)
     }
 }

@@ -13,7 +13,7 @@ keywords = ["ipfs", "cid"]
 thiserror = "1.0"
 integer-encoding = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag" }
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
 
 multihash = { package = "parity-multihash", version = "0.2" }
 multibase = { package = "rust-multibase", path = "../multibase" }

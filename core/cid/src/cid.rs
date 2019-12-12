@@ -76,6 +76,11 @@ impl Cid {
         }
     }
 
+    /// Stringify the CID with Base32 for `Version::V1`
+    pub fn to_string(&self) -> String {
+        self.to_string_by_base(Base::Base32Lower)
+    }
+
     fn to_bytes_v0(&self) -> Vec<u8> {
         self.hash.as_bytes().to_vec()
     }

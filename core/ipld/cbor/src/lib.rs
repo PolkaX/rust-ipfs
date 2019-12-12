@@ -1,25 +1,35 @@
+#![cfg_attr(feature = "bench", feature(test))]
+#[cfg(feature = "bench")]
+extern crate test;
+
+#[cfg(feature = "bigint")]
+mod bigint;
 mod error;
 mod localcid;
 mod obj;
-
+#[cfg(test)]
+mod tests;
+// std
 use std::result;
 use std::str::FromStr;
-
-use either::*;
-
+// 3rd party
 use bytes::Bytes;
-
-use cid::{Cid, Codec};
-use multihash::Hash as MHashEnum;
-
+use either::*;
+use serde::Serialize;
+// local dependency
 use block_format::{BasicBlock, Block};
+use cid::{Cid, Codec};
 use ipld_format::{FormatError, Link, Node as NodeT, NodeStat, Resolver};
-
+use multihash::Hash as MHashEnum;
+// self
+#[cfg(feature = "bigint")]
+pub use crate::bigint::CborBigUint;
 pub use crate::error::*;
 pub use crate::localcid::LocalCid;
 pub use crate::obj::{convert_to_cborish_obj, convert_to_jsonish_obj, Obj};
 
 /// Node represents an IPLD node.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     obj: Obj,
     tree: Vec<String>,
@@ -60,11 +70,9 @@ impl Resolver for Node {
         for (index, val) in path.iter().enumerate() {
             match cur {
                 Obj::Map(m) => {
-                    cur = m
-                        .get(val)
-                        .ok_or(FormatError::Other(Box::new(CborError::NoSuchLink(
-                            val.clone(),
-                        ))))?;
+                    cur = m.get::<str>(val).ok_or(FormatError::Other(Box::new(
+                        CborError::NoSuchLink(val.clone()),
+                    )))?;
                 }
                 Obj::Array(arr) => {
                     let index =
@@ -164,6 +172,8 @@ impl NodeT for Node {
     }
 }
 
+// json Serialize/Deserialize
+/// Serialize `Node` to json string
 pub fn to_json(node: &Node) -> Result<String> {
     // drop other info
     let obj = node.obj.clone();
@@ -172,6 +182,7 @@ pub fn to_json(node: &Node) -> Result<String> {
     Ok(s)
 }
 
+/// Deserialize json string to `Node`
 pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<Node> {
     let obj = serde_json::from_str::<Obj>(json_str)?;
     let obj = convert_to_cborish_obj(obj)?;
@@ -179,11 +190,22 @@ pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<Node> {
     wrap_obj(obj, hash_type)
 }
 
+// cbor Serialize/Deserialize
+/// Decode decodes a CBOR object into an IPLD Node.
+#[inline]
+pub fn decode(bytes: &[u8], hash_type: MHashEnum) -> Result<Node> {
+    let obj: Obj = serde_cbor::from_slice(bytes)?;
+    wrap_obj(obj, hash_type)
+}
+
+#[inline]
+pub fn dump_object<T: Serialize>(obj: &T) -> Result<Vec<u8>> {
+    serde_cbor::to_vec(&obj).map_err(CborError::CborErr)
+}
+
 fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<Node> {
-    let data = serde_cbor::to_vec(&obj)?;
-
+    let data = dump_object(&obj)?;
     let hash = multihash::encode(hash_type, &data)?;
-
     let c = Cid::new_cid_v1(Codec::DagCBOR, hash)?;
 
     let block = BasicBlock::new_with_cid(data.into(), c)?;
