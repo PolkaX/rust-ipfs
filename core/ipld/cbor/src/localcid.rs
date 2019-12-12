@@ -30,12 +30,13 @@ impl<'de> Deserialize<'de> for LocalCid {
         D: Deserializer<'de>,
     {
         deserializer.expect_cbor_tag(CID_CBOR_TAG)?;
-
-        let res = if let serde_cbor::Value::Bytes(b) = serde_cbor::Value::deserialize(deserializer)?
-        {
+        let v = serde_cbor::Value::deserialize(deserializer)?;
+        let res = if let serde_cbor::Value::Bytes(b) = v {
             b
         } else {
-            panic!("Should not happen! serde_cbor::Value must be Bytes type")
+            return Err(D::Error::custom(format!(
+                "serde_cbor::Value must be Bytes type"
+            )));
         };
 
         if res.len() == 0 {
@@ -46,7 +47,7 @@ impl<'de> Deserialize<'de> for LocalCid {
             return Err(D::Error::custom(format!("Invalid multibase on IPLD link")));
         }
 
-        let cid = Cid::from(res)
+        let cid = Cid::from(&res[1..])
             .map_err(|e| D::Error::custom(format!("Cid deserialize failed: {:}", e)))?;
         Ok(LocalCid(cid))
     }

@@ -1,16 +1,18 @@
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 use cid::ToCid;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
 
 use crate::error::*;
 use crate::localcid::LocalCid;
+use std::fmt::Write;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(untagged)]
+#[derive(Clone, Debug, PartialEq)]
+//#[serde(untagged)]
 pub enum Obj {
     Null,
     Bool(bool),
@@ -71,6 +73,171 @@ impl PartialOrd for SortedStr {
 impl From<String> for SortedStr {
     fn from(s: String) -> Self {
         SortedStr(s)
+    }
+}
+
+impl serde::Serialize for Obj {
+    #[inline]
+    fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match *self {
+            Obj::Null => serializer.serialize_unit(),
+            Obj::Bool(v) => serializer.serialize_bool(v),
+            Obj::Integer(v) => serializer.serialize_i128(v),
+            Obj::Float(v) => serializer.serialize_f64(v),
+            Obj::Bytes(ref v) => serializer.serialize_bytes(&v),
+            Obj::Text(ref v) => serializer.serialize_str(&v),
+            Obj::Array(ref v) => v.serialize(serializer),
+            Obj::Map(ref v) => v.serialize(serializer),
+            Obj::Cid(ref v) => v.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Obj {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ValueVisitor;
+
+        impl<'de> de::Visitor<'de> for ValueVisitor {
+            type Value = Obj;
+
+            fn expecting(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt.write_str("any valid CBOR value")
+            }
+
+            #[inline]
+            fn visit_str<E>(self, value: &str) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_string(String::from(value))
+            }
+
+            #[inline]
+            fn visit_string<E>(self, value: String) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Obj::Text(value))
+            }
+            #[inline]
+            fn visit_bytes<E>(self, v: &[u8]) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_byte_buf(v.to_owned())
+            }
+
+            #[inline]
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Obj::Bytes(v))
+            }
+
+            #[inline]
+            fn visit_u64<E>(self, v: u64) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Obj::Integer(v.into()))
+            }
+
+            #[inline]
+            fn visit_i64<E>(self, v: i64) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Obj::Integer(v.into()))
+            }
+
+            #[inline]
+            fn visit_i128<E>(self, v: i128) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Obj::Integer(v))
+            }
+
+            #[inline]
+            fn visit_bool<E>(self, v: bool) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Obj::Bool(v))
+            }
+
+            #[inline]
+            fn visit_none<E>(self) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                self.visit_unit()
+            }
+
+            #[inline]
+            fn visit_unit<E>(self) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Obj::Null)
+            }
+
+            #[inline]
+            fn visit_seq<V>(self, mut visitor: V) -> ::std::result::Result<Self::Value, V::Error>
+            where
+                V: de::SeqAccess<'de>,
+            {
+                let mut vec = Vec::new();
+
+                while let Some(elem) = visitor.next_element()? {
+                    vec.push(elem);
+                }
+
+                Ok(Obj::Array(vec))
+            }
+
+            #[inline]
+            fn visit_map<V>(self, mut visitor: V) -> ::std::result::Result<Self::Value, V::Error>
+            where
+                V: de::MapAccess<'de>,
+            {
+                let mut values = BTreeMap::new();
+
+                while let Some((key, value)) = visitor.next_entry()? {
+                    values.insert(key, value);
+                }
+
+                Ok(Obj::Map(values))
+            }
+
+            #[inline]
+            fn visit_f64<E>(self, v: f64) -> ::std::result::Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Obj::Float(v))
+            }
+
+            fn visit_newtype_struct<D>(
+                self,
+                deserializer: D,
+            ) -> ::std::result::Result<Self::Value, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let cid = LocalCid::deserialize(deserializer)?;
+                Ok(Obj::Cid(cid))
+            }
+        }
+
+        deserializer.deserialize_any(ValueVisitor)
     }
 }
 
