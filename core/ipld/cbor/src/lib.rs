@@ -25,8 +25,11 @@ use multihash::Hash as MHashEnum;
 #[cfg(feature = "bigint")]
 pub use crate::bigint::CborBigUint;
 pub use crate::error::*;
-pub use crate::localcid::LocalCid;
-pub use crate::obj::{convert_to_cborish_obj, convert_to_jsonish_obj, Obj};
+pub use crate::localcid::CborCid;
+pub use crate::obj::{
+    convert_to_cborish_obj, convert_to_jsonish_obj, hack_convert_float_to_int,
+    hack_convert_int_to_float, Obj,
+};
 
 /// Node represents an IPLD node.
 #[derive(Debug, Clone, PartialEq)]
@@ -115,11 +118,13 @@ impl Resolver for Node {
             // `skip_while` would ignore first chars until meet "/"
             // `skip_while` plus `trim_start_matches` would equal to `strings.TrimLeft` in GO
             // but `s` is allocated, use char.utf8_len to peek slice for `t` could avoid allocate.
-            let s: String = t
-                .chars()
-                .skip(path.len())
-                .skip_while(|c| *c != '/')
-                .collect();
+            let skip = t.chars().skip(path.len()); // equal to `[len(path):]`
+            let s: String = if path.len() != 0 {
+                // only filter when path is not "", notice GO not impl for this!
+                skip.skip_while(|c| *c != '/').collect()
+            } else {
+                skip.collect()
+            };
             // "/123/123" would be "123/123", "//123/123" would be "123/123"
             let sub = s.trim_start_matches('/');
             if sub == "" {
@@ -177,17 +182,33 @@ impl NodeT for Node {
 pub fn to_json(node: &Node) -> Result<String> {
     // drop other info
     let obj = node.obj.clone();
+    obj_to_json(obj)
+}
+
+// sample for test
+#[inline]
+fn obj_to_json(obj: Obj) -> Result<String> {
     let json_obj = convert_to_jsonish_obj(obj)?;
+    // hack handle for rust, to match go
+    let json_obj = hack_convert_float_to_int(json_obj)?;
     let s = serde_json::to_string(&json_obj)?;
     Ok(s)
 }
 
 /// Deserialize json string to `Node`
 pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<Node> {
-    let obj = serde_json::from_str::<Obj>(json_str)?;
-    let obj = convert_to_cborish_obj(obj)?;
+    let obj = json_to_obj(json_str)?;
     // need to generate other info
     wrap_obj(obj, hash_type)
+}
+
+// sample for test
+#[inline]
+fn json_to_obj(json_str: &str) -> Result<Obj> {
+    let obj = serde_json::from_str::<Obj>(json_str)?;
+    // hack handle for rust, to match go
+    let obj = hack_convert_int_to_float(obj)?;
+    convert_to_cborish_obj(obj)
 }
 
 // cbor Serialize/Deserialize

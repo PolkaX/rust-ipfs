@@ -1,15 +1,16 @@
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-use cid::ToCid;
+use cid::{Cid, ToCid};
 use serde::{de, Deserialize, Serialize};
+use serde_cbor::Value;
 
 use crate::error::*;
-use crate::localcid::LocalCid;
-use std::fmt::Write;
+use crate::localcid::CborCid;
 
 #[derive(Clone, Debug, PartialEq)]
 //#[serde(untagged)]
@@ -22,7 +23,7 @@ pub enum Obj {
     Text(String),
     Array(Vec<Obj>),
     Map(BTreeMap<SortedStr, Obj>),
-    Cid(LocalCid),
+    Cid(CborCid),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -73,6 +74,12 @@ impl PartialOrd for SortedStr {
 impl From<String> for SortedStr {
     fn from(s: String) -> Self {
         SortedStr(s)
+    }
+}
+
+impl From<&str> for SortedStr {
+    fn from(s: &str) -> Self {
+        SortedStr(s.to_string())
     }
 }
 
@@ -232,13 +239,97 @@ impl<'de> serde::Deserialize<'de> for Obj {
             where
                 D: serde::Deserializer<'de>,
             {
-                let cid = LocalCid::deserialize(deserializer)?;
+                let cid = CborCid::deserialize(deserializer)?;
                 Ok(Obj::Cid(cid))
             }
         }
 
         deserializer.deserialize_any(ValueVisitor)
     }
+}
+
+impl TryFrom<serde_cbor::Value> for Obj {
+    type Error = ();
+
+    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+        match value {
+            Value::Null => Ok(Obj::Null),
+            Value::Bool(b) => Ok(Obj::Bool(b)),
+            Value::Integer(i) => Ok(Obj::Integer(i)),
+            Value::Float(f) => Ok(Obj::Float(f)),
+            Value::Bytes(b) => Ok(Obj::Bytes(b)),
+            Value::Text(s) => Ok(Obj::Text(s)),
+            Value::Array(arr) => {
+                let mut v = vec![];
+                for i in arr {
+                    let obj = Obj::try_from(i)?;
+                    v.push(obj);
+                }
+                Ok(Obj::Array(v))
+            }
+            Value::Map(m) => {
+                let mut new_m = BTreeMap::new();
+                for (k, v) in m {
+                    if let Value::Text(key) = k {
+                        new_m.insert(key.into(), Obj::try_from(v)?);
+                    } else {
+                        // todo handle error
+                    }
+                }
+                Ok(Obj::Map(new_m))
+            }
+            Value::Tag(tag, v) => {
+                // todo handle error
+                assert_eq!(tag, 42);
+                if let Value::Bytes(res) = *v {
+                    if res.len() == 0 {
+                        // TODO handle error
+                    }
+
+                    if res[0] != 0 {
+                        // TODO handle error
+                    }
+
+                    // TODO handle error
+                    let cid = Cid::from(&res[1..]).unwrap();
+                    Ok(Obj::Cid(cid.into()))
+                } else {
+                    // todo handle error
+                    panic!("")
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+pub fn hack_convert_int_to_float(value: Obj) -> Result<Obj> {
+    let mut value = value;
+    let mut func = |obj: &mut Obj| match obj {
+        Obj::Integer(ref mut i) => {
+            // all integer would convert into f64
+            *obj = Obj::Float(*i as f64);
+            Ok(())
+        }
+        _ => Ok(()),
+    };
+    traverse_obj_tree(&mut value, &mut func)?;
+    Ok(value)
+}
+
+pub fn hack_convert_float_to_int(value: Obj) -> Result<Obj> {
+    let mut value = value;
+    let mut func = |obj: &mut Obj| match obj {
+        Obj::Float(ref mut f) => {
+            if f.fract() == 0.0 {
+                *obj = Obj::Integer(*f as i128);
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    };
+    traverse_obj_tree(&mut value, &mut func)?;
+    Ok(value)
 }
 
 pub fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
@@ -250,7 +341,7 @@ pub fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
                     match link {
                         Obj::Text(s) => {
                             let cid = s.to_cid()?;
-                            *obj = Obj::Cid(LocalCid(cid));
+                            *obj = Obj::Cid(CborCid(cid));
                         }
                         Obj::Cid(cid) => {
                             *obj = Obj::Cid(cid.clone());

@@ -1,17 +1,20 @@
+use std::borrow::Borrow;
+
 use serde::de::{Deserialize, Deserializer, Error};
 use serde::ser::{Serialize, Serializer};
 
 use serde_cbor::tags::{DeserializerExt, SerializerExt};
 
 use crate::Cid;
+use std::ops::{Deref, DerefMut};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct LocalCid(pub Cid);
+pub struct CborCid(pub Cid);
 
 /// CID_CBOR_TAG is the integer used to represent cid tags in CBOR.
 pub const CID_CBOR_TAG: u64 = 42;
 
-impl Serialize for LocalCid {
+impl Serialize for CborCid {
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -24,8 +27,8 @@ impl Serialize for LocalCid {
     }
 }
 
-impl<'de> Deserialize<'de> for LocalCid {
-    fn deserialize<D>(deserializer: D) -> Result<LocalCid, D::Error>
+impl<'de> Deserialize<'de> for CborCid {
+    fn deserialize<D>(deserializer: D) -> Result<CborCid, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -49,12 +52,38 @@ impl<'de> Deserialize<'de> for LocalCid {
 
         let cid = Cid::from(&res[1..])
             .map_err(|e| D::Error::custom(format!("Cid deserialize failed: {:}", e)))?;
-        Ok(LocalCid(cid))
+        Ok(CborCid(cid))
     }
 }
 
-impl From<Cid> for LocalCid {
+impl From<Cid> for CborCid {
     fn from(cid: Cid) -> Self {
-        LocalCid(cid)
+        CborCid(cid)
+    }
+}
+
+impl Borrow<Cid> for CborCid {
+    fn borrow(&self) -> &Cid {
+        &self.0
+    }
+}
+
+impl AsRef<Cid> for CborCid {
+    fn as_ref(&self) -> &Cid {
+        &self.0
+    }
+}
+
+impl Deref for CborCid {
+    type Target = Cid;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for CborCid {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
