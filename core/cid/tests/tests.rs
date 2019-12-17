@@ -2,9 +2,7 @@
 
 use std::collections::HashMap;
 
-use rust_cid::{
-    new_cid_v0, new_cid_v1, new_prefix_v0, new_prefix_v1, Cid, Codec, Hash, Prefix, Version,
-};
+use rust_cid::{new_prefix_v0, new_prefix_v1, Cid, Codec, Hash, Prefix, Version};
 
 #[test]
 fn basic_marshalling() {
@@ -139,7 +137,7 @@ fn test_new_prefix_v0() {
 
     // Construct c2
     let mhash = multihash::encode(Hash::SHA2256, data).unwrap();
-    let c2 = new_cid_v0(mhash).unwrap();
+    let c2 = Cid::new_cid_v0(mhash).unwrap();
     assert_eq!(c1, c2);
     assert_eq!(c1.prefix(), c2.prefix());
 }
@@ -185,7 +183,7 @@ fn test_new_prefix_v1() {
 
     // Construct c2
     let mhash = multihash::encode(Hash::SHA2256, data).unwrap();
-    let c2 = new_cid_v1(Codec::DagCBOR, mhash).unwrap();
+    let c2 = Cid::new_cid_v1(Codec::DagCBOR, mhash).unwrap();
     assert_eq!(c1, c2);
     assert_eq!(c1.prefix(), c2.prefix());
 }
@@ -194,7 +192,7 @@ fn test_new_prefix_v1() {
 fn test_prefix_roundtrip() {
     let data = b"this is some test content";
     let mhash = multihash::encode(Hash::SHA2256, data.as_ref()).unwrap();
-    let c1 = new_cid_v1(Codec::DagCBOR, mhash).unwrap();
+    let c1 = Cid::new_cid_v1(Codec::DagCBOR, mhash).unwrap();
 
     let prefix1 = c1.prefix();
     let c2 = prefix1.sum(data.as_ref()).unwrap();

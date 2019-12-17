@@ -17,7 +17,7 @@ mod version;
 pub use multibase::Base;
 pub use multihash::{Hash, Multihash};
 
-pub use self::cid::{new_cid_v0, new_cid_v1, Cid};
+pub use self::cid::Cid;
 pub use self::codec::Codec;
 pub use self::error::{Error, Result};
 pub use self::prefix::{new_prefix_v0, new_prefix_v1, Prefix};

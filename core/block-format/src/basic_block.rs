@@ -3,7 +3,7 @@
 use std::fmt::{Debug, Display, Error, Formatter};
 
 use bytes::Bytes;
-use cid::{new_cid_v0, Cid, Multihash};
+use cid::{Cid, Multihash};
 use ipfs_util::hash;
 
 use crate::error::BlockFormatError;
@@ -23,7 +23,7 @@ impl BasicBlock {
         let sha256_hash = hash(data.as_ref());
         BasicBlock {
             data,
-            cid: new_cid_v0(sha256_hash).expect("invalid hash for cidv0"),
+            cid: Cid::new_cid_v0(sha256_hash).expect("invalid hash for cidv0"),
         }
     }
     pub fn new_with_cid(data: Bytes, cid: Cid) -> Result<BasicBlock, BlockFormatError> {

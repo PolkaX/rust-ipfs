@@ -31,6 +31,20 @@ impl Cid {
         }
     }
 
+    /// A helper function to create CIDv0.
+    pub fn new_cid_v0(mh: Multihash) -> Result<Cid> {
+        if mh.algorithm() != Hash::SHA2256 || mh.digest().len() != 32 {
+            return Err(Error::InvalidCidV0(mh.algorithm(), mh.digest().len()));
+        }
+
+        Ok(Cid::new(Version::V0, Codec::DagProtobuf, mh))
+    }
+
+    /// A helper function to create CIDv1.
+    pub fn new_cid_v1(codec: Codec, mh: Multihash) -> Result<Cid> {
+        Ok(Cid::new(Version::V1, codec, mh))
+    }
+
     /// Create a new CID from raw data (binary or multibase encoded string)
     pub fn from<T: ToCid>(data: T) -> Result<Cid> {
         data.to_cid()
@@ -60,6 +74,11 @@ impl Cid {
             Version::V0 => self.to_string_v0(),
             Version::V1 => self.to_string_v1(v1_base),
         }
+    }
+
+    /// Stringify the CID with Base32 for `Version::V1`
+    pub fn to_string(&self) -> String {
+        self.to_string_by_base(Base::Base32Lower)
     }
 
     fn to_bytes_v0(&self) -> Vec<u8> {
@@ -125,18 +144,4 @@ impl std::fmt::Display for Cid {
             self.to_string_by_base(multibase::Base::Base32Lower)
         )
     }
-}
-
-/// A helper function to create CIDv0.
-pub fn new_cid_v0(mh: Multihash) -> Result<Cid> {
-    if mh.algorithm() != Hash::SHA2256 || mh.digest().len() != 32 {
-        return Err(Error::InvalidCidV0(mh.algorithm(), mh.digest().len()));
-    }
-
-    Ok(Cid::new(Version::V0, Codec::DagProtobuf, mh))
-}
-
-/// A helper function to create CIDv1.
-pub fn new_cid_v1(codec: Codec, mh: Multihash) -> Result<Cid> {
-    Ok(Cid::new(Version::V1, codec, mh))
 }

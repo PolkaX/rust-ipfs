@@ -1,9 +1,11 @@
+use std::error::Error;
+
 use cid::Codec;
 use thiserror::Error;
 
 pub type Result<T> = ::std::result::Result<T, FormatError>;
 
-#[derive(Error, PartialEq, Eq, Clone, Debug)]
+#[derive(Error, Debug)]
 pub enum FormatError {
     #[error("this obj can't return NodeStat")]
     NotSupportStat,
@@ -31,4 +33,10 @@ pub enum FormatError {
 
     #[error("child not exist for this index. index: {0}")]
     NoChild(usize),
+
+    #[error("no such link found")]
+    NoSuchLink,
+
+    #[error("other err: {0}")]
+    Other(Box<dyn Error>),
 }

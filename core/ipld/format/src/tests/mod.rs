@@ -31,7 +31,7 @@ impl EmptyNode {
 }
 
 impl Node for EmptyNode {
-    fn resolve_link(&self, path: &str, depth: i32) -> Vec<String> {
+    fn resolve_link(&self, path: &[String]) -> Result<(Link, Vec<String>)> {
         unimplemented!()
     }
 
@@ -59,11 +59,12 @@ impl Block for EmptyNode {
 }
 
 impl Resolver for EmptyNode {
-    fn resolve(&self, path: &[String]) -> Vec<String> {
+    type Output = ();
+    fn resolve(&self, path: &[String]) -> Result<(Self::Output, Vec<String>)> {
         unimplemented!()
     }
 
-    fn tree(&self, path: &str, depth: i32) -> Vec<String> {
+    fn tree(&self, path: &str, depth: Option<usize>) -> Vec<String> {
         unimplemented!()
     }
 }

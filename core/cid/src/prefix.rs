@@ -5,7 +5,7 @@ use std::io::Cursor;
 use integer_encoding::{VarIntReader, VarIntWriter};
 use multihash::Hash;
 
-use crate::cid::{new_cid_v0, new_cid_v1, Cid};
+use crate::cid::Cid;
 use crate::codec::Codec;
 use crate::error::{Error, Result};
 use crate::version::Version;
@@ -65,8 +65,8 @@ impl Prefix {
 
         let mh = multihash::encode(self.mh_type, data)?;
         match self.version {
-            Version::V0 => new_cid_v0(mh),
-            Version::V1 => new_cid_v1(self.codec, mh),
+            Version::V0 => Cid::new_cid_v0(mh),
+            Version::V1 => Cid::new_cid_v1(self.codec, mh),
         }
     }
 }
