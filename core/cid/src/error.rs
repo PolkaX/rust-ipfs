@@ -1,13 +1,12 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use multihash::Hash;
-use thiserror::Error;
 
 /// The custom result type for `CID`.
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// The custom error type for `CID`.
-#[derive(Error, Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Invalid format of CID version0.
     #[error("Invalid hash bytes for CIDv0, hash: {0:?}, hash len: {1}")]
@@ -29,7 +28,7 @@ pub enum Error {
     InputTooShort,
     /// Multihash parse failure.
     #[error("Failed to parse multihash: {0}")]
-    ParsingError(#[source] Box<dyn std::error::Error + Send>),
+    ParsingError(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<std::io::Error> for Error {

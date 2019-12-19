@@ -1,32 +1,41 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use std::fmt::{Debug, Display, Error, Formatter};
+use std::fmt;
 
 use bytes::Bytes;
 use cid::{Cid, Multihash};
-use ipfs_util::hash;
+use util::sha2_256_hash;
 
-use crate::error::BlockFormatError;
+use crate::error::{BlockFormatError, Result};
 
+/// The trait for getting raw data and cid of block.
 pub trait Block {
+    /// Get the raw data of block.
     fn raw_data(&self) -> &Bytes;
+
+    /// Get the cid of block.
     fn cid(&self) -> &Cid;
 }
 
+/// The basic block.
+#[derive(Clone, Debug)]
 pub struct BasicBlock {
     cid: Cid,
     data: Bytes,
 }
 
 impl BasicBlock {
+    /// Creates a new `BasicBlock` with given bytes, and its CID is version 0.
     pub fn new(data: Bytes) -> BasicBlock {
-        let sha256_hash = hash(data.as_ref());
+        let sha256_hash = sha2_256_hash(data.as_ref());
         BasicBlock {
             data,
-            cid: Cid::new_cid_v0(sha256_hash).expect("invalid hash for cidv0"),
+            cid: Cid::new_cid_v0(sha256_hash).expect("invalid hash for CIDv0"),
         }
     }
-    pub fn new_with_cid(data: Bytes, cid: Cid) -> Result<BasicBlock, BlockFormatError> {
+
+    /// Creates a new `BasicBlock` with given bytes and CID.
+    pub fn new_with_cid(data: Bytes, cid: Cid) -> Result<BasicBlock> {
         #[cfg(debug_assertions)]
         {
             let checked_cid = cid
@@ -41,6 +50,7 @@ impl BasicBlock {
         Ok(BasicBlock { data, cid })
     }
 
+    /// Get the multihash of cid of the basic block.
     pub fn multihash(&self) -> Multihash {
         self.cid.multihash()
     }
@@ -56,14 +66,8 @@ impl Block for BasicBlock {
     }
 }
 
-impl Debug for BasicBlock {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+impl fmt::Display for BasicBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[Block {:?}]", self)
-    }
-}
-
-impl Display for BasicBlock {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        Debug::fmt(self, f)
     }
 }

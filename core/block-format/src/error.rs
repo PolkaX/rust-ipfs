@@ -1,17 +1,17 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use thiserror::Error;
+use cid::{Cid, Error as CidError};
 
-use cid::{Cid, Error as CidErr};
+/// The custom result type for `block format`.
+pub type Result<T> = std::result::Result<T, BlockFormatError>;
 
-#[derive(Error, Debug)]
+/// The custom error type for `block format`.
+#[derive(Debug, thiserror::Error)]
 pub enum BlockFormatError {
-    #[error("data did not match given hash, fst: {0}, snd: {1}")]
+    /// The data of block is not match given hash.
+    #[error("data is not match given hash, fst: {0}, snd: {1}")]
     WrongHash(Cid, Cid),
-    #[error("Cid Error {0}")]
-    CidError(
-        #[from]
-        #[source]
-        CidErr,
-    ),
+    /// Cid error.
+    #[error("cid error: {0}")]
+    CidError(#[from] CidError),
 }
