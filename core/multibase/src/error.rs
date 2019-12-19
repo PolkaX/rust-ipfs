@@ -1,6 +1,9 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-/// The custom error type for `multibase`.
+/// The special result type for `multibase`.
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// The special error type for `multibase`.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Error {
     /// Unknown base code.
@@ -31,6 +34,3 @@ impl From<data_encoding::DecodeError> for Error {
         Error::InvalidCharacter
     }
 }
-
-/// The custom result type for `multibase`.
-pub type Result<T> = std::result::Result<T, Error>;

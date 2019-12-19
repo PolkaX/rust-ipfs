@@ -14,7 +14,7 @@ thiserror = "1.0"
 bytes = { version = "0.5", features = ["serde"] }
 
 cid = { package = "rust-cid", path = "../cid" }
-ipfs-util = { package = "rust-ipfs-util", path = "../util" }
+util = { package = "rust-ipfs-util", path = "../util" }
 
 [dev-dependencies]
 multihash = { package = "parity-multihash", version = "0.2" }

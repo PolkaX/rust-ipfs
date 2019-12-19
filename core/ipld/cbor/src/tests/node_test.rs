@@ -43,7 +43,7 @@ fn test_decode_into_non_obj() {
 
 #[test]
 fn test_basic_marshal() {
-    let c = Cid::new_cid_v0(util::hash(b"something")).unwrap();
+    let c = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
     let mut m = BTreeMap::new();
     m.insert("name".to_string().into(), Obj::Text("foo".to_string()));
     m.insert("bar".to_string().into(), Obj::Cid(c.clone().into()));
@@ -70,9 +70,9 @@ fn test_basic_marshal() {
 
 #[test]
 fn test_marshal_roundtrip() {
-    let c1 = Cid::new_cid_v0(util::hash(b"something1")).unwrap();
-    let c2 = Cid::new_cid_v0(util::hash(b"something2")).unwrap();
-    let c3 = Cid::new_cid_v0(util::hash(b"something3")).unwrap();
+    let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
+    let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
+    let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
 
     let mut m = BTreeMap::new();
     m.insert("foo".to_string().into(), Obj::Text("bar".to_string()));
@@ -117,10 +117,10 @@ fn test_marshal_roundtrip() {
 
 #[test]
 fn test_tree() {
-    let c1 = Cid::new_cid_v0(util::hash(b"something1")).unwrap();
-    let c2 = Cid::new_cid_v0(util::hash(b"something2")).unwrap();
-    let c3 = Cid::new_cid_v0(util::hash(b"something3")).unwrap();
-    let c4 = Cid::new_cid_v0(util::hash(b"something4")).unwrap();
+    let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
+    let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
+    let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
+    let c4 = Cid::new_cid_v0(util::sha2_256_hash(b"something4")).unwrap();
 
     let mut obj_m = BTreeMap::new();
     obj_m.insert("foo".into(), Obj::Cid(c1.into()));
@@ -254,7 +254,7 @@ fn test_resolved_val_is_jsonable() {
         &n.cid().to_string(),
         "bafyreiahcy6ewqmabbh7lcjhxrillpf72zlu3vqcovckanvj2fwdtenvbe"
     );
-    let (val, _) = n.resolve(&vec!["foo".to_string()]).unwrap();
+    let (val, _) = n.resolve(&vec!["foo"]).unwrap();
     match val {
         Either::Left(l) => panic!(""),
         Either::Right(obj) => {
@@ -363,7 +363,7 @@ fn test_canonicalize() {
 #[test]
 fn test_stable_cid() {
     let b = fs::read(format!("{}non-canon.cbor", TEST_OBJ_ROOT)).unwrap();
-    let hash = util::hash(&b);
+    let hash = util::sha2_256_hash(&b);
     let c = Cid::new_cid_v1(Codec::DagCBOR, hash).unwrap();
     let bad_block = BasicBlock::new_with_cid(b.into(), c).unwrap();
     let bad_node = decode_block(&bad_block).unwrap();

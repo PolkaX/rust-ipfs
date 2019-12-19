@@ -5,7 +5,7 @@
 //! But we provide more useful functions.
 
 #![deny(missing_docs)]
-#![allow(clippy::derive_hash_xor_eq)]
+#![allow(clippy::derive_hash_xor_eq, clippy::inherent_to_string_shadow_display)]
 
 mod cid;
 mod codec;
