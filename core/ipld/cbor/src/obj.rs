@@ -1,3 +1,5 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -9,7 +11,7 @@ use cid::{Cid, ToCid};
 use serde::{de, Deserialize, Serialize};
 use serde_cbor::Value;
 
-use crate::error::*;
+use crate::error::{CborError, Result};
 use crate::localcid::CborCid;
 
 #[derive(Clone, Debug, PartialEq)]
