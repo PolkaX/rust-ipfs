@@ -68,13 +68,13 @@ impl Resolver for Node {
     type Output = Either<Link, Obj>;
     /// Resolve resolves a given path, and returns the object found at the end, as well
     /// as the possible tail of the path that was not resolved.
-    fn resolve(&self, path: &[String]) -> result::Result<(Self::Output, Vec<String>), FormatError> {
+    fn resolve(&self, path: &[&str]) -> result::Result<(Self::Output, Vec<String>), FormatError> {
         let mut cur = &self.obj;
         for (index, val) in path.iter().enumerate() {
             match cur {
                 Obj::Map(m) => {
                     cur = m.get::<str>(val).ok_or(FormatError::Other(Box::new(
-                        CborError::NoSuchLink(val.clone()),
+                        CborError::NoSuchLink(val.clone().to_string()),
                     )))?;
                 }
                 Obj::Array(arr) => {
@@ -85,7 +85,7 @@ impl Resolver for Node {
                     )))?;
                 }
                 Obj::Cid(cid) => {
-                    let link = Link::new_default(cid.0.clone());
+                    let link = Link::new_with_cid(cid.0.clone());
                     return Ok((
                         Left(link),
                         path.iter().skip(index).map(|s| s.clone()).collect(),
@@ -95,7 +95,7 @@ impl Resolver for Node {
             }
         }
         if let Obj::Cid(cid) = cur {
-            let link = Link::new_default(cid.0.clone());
+            let link = Link::new_with_cid(cid.0.clone());
             return Ok((Left(link), vec![]));
         }
         let jsonish =
@@ -152,7 +152,7 @@ impl Resolver for Node {
 }
 
 impl NodeT for Node {
-    fn resolve_link(&self, path: &[String]) -> result::Result<(Link, Vec<String>), FormatError> {
+    fn resolve_link(&self, path: &[&str]) -> result::Result<(Link, Vec<String>), FormatError> {
         let (either, rest) = self.resolve(path)?;
 
         match either {
@@ -243,7 +243,7 @@ fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
             tree.push(name);
         }
         if let Obj::Cid(cid) = obj {
-            links.push(Link::new_default(cid.0.clone()))
+            links.push(Link::new_with_cid(cid.0.clone()))
         }
         Ok(())
     };

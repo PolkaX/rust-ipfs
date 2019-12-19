@@ -1,7 +1,5 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use std::fmt;
-
 use bytes::Bytes;
 use cid::{Cid, Multihash};
 use util::sha2_256_hash;
@@ -66,8 +64,8 @@ impl Block for BasicBlock {
     }
 }
 
-impl fmt::Display for BasicBlock {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for BasicBlock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[Block {:?}]", self)
     }
 }

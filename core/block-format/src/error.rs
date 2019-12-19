@@ -2,10 +2,10 @@
 
 use cid::{Cid, Error as CidError};
 
-/// The custom result type for `block format`.
+/// The special result type for `block format`.
 pub type Result<T> = std::result::Result<T, BlockFormatError>;
 
-/// The custom error type for `block format`.
+/// The special error type for `block format`.
 #[derive(Debug, thiserror::Error)]
 pub enum BlockFormatError {
     /// The data of block is not match given hash.

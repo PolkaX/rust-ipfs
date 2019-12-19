@@ -18,4 +18,4 @@ block-format = { package = "rust-block-format", path = "../../block-format" }
 cid = { package = "rust-cid", path = "../../cid" }
 
 [dev-dependencies]
-bytes = { version = "0.5", features = ["serde"] }
+bytes = "0.5"

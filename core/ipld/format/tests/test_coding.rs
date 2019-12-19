@@ -1,15 +1,21 @@
-use super::*;
-use crate::coding::{decode, register};
+mod common;
+
+use block_format::{BasicBlock, Block};
+use cid::{Codec, Hash, Prefix, Version};
+use rust_ipld_format::coding::{decode, register};
+use rust_ipld_format::{Node, Result};
+
+use self::common::EmptyNode;
 
 // coding
 fn init() {
-    register(Codec::Raw, |b| {
+    register(Codec::Raw, |_block| {
         let node = EmptyNode::new();
         Ok(Box::new(node))
     });
 }
 
-fn decode_fu(block: &dyn Block) -> Result<Box<dyn Node>> {
+fn decode_fu(_block: &dyn Block) -> Result<Box<dyn Node>> {
     let node = EmptyNode::new();
     Ok(Box::new(node))
 }

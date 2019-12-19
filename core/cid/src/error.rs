@@ -2,10 +2,10 @@
 
 use multihash::Hash;
 
-/// The custom result type for `CID`.
+/// The special result type for `CID`.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// The custom error type for `CID`.
+/// The special error type for `CID`.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Invalid format of CID version0.

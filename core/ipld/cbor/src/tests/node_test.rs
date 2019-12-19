@@ -254,7 +254,7 @@ fn test_resolved_val_is_jsonable() {
         &n.cid().to_string(),
         "bafyreiahcy6ewqmabbh7lcjhxrillpf72zlu3vqcovckanvj2fwdtenvbe"
     );
-    let (val, _) = n.resolve(&vec!["foo".to_string()]).unwrap();
+    let (val, _) = n.resolve(&vec!["foo"]).unwrap();
     match val {
         Either::Left(l) => panic!(""),
         Either::Right(obj) => {
