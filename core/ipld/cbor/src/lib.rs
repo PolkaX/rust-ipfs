@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use bytes::Bytes;
 use either::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use block_format::{BasicBlock, Block};
 use cid::{Cid, Codec};
@@ -26,11 +26,11 @@ use multihash::Hash as MHashEnum;
 
 #[cfg(feature = "bigint")]
 pub use self::bigint::CborBigUint;
-pub use self::error::{CborError, Result};
+pub use self::error::{IpldCborError, Result};
 pub use self::localcid::CborCid;
 pub use self::obj::{
     convert_to_cborish_obj, convert_to_jsonish_obj, hack_convert_float_to_int,
-    hack_convert_int_to_float, Obj,
+    hack_convert_int_to_float, struct_to_cbor_value, Obj,
 };
 
 /// `IpldNode` represents an IPLD node.
@@ -76,24 +76,24 @@ impl Resolver for IpldNode {
             match cur {
                 Obj::Map(m) => {
                     cur = m.get::<str>(val).ok_or(FormatError::Other(Box::new(
-                        CborError::NoSuchLink(val.clone().to_string()),
+                        IpldCborError::NoSuchLink(val.clone().to_string()),
                     )))?;
                 }
                 Obj::Array(arr) => {
                     let index =
                         usize::from_str(val).map_err(|e| FormatError::Other(Box::new(e)))?;
                     cur = arr.get(index).ok_or(FormatError::Other(Box::new(
-                        CborError::NoSuchLink(format!("array index out of range[{}]", index)),
+                        IpldCborError::NoSuchLink(format!("array index out of range[{}]", index)),
                     )))?;
                 }
                 Obj::Cid(cid) => {
                     let link = Link::new_with_cid(cid.0.clone());
                     return Ok((
                         Left(link),
-                        path.iter().skip(index).map(|s| s.clone()).collect(),
+                        path.iter().skip(index).map(|s| (*s).to_string()).collect(),
                     ));
                 }
-                _ => return Err(FormatError::Other(Box::new(CborError::NoLinks))),
+                _ => return Err(FormatError::Other(Box::new(IpldCborError::NoLinks))),
             }
         }
         if let Obj::Cid(cid) = cur {
@@ -159,7 +159,7 @@ impl Node for IpldNode {
 
         match either {
             Left(link) => Ok((link, rest)),
-            Right(_) => Err(FormatError::Other(Box::new(CborError::NonLink))),
+            Right(_) => Err(FormatError::Other(Box::new(IpldCborError::NonLink))),
         }
     }
 
@@ -213,17 +213,23 @@ fn json_to_obj(json_str: &str) -> Result<Obj> {
     convert_to_cborish_obj(obj)
 }
 
+#[inline]
+pub fn decode_into<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
+    let obj: T = serde_cbor::from_slice(bytes)?;
+    Ok(obj)
+}
+
 // cbor Serialize/Deserialize
 /// Decode decodes a CBOR object into an IPLD Node.
 #[inline]
 pub fn decode(bytes: &[u8], hash_type: MHashEnum) -> Result<IpldNode> {
-    let obj: Obj = serde_cbor::from_slice(bytes)?;
+    let obj: Obj = decode_into(bytes)?;
     wrap_obj(obj, hash_type)
 }
 
 #[inline]
 pub fn dump_object<T: Serialize>(obj: &T) -> Result<Vec<u8>> {
-    serde_cbor::to_vec(&obj).map_err(CborError::CborErr)
+    serde_cbor::to_vec(&obj).map_err(IpldCborError::CborErr)
 }
 
 fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<IpldNode> {
