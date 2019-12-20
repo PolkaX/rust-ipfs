@@ -41,7 +41,8 @@ impl Serialize for CborBigUint {
     {
         // Returns the byte representation of the `BigUint` in big-endian byte order
         let v = self.0.to_bytes_be();
-        serializer.serialize_bytes(&v)
+        let value = serde_bytes::Bytes::new(&v);
+        serializer.serialize_bytes(&value)
     }
 }
 
@@ -50,7 +51,7 @@ impl<'de> Deserialize<'de> for CborBigUint {
     where
         D: Deserializer<'de>,
     {
-        let v = Vec::<u8>::deserialize(deserializer)?;
+        let v = serde_bytes::ByteBuf::deserialize(deserializer)?;
         Ok(CborBigUint(BigUint::from_bytes_be(&v)))
     }
 }

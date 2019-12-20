@@ -1,16 +1,16 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 ///
-pub type Result<T> = std::result::Result<T, CborError>;
+pub type Result<T> = std::result::Result<T, IpldCborError>;
 
 ///
 #[derive(Debug, thiserror::Error)]
-pub enum CborError {
+pub enum IpldCborError {
     ///
-    #[error("json error: {0}")]
+    #[error("json de/serialize error: {0}")]
     JsonErr(#[from] serde_json::Error),
     ///
-    #[error("json error: {0}")]
+    #[error("cbor de/serialize error: {0}")]
     CborErr(#[from] serde_cbor::Error),
     ///
     #[error("cid error: {0}")]
@@ -36,6 +36,12 @@ pub enum CborError {
     ///
     #[error("link should have been a string")]
     NonStringLink,
+    ///
+    #[error("deserialize cid failed, reason: {0}")]
+    DeserializeCid(String),
+    ///
+    #[error("into Obj failed, reason: {0}")]
+    ObjErr(String),
     /// Other error
     #[error("other error: {0}")]
     Other(#[from] Box<dyn std::error::Error + Send + Sync>),
