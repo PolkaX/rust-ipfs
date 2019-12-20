@@ -1,0 +1,18 @@
+[package]
+name = "rust-hamp-ipld"
+version = "0.1.0"
+authors = ["Aten <jincxmain@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fasthash = "0.4"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+
+multihash = { package = "parity-multihash", version = "0.2" }
+
+block-format = { package = "rust-block-format", path = "../block-format" }
+cid = { package = "rust-cid", path = "../cid" }
+ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor", features = ["bigint"] }

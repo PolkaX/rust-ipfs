@@ -6,6 +6,7 @@ members = [
     "core/ipld/cbor",
     "core/ipld/format",
     "core/block-format",
+    "core/hamp-ipld",
     "core/util",
     "core/merkledag",
 ]
