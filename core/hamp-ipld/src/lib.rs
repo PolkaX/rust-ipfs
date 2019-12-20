@@ -1,10 +1,12 @@
 mod error;
+mod hash;
 mod ipld;
 #[cfg(test)]
 mod tests;
 
 use serde::{Deserialize, Serialize};
 
+use crate::hash::hash;
 use crate::ipld::{Blocks, CborIpldStor};
 use cid::Cid;
 use ipld_cbor::CborBigUint;
