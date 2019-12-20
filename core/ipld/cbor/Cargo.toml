@@ -1,23 +1,25 @@
 [package]
 name = "rust-ipld-cbor"
 version = "0.1.0"
-authors = ["Aten <jincxmain@gmail.com>"]
+authors = ["PolkaX <https://github.com/PolkaX>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT/Apache-2.0"
+repository = "https://github.com/PolkaX/rust-ipfs"
+description = "Implementation of the ipld cbor"
+keywords = ["ipfs", "ipld", "cbor"]
 
 [dependencies]
 thiserror = "1.0"
 either = "1.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
+serde_bytes = "0.11"
 bytes = { version = "0.5", features = ["serde"] }
 num-bigint = { version = "0.2.3", optional = true }
-
 multihash = { package = "parity-multihash", version = "0.2" }
 
 serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
-
 ipld-format = { package = "rust-ipld-format", path = "../format" }
 block-format = { package = "rust-block-format", path = "../../block-format" }
 cid = { package = "rust-cid", path = "../../cid" }

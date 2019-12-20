@@ -1,3 +1,5 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
@@ -6,11 +8,15 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 use cid::{Cid, ToCid};
-use serde::{de, Deserialize, Serialize};
+use serde::{
+    de::{self, Error},
+    Deserialize, Serialize,
+};
+use serde_cbor::tags::current_cbor_tag;
 use serde_cbor::Value;
 
-use crate::error::*;
-use crate::localcid::CborCid;
+use crate::error::{IpldCborError, Result};
+use crate::localcid::{deserialize_cid_from_bytes, CborCid, CID_CBOR_TAG};
 
 #[derive(Clone, Debug, PartialEq)]
 //#[serde(untagged)]
@@ -239,8 +245,13 @@ impl<'de> serde::Deserialize<'de> for Obj {
             where
                 D: serde::Deserializer<'de>,
             {
-                let cid = CborCid::deserialize(deserializer)?;
-                Ok(Obj::Cid(cid))
+                match current_cbor_tag() {
+                    Some(CID_CBOR_TAG) | None => {
+                        let cid = CborCid::deserialize(deserializer)?;
+                        Ok(Obj::Cid(cid))
+                    }
+                    Some(tag) => Err(D::Error::custom(format!("unexpected tag ({})", tag))),
+                }
             }
         }
 
@@ -248,8 +259,14 @@ impl<'de> serde::Deserialize<'de> for Obj {
     }
 }
 
+pub fn struct_to_cbor_value<S: Serialize>(v: &S) -> Result<serde_cbor::Value> {
+    let s = serde_cbor::to_vec(&v)?;
+    let value: serde_cbor::Value = serde_cbor::from_slice(&s)?;
+    Ok(value)
+}
+
 impl TryFrom<serde_cbor::Value> for Obj {
-    type Error = ();
+    type Error = IpldCborError;
 
     fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
         match value {
@@ -273,32 +290,30 @@ impl TryFrom<serde_cbor::Value> for Obj {
                     if let Value::Text(key) = k {
                         new_m.insert(key.into(), Obj::try_from(v)?);
                     } else {
-                        // todo handle error
+                        return Err(IpldCborError::ObjErr(format!("map key must be string")));
                     }
                 }
                 Ok(Obj::Map(new_m))
             }
             Value::Tag(tag, v) => {
-                // todo handle error
-                assert_eq!(tag, 42);
+                if tag != CID_CBOR_TAG {
+                    return Err(IpldCborError::ObjErr(format!(
+                        "obj only accept tag [{:}] to represent cid",
+                        CID_CBOR_TAG
+                    )));
+                }
+
                 if let Value::Bytes(res) = *v {
-                    if res.len() == 0 {
-                        // TODO handle error
-                    }
-
-                    if res[0] != 0 {
-                        // TODO handle error
-                    }
-
-                    // TODO handle error
-                    let cid = Cid::from(&res[1..]).unwrap();
+                    let cid = deserialize_cid_from_bytes(&res)?;
                     Ok(Obj::Cid(cid.into()))
                 } else {
-                    // todo handle error
-                    panic!("")
+                    return Err(IpldCborError::ObjErr(format!(
+                        "tag [{:}] value must be bytes",
+                        CID_CBOR_TAG
+                    )));
                 }
             }
-            _ => unreachable!(),
+            _ => unreachable!("not impl for the hidden variant"),
         }
     }
 }
@@ -346,7 +361,7 @@ pub fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
                         Obj::Cid(cid) => {
                             *obj = Obj::Cid(cid.clone());
                         }
-                        _ => return Err(CborError::NonStringLink), // should not happen
+                        _ => return Err(IpldCborError::NonStringLink), // should not happen
                     }
                 }
             }
@@ -377,7 +392,7 @@ pub fn convert_to_jsonish_obj(value: Obj) -> Result<Obj> {
                         match cid {
                             Obj::Cid(local_cid) => *cid = &Obj::Text(local_cid.0.to_string()),
                             Obj::Text(_s) => {} // do nothing,
-                            _ => return Err(CborError::NonStringLink), // should not happen
+                            _ => return Err(IpldCborError::NonStringLink), // should not happen
                         }
                     }
                 }

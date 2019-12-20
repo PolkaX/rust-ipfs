@@ -1,22 +1,18 @@
-mod test_coding;
-mod test_dag_walker;
+use std::sync::Arc;
 
-use block_format::{BasicBlock, Block};
+use block_format::Block;
 use bytes::Bytes;
 use cid::{Cid, Codec, Hash, Prefix, Version};
 
-use crate::error::*;
-use crate::walker::NavigableNode;
-use crate::{FormatError, Link, Node, NodeStat, Resolver};
-use std::sync::Arc;
+use rust_ipld_format::{FormatError, Link, NavigableNode, Node, NodeStat, Resolver, Result};
 
-struct EmptyNode {
+pub struct EmptyNode {
     cid: Cid,
     data: Bytes,
 }
 
 impl EmptyNode {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let p = Prefix {
             version: Version::V1,
             codec: Codec::Raw,
@@ -31,7 +27,7 @@ impl EmptyNode {
 }
 
 impl Node for EmptyNode {
-    fn resolve_link(&self, path: &[String]) -> Result<(Link, Vec<String>)> {
+    fn resolve_link(&self, _path: &[&str]) -> Result<(Link, Vec<String>)> {
         unimplemented!()
     }
 
@@ -60,18 +56,18 @@ impl Block for EmptyNode {
 
 impl Resolver for EmptyNode {
     type Output = ();
-    fn resolve(&self, path: &[String]) -> Result<(Self::Output, Vec<String>)> {
+    fn resolve(&self, _path: &[&str]) -> Result<(Self::Output, Vec<String>)> {
         unimplemented!()
     }
 
-    fn tree(&self, path: &str, depth: Option<usize>) -> Vec<String> {
+    fn tree(&self, _path: &str, _depth: Option<usize>) -> Vec<String> {
         unimplemented!()
     }
 }
 
-struct N {
-    inner: EmptyNode,
-    child: Vec<Arc<dyn NavigableNode>>,
+pub struct N {
+    pub inner: EmptyNode,
+    pub child: Vec<Arc<dyn NavigableNode>>,
 }
 
 impl NavigableNode for N {

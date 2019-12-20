@@ -1,3 +1,5 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 #![cfg_attr(feature = "bench", feature(test))]
 #[cfg(feature = "bench")]
 extern crate test;
@@ -9,31 +11,31 @@ mod localcid;
 mod obj;
 #[cfg(test)]
 mod tests;
-// std
-use std::result;
+
+use std::result::Result as StdResult;
 use std::str::FromStr;
-// 3rd party
+
 use bytes::Bytes;
 use either::*;
-use serde::Serialize;
-// local dependency
+use serde::{Deserialize, Serialize};
+
 use block_format::{BasicBlock, Block};
 use cid::{Cid, Codec};
-use ipld_format::{FormatError, Link, Node as NodeT, NodeStat, Resolver};
+use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 use multihash::Hash as MHashEnum;
-// self
+
 #[cfg(feature = "bigint")]
-pub use crate::bigint::CborBigUint;
-pub use crate::error::*;
-pub use crate::localcid::CborCid;
-pub use crate::obj::{
+pub use self::bigint::CborBigUint;
+pub use self::error::{IpldCborError, Result};
+pub use self::localcid::CborCid;
+pub use self::obj::{
     convert_to_cborish_obj, convert_to_jsonish_obj, hack_convert_float_to_int,
-    hack_convert_int_to_float, Obj,
+    hack_convert_int_to_float, struct_to_cbor_value, Obj,
 };
 
-/// Node represents an IPLD node.
+/// `IpldNode` represents an IPLD node.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Node {
+pub struct IpldNode {
     obj: Obj,
     tree: Vec<String>,
     links: Vec<Link>,
@@ -41,10 +43,10 @@ pub struct Node {
     cid: Cid,
 }
 
-impl Node {
-    fn new_node(block: &dyn Block, obj: Obj) -> Result<Node> {
+impl IpldNode {
+    fn new_node(block: &dyn Block, obj: Obj) -> Result<IpldNode> {
         let (tree, links) = compute(&obj)?;
-        Ok(Node {
+        Ok(IpldNode {
             obj,
             tree,
             links,
@@ -54,7 +56,7 @@ impl Node {
     }
 }
 
-impl Block for Node {
+impl Block for IpldNode {
     fn raw_data(&self) -> &Bytes {
         &self.raw
     }
@@ -64,38 +66,38 @@ impl Block for Node {
     }
 }
 
-impl Resolver for Node {
+impl Resolver for IpldNode {
     type Output = Either<Link, Obj>;
     /// Resolve resolves a given path, and returns the object found at the end, as well
     /// as the possible tail of the path that was not resolved.
-    fn resolve(&self, path: &[String]) -> result::Result<(Self::Output, Vec<String>), FormatError> {
+    fn resolve(&self, path: &[&str]) -> StdResult<(Self::Output, Vec<String>), FormatError> {
         let mut cur = &self.obj;
         for (index, val) in path.iter().enumerate() {
             match cur {
                 Obj::Map(m) => {
                     cur = m.get::<str>(val).ok_or(FormatError::Other(Box::new(
-                        CborError::NoSuchLink(val.clone()),
+                        IpldCborError::NoSuchLink(val.clone().to_string()),
                     )))?;
                 }
                 Obj::Array(arr) => {
                     let index =
                         usize::from_str(val).map_err(|e| FormatError::Other(Box::new(e)))?;
                     cur = arr.get(index).ok_or(FormatError::Other(Box::new(
-                        CborError::NoSuchLink(format!("array index out of range[{}]", index)),
+                        IpldCborError::NoSuchLink(format!("array index out of range[{}]", index)),
                     )))?;
                 }
                 Obj::Cid(cid) => {
-                    let link = Link::new_default(cid.0.clone());
+                    let link = Link::new_with_cid(cid.0.clone());
                     return Ok((
                         Left(link),
-                        path.iter().skip(index).map(|s| s.clone()).collect(),
+                        path.iter().skip(index).map(|s| (*s).to_string()).collect(),
                     ));
                 }
-                _ => return Err(FormatError::Other(Box::new(CborError::NoLinks))),
+                _ => return Err(FormatError::Other(Box::new(IpldCborError::NoLinks))),
             }
         }
         if let Obj::Cid(cid) = cur {
-            let link = Link::new_default(cid.0.clone());
+            let link = Link::new_with_cid(cid.0.clone());
             return Ok((Left(link), vec![]));
         }
         let jsonish =
@@ -151,13 +153,13 @@ impl Resolver for Node {
     }
 }
 
-impl NodeT for Node {
-    fn resolve_link(&self, path: &[String]) -> result::Result<(Link, Vec<String>), FormatError> {
+impl Node for IpldNode {
+    fn resolve_link(&self, path: &[&str]) -> StdResult<(Link, Vec<String>), FormatError> {
         let (either, rest) = self.resolve(path)?;
 
         match either {
             Left(link) => Ok((link, rest)),
-            Right(_) => Err(FormatError::Other(Box::new(CborError::NonLink))),
+            Right(_) => Err(FormatError::Other(Box::new(IpldCborError::NonLink))),
         }
     }
 
@@ -166,7 +168,7 @@ impl NodeT for Node {
     }
 
     /// Stat returns stats about the Node.
-    fn stat(&self) -> result::Result<&NodeStat, FormatError> {
+    fn stat(&self) -> StdResult<&NodeStat, FormatError> {
         // TODO: implement?
         unimplemented!()
     }
@@ -179,7 +181,7 @@ impl NodeT for Node {
 
 // json Serialize/Deserialize
 /// Serialize `Node` to json string
-pub fn to_json(node: &Node) -> Result<String> {
+pub fn to_json(node: &IpldNode) -> Result<String> {
     // drop other info
     let obj = node.obj.clone();
     obj_to_json(obj)
@@ -196,7 +198,7 @@ fn obj_to_json(obj: Obj) -> Result<String> {
 }
 
 /// Deserialize json string to `Node`
-pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<Node> {
+pub fn from_json(json_str: &str, hash_type: MHashEnum) -> Result<IpldNode> {
     let obj = json_to_obj(json_str)?;
     // need to generate other info
     wrap_obj(obj, hash_type)
@@ -211,26 +213,32 @@ fn json_to_obj(json_str: &str) -> Result<Obj> {
     convert_to_cborish_obj(obj)
 }
 
+#[inline]
+pub fn decode_into<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
+    let obj: T = serde_cbor::from_slice(bytes)?;
+    Ok(obj)
+}
+
 // cbor Serialize/Deserialize
 /// Decode decodes a CBOR object into an IPLD Node.
 #[inline]
-pub fn decode(bytes: &[u8], hash_type: MHashEnum) -> Result<Node> {
-    let obj: Obj = serde_cbor::from_slice(bytes)?;
+pub fn decode(bytes: &[u8], hash_type: MHashEnum) -> Result<IpldNode> {
+    let obj: Obj = decode_into(bytes)?;
     wrap_obj(obj, hash_type)
 }
 
 #[inline]
 pub fn dump_object<T: Serialize>(obj: &T) -> Result<Vec<u8>> {
-    serde_cbor::to_vec(&obj).map_err(CborError::CborErr)
+    serde_cbor::to_vec(&obj).map_err(IpldCborError::CborErr)
 }
 
-fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<Node> {
+fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<IpldNode> {
     let data = dump_object(&obj)?;
     let hash = multihash::encode(hash_type, &data)?;
     let c = Cid::new_cid_v1(Codec::DagCBOR, hash)?;
 
     let block = BasicBlock::new_with_cid(data.into(), c)?;
-    Node::new_node(&block, obj)
+    IpldNode::new_node(&block, obj)
 }
 
 fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
@@ -243,7 +251,7 @@ fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
             tree.push(name);
         }
         if let Obj::Cid(cid) = obj {
-            links.push(Link::new_default(cid.0.clone()))
+            links.push(Link::new_with_cid(cid.0.clone()))
         }
         Ok(())
     };
@@ -275,12 +283,12 @@ where
     }
 }
 
-fn decode_block(block: &dyn Block) -> Result<Node> {
+fn decode_block(block: &impl Block) -> Result<IpldNode> {
     let obj: Obj = serde_cbor::from_slice(block.raw_data())?;
-    Node::new_node(block, obj)
+    IpldNode::new_node(block, obj)
 }
 
-pub fn decode_block_for_coding(block: &dyn Block) -> Result<Box<dyn NodeT>> {
+pub fn decode_block_for_coding(block: &impl Block) -> Result<Box<dyn Node>> {
     let n = decode_block(block).map(|n| Box::new(n))?;
     Ok(n)
 }

@@ -1,25 +1,29 @@
-/// notice, in GO version, thought it support `big.Int` cbor serialize/deserialize,
-/// but in fact it only support unsigned int.
-/// ```go
-/// var BigIntAtlasEntry = atlas.BuildEntry(big.Int{}).Transform().
-///	TransformMarshal(atlas.MakeMarshalTransformFunc(
-///		func(i big.Int) ([]byte, error) {
-///         /* notice `i.Bytes()` just return absolute value of x as a big-endian byte slice */
-///			return i.Bytes(), nil
-///		})).
-///	TransformUnmarshal(atlas.MakeUnmarshalTransformFunc(
-///		func(x []byte) (big.Int, error) {
-///         /* when recover from slice, `big.NewInt(0)` neg is true, thus, whatever set positive
-///         or negative number in `big.Int`, when recover from slice, would all be positive */
-///			return *big.NewInt(0).SetBytes(x), nil
-///		})).
-///	Complete()
-/// ```
-/// Thus, we just provide `num::BigUint` to stand for `big.NewInt` in rust. if someone need real
-/// `num::BigInt`, it should implement by himself.
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
+// notice, in GO version, thought it support `big.Int` cbor serialize/deserialize,
+// but in fact it only support unsigned int.
+// ```go
+// var BigIntAtlasEntry = atlas.BuildEntry(big.Int{}).Transform().
+//	TransformMarshal(atlas.MakeMarshalTransformFunc(
+//		func(i big.Int) ([]byte, error) {
+//         /* notice `i.Bytes()` just return absolute value of x as a big-endian byte slice */
+//			return i.Bytes(), nil
+//		})).
+//	TransformUnmarshal(atlas.MakeUnmarshalTransformFunc(
+//		func(x []byte) (big.Int, error) {
+//         /* when recover from slice, `big.NewInt(0)` neg is true, thus, whatever set positive
+//         or negative number in `big.Int`, when recover from slice, would all be positive */
+//			return *big.NewInt(0).SetBytes(x), nil
+//		})).
+//	Complete()
+// ```
+// Thus, we just provide `num::BigUint` to stand for `big.NewInt` in rust. if someone need real
+// `num::BigInt`, it should implement by himself.
+
+use std::fmt::{Display, Error, Formatter};
+
 use num_bigint::BigUint;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Error, Formatter};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CborBigUint(pub BigUint);
@@ -37,7 +41,8 @@ impl Serialize for CborBigUint {
     {
         // Returns the byte representation of the `BigUint` in big-endian byte order
         let v = self.0.to_bytes_be();
-        serializer.serialize_bytes(&v)
+        let value = serde_bytes::Bytes::new(&v);
+        serializer.serialize_bytes(&value)
     }
 }
 
@@ -46,7 +51,7 @@ impl<'de> Deserialize<'de> for CborBigUint {
     where
         D: Deserializer<'de>,
     {
-        let v = Vec::<u8>::deserialize(deserializer)?;
+        let v = serde_bytes::ByteBuf::deserialize(deserializer)?;
         Ok(CborBigUint(BigUint::from_bytes_be(&v)))
     }
 }

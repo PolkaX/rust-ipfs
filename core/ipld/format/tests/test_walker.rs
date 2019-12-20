@@ -1,10 +1,10 @@
-use std::iter::Iterator;
+mod common;
+
 use std::sync::Arc;
 
-use crate::error::*;
-use crate::walker::{NavigableNode, Walker};
+use rust_ipld_format::Walker;
 
-use super::{EmptyNode, N};
+use self::common::{EmptyNode, N};
 
 #[test]
 fn test_walker() {
@@ -33,12 +33,8 @@ fn test_walker() {
         child: vec![n1.clone(), n2.clone()],
     });
 
-    let mut w = Walker::new(root);
-    let mut x = 0;
-    for node in w {
-        x += 1;
-    }
-    assert_eq!(x, 6);
+    let counter = Walker::new(root).into_iter().count();
+    assert_eq!(counter, 6);
 
     // root -> 1 -> 3
     //      -> 2 ---^
@@ -59,10 +55,7 @@ fn test_walker() {
         inner: EmptyNode::new(),
         child: vec![n1.clone(), n2.clone()],
     });
-    let mut w = Walker::new(root);
-    let mut x = 0;
-    for node in w {
-        x += 1;
-    }
-    assert_eq!(x, 5);
+
+    let counter = Walker::new(root).into_iter().count();
+    assert_eq!(counter, 5);
 }

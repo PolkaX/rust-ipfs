@@ -1,4 +1,5 @@
 use super::*;
+use crate::obj::SortedStr;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fs;
@@ -43,7 +44,7 @@ fn test_decode_into_non_obj() {
 
 #[test]
 fn test_basic_marshal() {
-    let c = Cid::new_cid_v0(util::hash(b"something")).unwrap();
+    let c = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
     let mut m = BTreeMap::new();
     m.insert("name".to_string().into(), Obj::Text("foo".to_string()));
     m.insert("bar".to_string().into(), Obj::Cid(c.clone().into()));
@@ -63,16 +64,16 @@ fn test_basic_marshal() {
         "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
     );
 
-    let (lnk, _) = back.resolve_link(&vec!["bar".to_string()]).unwrap();
+    let (lnk, _) = back.resolve_link(&vec!["bar"]).unwrap();
     assert_eq!(lnk.cid, c);
     assert_eq!(nd.cid(), back.cid())
 }
 
 #[test]
 fn test_marshal_roundtrip() {
-    let c1 = Cid::new_cid_v0(util::hash(b"something1")).unwrap();
-    let c2 = Cid::new_cid_v0(util::hash(b"something2")).unwrap();
-    let c3 = Cid::new_cid_v0(util::hash(b"something3")).unwrap();
+    let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
+    let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
+    let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
 
     let mut m = BTreeMap::new();
     m.insert("foo".to_string().into(), Obj::Text("bar".to_string()));
@@ -97,9 +98,7 @@ fn test_marshal_roundtrip() {
     let nd2 = decode(nd1.raw_data(), MHashEnum::SHA2256).unwrap();
     assert_eq!(nd1.cid(), nd2.cid());
 
-    let (link, rest) = nd2
-        .resolve_link(&vec!["baz".to_string(), "1".to_string(), "bop".to_string()])
-        .unwrap();
+    let (link, rest) = nd2.resolve_link(&vec!["baz", "1", "bop"]).unwrap();
     assert_eq!(link.cid, c2);
 
     assert_eq!(rest.len(), 1);
@@ -117,10 +116,10 @@ fn test_marshal_roundtrip() {
 
 #[test]
 fn test_tree() {
-    let c1 = Cid::new_cid_v0(util::hash(b"something1")).unwrap();
-    let c2 = Cid::new_cid_v0(util::hash(b"something2")).unwrap();
-    let c3 = Cid::new_cid_v0(util::hash(b"something3")).unwrap();
-    let c4 = Cid::new_cid_v0(util::hash(b"something4")).unwrap();
+    let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
+    let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
+    let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
+    let c4 = Cid::new_cid_v0(util::sha2_256_hash(b"something4")).unwrap();
 
     let mut obj_m = BTreeMap::new();
     obj_m.insert("foo".into(), Obj::Cid(c1.into()));
@@ -254,7 +253,7 @@ fn test_resolved_val_is_jsonable() {
         &n.cid().to_string(),
         "bafyreiahcy6ewqmabbh7lcjhxrillpf72zlu3vqcovckanvj2fwdtenvbe"
     );
-    let (val, _) = n.resolve(&vec!["foo".to_string()]).unwrap();
+    let (val, _) = n.resolve(&vec!["foo"]).unwrap();
     match val {
         Either::Left(l) => panic!(""),
         Either::Right(obj) => {
@@ -320,7 +319,9 @@ fn test_examples() {
         assert_eq!(json, &s);
     }
 }
+
 const TEST_OBJ_ROOT: &'static str = "src/tests/test_objects/";
+
 #[test]
 fn test_objects() {
     let content = fs::read_to_string(format!("{}{}", TEST_OBJ_ROOT, "expected.json")).unwrap();
@@ -363,7 +364,7 @@ fn test_canonicalize() {
 #[test]
 fn test_stable_cid() {
     let b = fs::read(format!("{}non-canon.cbor", TEST_OBJ_ROOT)).unwrap();
-    let hash = util::hash(&b);
+    let hash = util::sha2_256_hash(&b);
     let c = Cid::new_cid_v1(Codec::DagCBOR, hash).unwrap();
     let bad_block = BasicBlock::new_with_cid(b.into(), c).unwrap();
     let bad_node = decode_block(&bad_block).unwrap();
@@ -386,11 +387,11 @@ fn test_cid_and_bigint() {
         b: CborBigUint(1_u64.into()),
     };
 
-    let value = serde_cbor::value::to_value(foo).unwrap();
-    //    let value: serde_cbor::Value = .into();
+    let value = struct_to_cbor_value(&foo).unwrap();
     println!("{:?}", value);
-    //    let f: Foo = serde_cbor::value::from_value(value).unwrap();
-    //    wrap_obj(foo, MHashEnum::SHA2256)
+
+    let obj = Obj::try_from(value).unwrap();
+    wrap_obj(obj, MHashEnum::SHA2256).unwrap();
 }
 
 #[test]
@@ -405,6 +406,26 @@ fn test_empty_cid() {
         #[serde(skip)]
         a: Option<CborCid>,
     }
+
+    let foo = Foo {
+        a: Cid::new_cid_v0(util::sha2_256_hash(b"")).unwrap().into(),
+    };
+    let bar = Bar { a: None };
+
+    let value = struct_to_cbor_value(&foo).unwrap();
+    println!("{:?}", value);
+
+    let obj = Obj::try_from(value).unwrap();
+    wrap_obj(obj, MHashEnum::SHA2256).unwrap();
+
+    let value = struct_to_cbor_value(&bar).unwrap();
+    println!("{:?}", value);
+    let obj = Obj::try_from(value).unwrap();
+    let node = wrap_obj(obj, MHashEnum::SHA2256).unwrap();
+    assert_eq!(
+        &node.cid().to_string(),
+        "bafyreigbtj4x7ip5legnfznufuopl4sg4knzc2cof6duas4b3q2fy6swua"
+    )
 }
 
 #[test]
@@ -438,9 +459,40 @@ fn test_canonical_struct_encoding() {
 #[cfg(feature = "bigint")]
 #[test]
 fn test_bigint_roundtrip() {
+    #[derive(Debug, Deserialize, Serialize, Eq, PartialEq)]
     struct TestMe {
         hello: CborBigUint,
         world: CborBigUint,
         hi: i32,
     }
+    let me = TestMe {
+        hello: CborBigUint(100_u64.into()),
+        world: CborBigUint(99_u64.into()),
+        hi: 0,
+    };
+    let v = dump_object(&me).unwrap();
+    let obj: TestMe = decode_into(&v).unwrap();
+    assert_eq!(me, obj);
+
+    type M = BTreeMap<SortedStr, TestMe>;
+    let mut m = M::new();
+    m.insert(
+        "hello".into(),
+        TestMe {
+            hello: CborBigUint(10_u64.into()),
+            world: CborBigUint(101_u64.into()),
+            hi: 1,
+        },
+    );
+    m.insert(
+        "world".into(),
+        TestMe {
+            hello: CborBigUint(9_u64.into()),
+            world: CborBigUint(901_u64.into()),
+            hi: 3,
+        },
+    );
+    let bytes = dump_object(&m).unwrap();
+    let m2: M = decode_into(&bytes).unwrap();
+    assert_eq!(m, m2);
 }
