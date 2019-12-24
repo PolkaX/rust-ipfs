@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use block_format::Block;
 use bytes::Bytes;
-use cid::{Cid, Codec, Hash, Prefix, Version};
+use cid::{Cid, CidT, Codec, Hash, Prefix, Version};
 
 use rust_ipld_format::{FormatError, Link, NavigableNode, Node, NodeStat, Resolver, Result};
 
@@ -48,7 +48,9 @@ impl Block for EmptyNode {
     fn raw_data(&self) -> &Bytes {
         &self.data
     }
+}
 
+impl CidT for EmptyNode {
     fn cid(&self) -> &Cid {
         &self.cid
     }

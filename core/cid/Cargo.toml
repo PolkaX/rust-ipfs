@@ -17,3 +17,6 @@ serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", feat
 
 multihash = { package = "parity-multihash", version = "0.2" }
 multibase = { package = "rust-multibase", path = "../multibase" }
+
+[features]
+hascid = []

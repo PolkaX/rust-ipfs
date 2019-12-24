@@ -3,7 +3,7 @@
 //! Implementation of [cid](https://github.com/ipld/cid) in Rust.
 //! Fork from project [rust-cid](https://github.com/multiformats/rust-cid)
 //! But we provide more useful functions.
-
+#![cfg_attr(feature = "hascid", feature(specialization))]
 #![deny(missing_docs)]
 #![allow(clippy::derive_hash_xor_eq, clippy::inherent_to_string_shadow_display)]
 
@@ -17,7 +17,9 @@ mod version;
 pub use multibase::Base;
 pub use multihash::{Hash, Multihash};
 
-pub use self::cid::Cid;
+#[cfg(feature = "hascid")]
+pub use self::cid::HasCid;
+pub use self::cid::{Cid, CidT};
 pub use self::codec::Codec;
 pub use self::error::{Error, Result};
 pub use self::prefix::{new_prefix_v0, new_prefix_v1, Prefix};

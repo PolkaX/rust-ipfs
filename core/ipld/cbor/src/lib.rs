@@ -17,10 +17,10 @@ use std::str::FromStr;
 
 use bytes::Bytes;
 use either::*;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 use block_format::{BasicBlock, Block};
-use cid::{Cid, Codec};
+use cid::{Cid, CidT, Codec};
 use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 use multihash::Hash as MHashEnum;
 
@@ -60,7 +60,8 @@ impl Block for IpldNode {
     fn raw_data(&self) -> &Bytes {
         &self.raw
     }
-
+}
+impl CidT for IpldNode {
     fn cid(&self) -> &Cid {
         &self.cid
     }
@@ -214,7 +215,7 @@ fn json_to_obj(json_str: &str) -> Result<Obj> {
 }
 
 #[inline]
-pub fn decode_into<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
+pub fn decode_into<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
     let obj: T = serde_cbor::from_slice(bytes)?;
     Ok(obj)
 }
@@ -232,13 +233,27 @@ pub fn dump_object<T: Serialize>(obj: &T) -> Result<Vec<u8>> {
     serde_cbor::to_vec(&obj).map_err(IpldCborError::CborErr)
 }
 
-fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<IpldNode> {
-    let data = dump_object(&obj)?;
+pub fn wrap_object_with_codec<T: Serialize>(
+    v: T,
+    hash_type: MHashEnum,
+    codec: Codec,
+) -> Result<IpldNode> {
+    let data = dump_object(&v)?;
+    let obj = decode_into(&data)?;
+
     let hash = multihash::encode(hash_type, &data)?;
-    let c = Cid::new_cid_v1(Codec::DagCBOR, hash)?;
+    let c = Cid::new_cid_v1(codec, hash)?;
 
     let block = BasicBlock::new_with_cid(data.into(), c)?;
     IpldNode::new_node(&block, obj)
+}
+
+pub fn wrap_object<T: Serialize>(v: T, hash_type: MHashEnum) -> Result<IpldNode> {
+    wrap_object_with_codec(v, hash_type, Codec::DagCBOR)
+}
+
+fn wrap_obj(obj: Obj, hash_type: MHashEnum) -> Result<IpldNode> {
+    wrap_object(&obj, hash_type)
 }
 
 fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
@@ -284,7 +299,7 @@ where
 }
 
 fn decode_block(block: &impl Block) -> Result<IpldNode> {
-    let obj: Obj = serde_cbor::from_slice(block.raw_data())?;
+    let obj: Obj = decode_into(block.raw_data())?;
     IpldNode::new_node(block, obj)
 }
 

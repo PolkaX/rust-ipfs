@@ -21,6 +21,33 @@ pub struct Cid {
     hash: Multihash,
 }
 
+/// Cid Trait
+pub trait CidT {
+    /// Get cid ref
+    fn cid(&self) -> &Cid;
+}
+
+#[cfg(feature = "hascid")]
+///
+pub trait HasCid {
+    ///
+    fn has_cid(&self) -> Option<&Cid>;
+}
+
+#[cfg(feature = "hascid")]
+impl<T> HasCid for T {
+    default fn has_cid(&self) -> Option<&Cid> {
+        None
+    }
+}
+
+#[cfg(feature = "hascid")]
+impl<T: CidT> HasCid for T {
+    fn has_cid(&self) -> Option<&Cid> {
+        Some(self.cid())
+    }
+}
+
 impl Cid {
     /// Create a new CID.
     pub fn new(version: Version, codec: Codec, hash: Multihash) -> Cid {
