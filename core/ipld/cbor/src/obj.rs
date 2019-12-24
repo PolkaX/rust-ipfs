@@ -1,63 +1,28 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
-use std::ops::{Deref, DerefMut};
 
-use cid::{Cid, ToCid};
 use serde::{
-    de::{self, Error},
+    de::{self, Error as _},
     Deserialize, Serialize,
 };
-use serde_cbor::tags::current_cbor_tag;
-use serde_cbor::Value;
+use serde_cbor::{tags::current_cbor_tag, Value};
 
-use crate::error::{IpldCborError, Result};
+use crate::error::IpldCborError;
 use crate::localcid::{deserialize_cid_from_bytes, CborCid, CID_CBOR_TAG};
 
-#[derive(Clone, Debug, PartialEq)]
-//#[serde(untagged)]
-pub enum Obj {
-    Null,
-    Bool(bool),
-    Integer(i128),
-    Float(f64),
-    Bytes(Vec<u8>),
-    Text(String),
-    Array(Vec<Obj>),
-    Map(BTreeMap<SortedStr, Obj>),
-    Cid(CborCid),
-}
+/// A String Wrapper that implements `Ord` and `PartialOrd`,
+/// according to the length of string, in bytes.
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct SortedStr(String);
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct SortedStr(pub String);
-
-impl Borrow<str> for SortedStr {
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for SortedStr {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl Deref for SortedStr {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for SortedStr {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl SortedStr {
+    /// Convert to inner string.
+    pub fn into_inner(self) -> String {
+        self.0
     }
 }
 
@@ -77,6 +42,50 @@ impl PartialOrd for SortedStr {
     }
 }
 
+impl fmt::Display for SortedStr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::borrow::Borrow<str> for SortedStr {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::borrow::BorrowMut<str> for SortedStr {
+    fn borrow_mut(&mut self) -> &mut str {
+        &mut self.0
+    }
+}
+
+impl AsRef<str> for SortedStr {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsMut<str> for SortedStr {
+    fn as_mut(&mut self) -> &mut str {
+        &mut self.0
+    }
+}
+
+impl std::ops::Deref for SortedStr {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for SortedStr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl From<String> for SortedStr {
     fn from(s: String) -> Self {
         SortedStr(s)
@@ -87,6 +96,29 @@ impl From<&str> for SortedStr {
     fn from(s: &str) -> Self {
         SortedStr(s.to_string())
     }
+}
+
+/// A special CBOR value.
+#[derive(PartialEq, Clone, Debug)]
+pub enum Obj {
+    /// CBOR null value.
+    Null,
+    /// CBOR bool value.
+    Bool(bool),
+    /// CBOR integer value.
+    Integer(i128),
+    /// CBOR float value.
+    Float(f64),
+    /// CBOR byte string value.
+    Bytes(Vec<u8>),
+    /// CBOR text string value.
+    Text(String),
+    /// CBOR array value.
+    Array(Vec<Obj>),
+    /// CBOR map value.
+    Map(BTreeMap<SortedStr, Obj>),
+    /// CBOR tag value (tag is 42).
+    Cid(CborCid),
 }
 
 impl serde::Serialize for Obj {
@@ -110,7 +142,7 @@ impl serde::Serialize for Obj {
 }
 
 impl<'de> serde::Deserialize<'de> for Obj {
-    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -124,7 +156,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_str<E>(self, value: &str) -> ::std::result::Result<Self::Value, E>
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -132,14 +164,14 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_string<E>(self, value: String) -> ::std::result::Result<Self::Value, E>
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
                 Ok(Obj::Text(value))
             }
             #[inline]
-            fn visit_bytes<E>(self, v: &[u8]) -> ::std::result::Result<Self::Value, E>
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -147,7 +179,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_byte_buf<E>(self, v: Vec<u8>) -> ::std::result::Result<Self::Value, E>
+            fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -155,7 +187,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_u64<E>(self, v: u64) -> ::std::result::Result<Self::Value, E>
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -163,7 +195,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_i64<E>(self, v: i64) -> ::std::result::Result<Self::Value, E>
+            fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -171,7 +203,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_i128<E>(self, v: i128) -> ::std::result::Result<Self::Value, E>
+            fn visit_i128<E>(self, v: i128) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -179,7 +211,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_bool<E>(self, v: bool) -> ::std::result::Result<Self::Value, E>
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -187,7 +219,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_none<E>(self) -> ::std::result::Result<Self::Value, E>
+            fn visit_none<E>(self) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -195,7 +227,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_unit<E>(self) -> ::std::result::Result<Self::Value, E>
+            fn visit_unit<E>(self) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
@@ -203,7 +235,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_seq<V>(self, mut visitor: V) -> ::std::result::Result<Self::Value, V::Error>
+            fn visit_seq<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
             where
                 V: de::SeqAccess<'de>,
             {
@@ -217,7 +249,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_map<V>(self, mut visitor: V) -> ::std::result::Result<Self::Value, V::Error>
+            fn visit_map<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
             where
                 V: de::MapAccess<'de>,
             {
@@ -231,17 +263,14 @@ impl<'de> serde::Deserialize<'de> for Obj {
             }
 
             #[inline]
-            fn visit_f64<E>(self, v: f64) -> ::std::result::Result<Self::Value, E>
+            fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
                 Ok(Obj::Float(v))
             }
 
-            fn visit_newtype_struct<D>(
-                self,
-                deserializer: D,
-            ) -> ::std::result::Result<Self::Value, D::Error>
+            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
@@ -259,16 +288,10 @@ impl<'de> serde::Deserialize<'de> for Obj {
     }
 }
 
-pub fn struct_to_cbor_value<S: Serialize>(v: &S) -> Result<serde_cbor::Value> {
-    let s = serde_cbor::to_vec(&v)?;
-    let value: serde_cbor::Value = serde_cbor::from_slice(&s)?;
-    Ok(value)
-}
-
 impl TryFrom<serde_cbor::Value> for Obj {
     type Error = IpldCborError;
 
-    fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Null => Ok(Obj::Null),
             Value::Bool(b) => Ok(Obj::Bool(b)),
@@ -276,153 +299,72 @@ impl TryFrom<serde_cbor::Value> for Obj {
             Value::Float(f) => Ok(Obj::Float(f)),
             Value::Bytes(b) => Ok(Obj::Bytes(b)),
             Value::Text(s) => Ok(Obj::Text(s)),
-            Value::Array(arr) => {
-                let mut v = vec![];
-                for i in arr {
-                    let obj = Obj::try_from(i)?;
-                    v.push(obj);
-                }
-                Ok(Obj::Array(v))
-            }
-            Value::Map(m) => {
-                let mut new_m = BTreeMap::new();
-                for (k, v) in m {
-                    if let Value::Text(key) = k {
-                        new_m.insert(key.into(), Obj::try_from(v)?);
-                    } else {
-                        return Err(IpldCborError::ObjErr(format!("map key must be string")));
-                    }
-                }
-                Ok(Obj::Map(new_m))
-            }
-            Value::Tag(tag, v) => {
-                if tag != CID_CBOR_TAG {
-                    return Err(IpldCborError::ObjErr(format!(
-                        "obj only accept tag [{:}] to represent cid",
-                        CID_CBOR_TAG
-                    )));
-                }
-
-                if let Value::Bytes(res) = *v {
-                    let cid = deserialize_cid_from_bytes(&res)?;
-                    Ok(Obj::Cid(cid.into()))
-                } else {
-                    return Err(IpldCborError::ObjErr(format!(
-                        "tag [{:}] value must be bytes",
-                        CID_CBOR_TAG
-                    )));
-                }
-            }
+            Value::Array(arr) => try_from_array(arr),
+            Value::Map(map) => try_from_map(map),
+            Value::Tag(tag, value) => try_from_tag(tag, value),
             _ => unreachable!("not impl for the hidden variant"),
         }
     }
 }
 
-pub fn hack_convert_int_to_float(value: Obj) -> Result<Obj> {
-    let mut value = value;
-    let mut func = |obj: &mut Obj| match obj {
-        Obj::Integer(ref mut i) => {
-            // all integer would convert into f64
-            *obj = Obj::Float(*i as f64);
-            Ok(())
-        }
-        _ => Ok(()),
-    };
-    traverse_obj_tree(&mut value, &mut func)?;
-    Ok(value)
+fn try_from_array(arr: Vec<Value>) -> Result<Obj, IpldCborError> {
+    let mut v = Vec::with_capacity(arr.len());
+    for i in arr {
+        let obj = Obj::try_from(i)?;
+        v.push(obj);
+    }
+    Ok(Obj::Array(v))
 }
 
-pub fn hack_convert_float_to_int(value: Obj) -> Result<Obj> {
-    let mut value = value;
-    let mut func = |obj: &mut Obj| match obj {
-        Obj::Float(ref mut f) => {
-            if f.fract() == 0.0 {
-                *obj = Obj::Integer(*f as i128);
-            }
-            Ok(())
+fn try_from_map(map: BTreeMap<Value, Value>) -> Result<Obj, IpldCborError> {
+    let mut m = BTreeMap::new();
+    for (k, v) in map {
+        if let Value::Text(key) = k {
+            m.insert(key.into(), Obj::try_from(v)?);
+        } else {
+            return Err(IpldCborError::ObjErr("map key must be string".to_string()));
         }
-        _ => Ok(()),
-    };
-    traverse_obj_tree(&mut value, &mut func)?;
-    Ok(value)
+    }
+    Ok(Obj::Map(m))
 }
 
-pub fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
-    let mut value = value;
-    let mut func = |obj: &mut Obj| match obj {
-        Obj::Map(ref mut map) => {
-            if map.len() == 1 {
-                if let Some(link) = map.get("/") {
-                    match link {
-                        Obj::Text(s) => {
-                            let cid = s.to_cid()?;
-                            *obj = Obj::Cid(CborCid(cid));
-                        }
-                        Obj::Cid(cid) => {
-                            *obj = Obj::Cid(cid.clone());
-                        }
-                        _ => return Err(IpldCborError::NonStringLink), // should not happen
-                    }
-                }
-            }
-            Ok(())
-        }
-        _ => Ok(()),
-    };
-    traverse_obj_tree(&mut value, &mut func)?;
-    Ok(value)
+fn try_from_tag(tag: u64, value: Box<Value>) -> Result<Obj, IpldCborError> {
+    if tag != CID_CBOR_TAG {
+        return Err(IpldCborError::ObjErr(format!(
+            "obj only accept tag [{}] to represent cid",
+            CID_CBOR_TAG
+        )));
+    }
+
+    if let Value::Bytes(ref bytes) = *value {
+        let cid = deserialize_cid_from_bytes(bytes)?;
+        Ok(Obj::Cid(cid.into()))
+    } else {
+        Err(IpldCborError::ObjErr(format!(
+            "tag [{}] value must be bytes",
+            CID_CBOR_TAG
+        )))
+    }
 }
 
-pub fn convert_to_jsonish_obj(value: Obj) -> Result<Obj> {
-    let mut value = value;
-    let mut func = |obj: &mut Obj| {
-        match obj {
-            // change cid to map { "/", "string" }
-            Obj::Cid(local_cid) => {
-                let link = Obj::Text(local_cid.0.to_string());
-                let mut map = BTreeMap::new();
-                map.insert("/".to_string().into(), link);
-                *obj = Obj::Map(map.into());
-                Ok(())
-            }
-            Obj::Map(ref mut map) => {
-                // if current map is like: { "/", cid }, change it to { "/": "string" }
-                if map.len() == 1 {
-                    if let Some(ref mut cid) = map.get("/") {
-                        match cid {
-                            Obj::Cid(local_cid) => *cid = &Obj::Text(local_cid.0.to_string()),
-                            Obj::Text(_s) => {} // do nothing,
-                            _ => return Err(IpldCborError::NonStringLink), // should not happen
-                        }
-                    }
-                }
-                Ok(())
-            }
-            _ => Ok(()),
-        }
-    };
-    traverse_obj_tree(&mut value, &mut func)?;
-    Ok(value)
-}
+#[cfg(test)]
+mod tests {
+    use super::SortedStr;
 
-fn traverse_obj_tree<F>(obj: &mut Obj, f: &mut F) -> Result<()>
-where
-    F: FnMut(&mut Obj) -> Result<()>,
-{
-    f(obj)?;
-    match obj {
-        Obj::Map(ref mut m) => {
-            for (_k, v) in m.iter_mut() {
-                traverse_obj_tree(v, f)?;
-            }
-            Ok(())
-        }
-        Obj::Array(ref mut arr) => {
-            for v in arr.iter_mut() {
-                traverse_obj_tree(v, f)?;
-            }
-            Ok(())
-        }
-        _ => Ok(()),
+    #[test]
+    fn test_sorted_str_ord() {
+        let sort_s1 = SortedStr::from("abc");
+        let sort_s2 = SortedStr::from("bcd");
+        let sort_s3 = SortedStr::from("abcd");
+        assert!(sort_s1 < sort_s2);
+        assert!(sort_s1 < sort_s3);
+        assert!(sort_s2 < sort_s3);
+
+        let s1 = sort_s1.into_inner();
+        let s2 = sort_s2.into_inner();
+        let s3 = sort_s3.into_inner();
+        assert!(s1 < s2);
+        assert!(s1 < s3);
+        assert!(s2 > s3);
     }
 }

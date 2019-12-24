@@ -4,7 +4,7 @@ use bytes::Bytes;
 use cid::{Cid, Multihash};
 use util::sha2_256_hash;
 
-use crate::error::{BlockFormatError, Result};
+use crate::error::Result;
 
 /// The trait for getting raw data and cid of block.
 pub trait Block {
@@ -36,6 +36,7 @@ impl BasicBlock {
     pub fn new_with_cid(data: Bytes, cid: Cid) -> Result<BasicBlock> {
         #[cfg(debug_assertions)]
         {
+            use crate::error::BlockFormatError;
             let checked_cid = cid
                 .prefix()
                 .sum(data.as_ref())
