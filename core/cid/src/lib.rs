@@ -19,7 +19,7 @@ pub use multihash::{Hash, Multihash};
 
 pub use self::cid::Cid;
 pub use self::codec::Codec;
-pub use self::error::{Error, Result};
+pub use self::error::{CidError, Result};
 pub use self::prefix::{new_prefix_v0, new_prefix_v1, Prefix};
 pub use self::to_cid::ToCid;
 pub use self::version::Version;

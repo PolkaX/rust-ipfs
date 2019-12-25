@@ -11,7 +11,7 @@ mod encoding;
 mod error;
 
 pub use self::base::Base;
-pub use self::error::{Error, Result};
+pub use self::error::{MultibaseError, Result};
 
 /// Decode the base string.
 ///
@@ -27,7 +27,7 @@ pub use self::error::{Error, Result};
 /// ```
 pub fn decode<I: AsRef<[u8]>>(input: I) -> Result<(Base, Vec<u8>)> {
     let input = input.as_ref();
-    let code = input.iter().next().ok_or(Error::InvalidCharacter)?;
+    let code = input.iter().next().ok_or(MultibaseError::InvalidCharacter)?;
     let base = Base::from(*code)?;
     let decoded = base.decode(&input[1..])?;
     Ok((base, decoded))

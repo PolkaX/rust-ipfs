@@ -1,6 +1,6 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use crate::error::{Error, Result};
+use crate::error::{CidError, Result};
 
 /// The version of the CID.
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -17,7 +17,7 @@ impl Version {
         match raw {
             0 => Ok(Version::V0),
             1 => Ok(Version::V1),
-            _ => Err(Error::InvalidCidVersion(raw)),
+            _ => Err(CidError::InvalidCidVersion(raw)),
         }
     }
 

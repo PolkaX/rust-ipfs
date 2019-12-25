@@ -5,7 +5,7 @@ use multibase::Base;
 use multihash::{Hash, Multihash};
 
 use crate::codec::Codec;
-use crate::error::{Error, Result};
+use crate::error::{CidError, Result};
 use crate::prefix::Prefix;
 use crate::to_cid::ToCid;
 use crate::version::Version;
@@ -34,7 +34,7 @@ impl Cid {
     /// A helper function to create CIDv0.
     pub fn new_cid_v0(mh: Multihash) -> Result<Cid> {
         if mh.algorithm() != Hash::SHA2256 || mh.digest().len() != 32 {
-            return Err(Error::InvalidCidV0(mh.algorithm(), mh.digest().len()));
+            return Err(CidError::InvalidCidV0(mh.algorithm(), mh.digest().len()));
         }
 
         Ok(Cid::new(Version::V0, Codec::DagProtobuf, mh))

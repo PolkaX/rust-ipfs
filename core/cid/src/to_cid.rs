@@ -7,7 +7,7 @@ use multihash::Multihash;
 
 use crate::cid::Cid;
 use crate::codec::Codec;
-use crate::error::{Error, Result};
+use crate::error::{CidError, Result};
 use crate::version::Version;
 
 /// A trait for converting data into CID format.
@@ -79,7 +79,7 @@ impl ToCid for str {
         };
 
         if hash.len() < 2 {
-            return Err(Error::InputTooShort);
+            return Err(CidError::InputTooShort);
         }
 
         if Version::is_v0_str(hash) {
@@ -91,7 +91,7 @@ impl ToCid for str {
 }
 
 impl std::str::FromStr for Cid {
-    type Err = Error;
+    type Err = CidError;
 
     fn from_str(src: &str) -> Result<Self> {
         src.to_cid()

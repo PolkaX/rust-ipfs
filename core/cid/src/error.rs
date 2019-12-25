@@ -2,12 +2,12 @@
 
 use multihash::Hash;
 
-/// The special result type for `CID`.
-pub type Result<T> = std::result::Result<T, Error>;
+/// Type alias to use this library's [`CidError`] type in a `Result`.
+pub type Result<T> = std::result::Result<T, CidError>;
 
-/// The special error type for `CID`.
+/// Errors generated from this library.
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum CidError {
     /// Invalid format of CID version0.
     #[error("Invalid hash bytes for CIDv0, hash: {0:?}, hash len: {1}")]
     InvalidCidV0(Hash, usize),
@@ -31,32 +31,32 @@ pub enum Error {
     ParsingError(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Error {
-        Error::ParsingError(Box::new(e))
+impl From<std::io::Error> for CidError {
+    fn from(e: std::io::Error) -> CidError {
+        CidError::ParsingError(Box::new(e))
     }
 }
 
-impl From<multibase::Error> for Error {
-    fn from(e: multibase::Error) -> Error {
-        Error::ParsingError(Box::new(e))
+impl From<multibase::MultibaseError> for CidError {
+    fn from(e: multibase::MultibaseError) -> CidError {
+        CidError::ParsingError(Box::new(e))
     }
 }
 
-impl From<multihash::EncodeError> for Error {
-    fn from(e: multihash::EncodeError) -> Error {
-        Error::ParsingError(Box::new(e))
+impl From<multihash::EncodeError> for CidError {
+    fn from(e: multihash::EncodeError) -> CidError {
+        CidError::ParsingError(Box::new(e))
     }
 }
 
-impl From<multihash::DecodeError> for Error {
-    fn from(e: multihash::DecodeError) -> Error {
-        Error::ParsingError(Box::new(e))
+impl From<multihash::DecodeError> for CidError {
+    fn from(e: multihash::DecodeError) -> CidError {
+        CidError::ParsingError(Box::new(e))
     }
 }
 
-impl From<multihash::DecodeOwnedError> for Error {
-    fn from(e: multihash::DecodeOwnedError) -> Error {
-        Error::ParsingError(Box::new(e))
+impl From<multihash::DecodeOwnedError> for CidError {
+    fn from(e: multihash::DecodeOwnedError) -> CidError {
+        CidError::ParsingError(Box::new(e))
     }
 }

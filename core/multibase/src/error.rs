@@ -1,36 +1,36 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-/// The special result type for `multibase`.
-pub type Result<T> = std::result::Result<T, Error>;
+/// Type alias to use this library's [`MultibaseError`] type in a `Result`.
+pub type Result<T> = std::result::Result<T, MultibaseError>;
 
-/// The special error type for `multibase`.
+/// Errors generated from this library.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum Error {
+pub enum MultibaseError {
     /// Unknown base code.
     UnknownBase(u8),
     /// Invalid character.
     InvalidCharacter,
 }
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for MultibaseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::UnknownBase(code) => write!(f, "Unknown base code: {}", code),
-            Error::InvalidCharacter => write!(f, "Invalid character"),
+            MultibaseError::UnknownBase(code) => write!(f, "Unknown base code: {}", code),
+            MultibaseError::InvalidCharacter => write!(f, "Invalid character"),
         }
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for MultibaseError {}
 
-impl From<bs58::decode::Error> for Error {
+impl From<bs58::decode::Error> for MultibaseError {
     fn from(_: bs58::decode::Error) -> Self {
-        Error::InvalidCharacter
+        MultibaseError::InvalidCharacter
     }
 }
 
-impl From<data_encoding::DecodeError> for Error {
+impl From<data_encoding::DecodeError> for MultibaseError {
     fn from(_: data_encoding::DecodeError) -> Self {
-        Error::InvalidCharacter
+        MultibaseError::InvalidCharacter
     }
 }

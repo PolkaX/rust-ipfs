@@ -8,14 +8,14 @@ use crate::error::{IpldCborError, Result};
 use crate::localcid::CborCid;
 use crate::obj::Obj;
 
-///
+/// Convert structure to CBOR Value.
 pub fn struct_to_cbor_value<S: serde::Serialize>(v: &S) -> Result<serde_cbor::Value> {
     let s = serde_cbor::to_vec(&v)?;
     let value: serde_cbor::Value = serde_cbor::from_slice(&s)?;
     Ok(value)
 }
 
-///
+/// Convert Obj Integer to Obj Float for matching golang version.
 pub fn hack_convert_int_to_float(value: Obj) -> Result<Obj> {
     let mut value = value;
     let mut func = |obj: &mut Obj| match obj {
@@ -30,7 +30,7 @@ pub fn hack_convert_int_to_float(value: Obj) -> Result<Obj> {
     Ok(value)
 }
 
-///
+/// Convert Obj Float to Obj Integer for matching golang version.
 pub fn hack_convert_float_to_int(value: Obj) -> Result<Obj> {
     let mut value = value;
     let mut func = |obj: &mut Obj| match obj {
@@ -47,8 +47,7 @@ pub fn hack_convert_float_to_int(value: Obj) -> Result<Obj> {
 }
 
 ///
-pub fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
-    let mut value = value;
+pub fn convert_to_cborish_obj(mut value: Obj) -> Result<Obj> {
     let mut func = |obj: &mut Obj| match obj {
         Obj::Map(ref mut map) => {
             if map.len() == 1 {
@@ -74,8 +73,7 @@ pub fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
 }
 
 ///
-pub fn convert_to_jsonish_obj(value: Obj) -> Result<Obj> {
-    let mut value = value;
+pub fn convert_to_jsonish_obj(mut value: Obj) -> Result<Obj> {
     let mut func = |obj: &mut Obj| {
         match obj {
             // change cid to map { "/", "string" }
