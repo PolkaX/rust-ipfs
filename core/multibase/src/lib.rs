@@ -27,7 +27,10 @@ pub use self::error::{MultibaseError, Result};
 /// ```
 pub fn decode<I: AsRef<[u8]>>(input: I) -> Result<(Base, Vec<u8>)> {
     let input = input.as_ref();
-    let code = input.iter().next().ok_or(MultibaseError::InvalidCharacter)?;
+    let code = input
+        .iter()
+        .next()
+        .ok_or(MultibaseError::InvalidCharacter)?;
     let base = Base::from(*code)?;
     let decoded = base.decode(&input[1..])?;
     Ok((base, decoded))

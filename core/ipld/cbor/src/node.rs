@@ -63,6 +63,11 @@ impl IpldNode {
         Self::from_obj(obj, hash_type)
     }
 
+    /// Just to match the golang version, it will be `deprecated` in the future.
+    pub fn decode(bytes: &[u8], hash_type: Hash) -> Result<Self> {
+        Self::from_cbor(bytes, hash_type)
+    }
+
     /// Creates an IPLD Node with the given obj and hash type.
     pub fn from_obj(obj: Obj, hash_type: Hash) -> Result<Self> {
         let data = serde_cbor::to_vec(&obj).map_err(IpldCborError::CborErr)?;
