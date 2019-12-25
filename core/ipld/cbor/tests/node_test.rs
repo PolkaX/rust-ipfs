@@ -1,15 +1,14 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use std::collections::{BTreeMap, HashMap};
-use std::convert::TryFrom;
 use std::fs;
 
 use block_format::{BasicBlock, Block};
 use cid::{Cid, Codec};
 use either::Either;
-use ipld_format::Resolver;
+use ipld_format::{Node, Resolver};
+use maplit::btreemap;
 use multihash::Hash;
-use rust_ipld_cbor::{json_to_obj, obj_to_json, IpldNode, Obj, SortedStr, CborCid};
+use rust_ipld_cbor::{json_to_obj, obj_to_json, IpldNode, Obj};
 use serde::{Deserialize, Serialize};
 
 #[test]
@@ -75,7 +74,7 @@ fn test_json_roundtrip() {
 
 #[test]
 fn test_cbor_roundtrip() {
-    let node = IpldNode::from_cbor("`".as_bytes(), Hash::SHA2256).unwrap();
+    let node = IpldNode::from_cbor(b"`", Hash::SHA2256).unwrap();
     assert_eq!(
         &node.cid().to_string(),
         "bafyreiengp2sbi6ez34a2jctv34bwyjl7yoliteleaswgcwtqzrhmpyt2m"
@@ -84,7 +83,7 @@ fn test_cbor_roundtrip() {
     assert_eq!(vec![b'`'], cbor_bytes)
 }
 
-const TEST_OBJ_ROOT: &'static str = "tests/test_objects/";
+const TEST_OBJ_ROOT: &str = "tests/test_objects/";
 
 #[test]
 fn test_objects() {
@@ -141,7 +140,7 @@ fn test_stable_cid() {
 fn test_canonical_struct_encoding() {
     use hex_literal::hex;
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(PartialEq, Debug, Serialize, Deserialize)]
     struct Foo {
         zebra: String,
         dog: i32,
@@ -149,135 +148,46 @@ fn test_canonical_struct_encoding() {
         whale: String,
         cat: bool,
     }
-    let foo = Foo {
+    let foo1 = Foo {
         zebra: "seven".to_string(),
         dog: 15,
         cats: 1.519,
         whale: "never".to_string(),
         cat: true,
     };
-    let value = serde_cbor::value::to_value(foo).unwrap();
-    let obj = Obj::try_from(value).unwrap();
-    let node = IpldNode::from_obj(obj, Hash::SHA2256).unwrap();
-
+    let cbor = serde_cbor::to_vec(&foo1).unwrap();
+    let node = IpldNode::from_cbor(&cbor, Hash::SHA2256).unwrap();
     let expect = hex!("a563636174f563646f670f6463617473fb3ff84dd2f1a9fbe7657768616c65656e65766572657a6562726165736576656e");
-    assert_eq!(node.raw_data(), expect.as_ref());
+    assert_eq!(node.raw_data().as_ref(), &expect[..]);
+
+    let foo2 = serde_cbor::from_slice::<Foo>(&cbor).unwrap();
+    assert_eq!(foo1, foo2);
 }
 
-/*
-#[test]
-fn test_basic_marshal() {
-    let c = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
-    let mut m = BTreeMap::new();
-    m.insert("name".to_string().into(), Obj::Text("foo".to_string()));
-    m.insert("bar".to_string().into(), Obj::Cid(c.clone().into()));
-    let obj = Obj::Map(m);
-
-    let raw = dump_object(&obj).unwrap();
-
-    let nd = wrap_obj(obj, Hash::SHA2256).unwrap();
-    assert_eq!(
-        &nd.cid().to_string(),
-        "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
-    );
-
-    let back = decode(nd.raw_data(), Hash::SHA2256).unwrap();
-    assert_eq!(
-        &back.cid().to_string(),
-        "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
-    );
-
-    let (lnk, _) = back.resolve_link(&vec!["bar"]).unwrap();
-    assert_eq!(lnk.cid, c);
-    assert_eq!(nd.cid(), back.cid())
-}
-
-#[test]
-fn test_marshal_roundtrip() {
-    let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
-    let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
-    let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
-
-    let mut m = BTreeMap::new();
-    m.insert("foo".to_string().into(), Obj::Text("bar".to_string()));
-    m.insert("hello".to_string().into(), Obj::Cid(c1.clone().into()));
-    m.insert(
-        "baz".to_string().into(),
-        Obj::Array(vec![Obj::Cid(c1.into()), Obj::Cid(c2.clone().into())]),
-    );
-    let mut cats_m = BTreeMap::new();
-    cats_m.insert("qux".to_string().into(), Obj::Cid(c3.into()));
-    m.insert("cats".to_string().into(), Obj::Map(cats_m));
-    let obj = Obj::Map(m);
-
-    let nd1 = wrap_obj(obj, Hash::SHA2256).unwrap();
-    assert_eq!(
-        &nd1.cid().to_string(),
-        "bafyreibgx4rjaqolj7c32c7ibxc5tedhisc4d23ihx5t4tgamuvy2hvwjm"
-    );
-
-    assert_eq!(nd1.links().len(), 4_usize);
-
-    let nd2 = decode(nd1.raw_data(), Hash::SHA2256).unwrap();
-    assert_eq!(nd1.cid(), nd2.cid());
-
-    let (link, rest) = nd2.resolve_link(&vec!["baz", "1", "bop"]).unwrap();
-    assert_eq!(link.cid, c2);
-
-    assert_eq!(rest.len(), 1);
-    assert_eq!(rest[0], "bop");
-
-    let output = to_json(&nd1).unwrap();
-    println!("{:}", output);
-    let raw = r#"
-    {"baz":[{"/":"Qma75NN8GaM99ioqsNUF9Ho816SonoGsVrvSnqz9uL4LPF"},{"/":"QmUE28rcN99es8ntD4T3sBScfyrADkF3q8qzM1gEW82oMh"}],"cats":{"qux":{"/":"QmSsM8Xm1g5WtfwkBvnttZafpDhaW6jkXeSFccECUnx7hg"}},"foo":"bar","hello":{"/":"Qma75NN8GaM99ioqsNUF9Ho816SonoGsVrvSnqz9uL4LPF"}}
-    "#;
-    let v: serde_json::Value = serde_json::from_slice(raw.as_ref()).unwrap();
-    let v2: serde_json::Value = serde_json::from_slice(output.as_ref()).unwrap();
-    assert_eq!(v, v2);
-}
-*/
-
-/*
 #[test]
 fn test_tree() {
     let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
     let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
     let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
     let c4 = Cid::new_cid_v0(util::sha2_256_hash(b"something4")).unwrap();
-
-    let mut obj_m = BTreeMap::new();
-    obj_m.insert("foo".into(), Obj::Cid(c1.into()));
-    obj_m.insert(
-        "baz".into(),
-        Obj::Array(vec![
-            Obj::Cid(c2.into()),
-            Obj::Cid(c3.into()),
-            Obj::Text("c".to_string()),
-        ]),
-    );
-    let mut cats_m = BTreeMap::new();
-    {
-        let mut qux_m = BTreeMap::new();
-        {
-            qux_m.insert("boo".into(), Obj::Integer(1));
-            qux_m.insert("baa".into(), Obj::Cid(c4.into()));
-            qux_m.insert("bee".into(), Obj::Integer(3));
-            qux_m.insert("bii".into(), Obj::Integer(4));
-
-            let mut buu_m = BTreeMap::new();
-            buu_m.insert("coat".into(), Obj::Text("rain".to_string()));
-            qux_m.insert("buu".into(), Obj::Map(buu_m));
-        }
-        cats_m.insert("qux".into(), Obj::Map(qux_m));
-    }
-    obj_m.insert("cats".into(), Obj::Map(cats_m));
-    let obj = Obj::Map(obj_m);
-
-    let nd = wrap_obj(obj, Hash::SHA2256).unwrap();
-
+    let obj = Obj::Map(btreemap! {
+        "foo".into() => Obj::Cid(c1.into()),
+        "baz".into() => Obj::Array(vec![Obj::Cid(c2.into()), Obj::Cid(c3.into()), Obj::Text("c".to_string())]),
+        "cats".into() => Obj::Map(btreemap!{
+            "qux".into() => Obj::Map(btreemap!{
+                "boo".into() => Obj::Integer(1),
+                "baa".into() => Obj::Cid(c4.into()),
+                "bee".into() => Obj::Integer(3),
+                "bii".into() => Obj::Integer(4),
+                "buu".into() => Obj::Map(btreemap!{
+                    "coat".into() => Obj::Text("rain".to_string()),
+                }),
+            }),
+        }),
+    });
+    let node = IpldNode::from_obj(obj, Hash::SHA2256).unwrap();
     assert_eq!(
-        &nd.cid().to_string(),
+        &node.cid().to_string(),
         "bafyreicp66zmx7grdrnweetu23anx3e5zguda7646iwyothju6nhgqykgq"
     );
 
@@ -296,7 +206,7 @@ fn test_tree() {
         "cats/qux/buu".to_string(),
         "cats/qux/buu/coat".to_string(),
     ];
-    let mut paths = nd.tree("", None);
+    let mut paths = node.tree("", None);
     paths.sort();
     full.sort();
     assert_eq!(paths, full);
@@ -310,44 +220,103 @@ fn test_tree() {
         "qux/buu".to_string(),
         "qux/buu/coat".to_string(),
     ];
-    let mut paths = nd.tree("cats", None);
+    let mut paths = node.tree("cats", None);
     paths.sort();
     cats.sort();
     assert_eq!(paths, cats);
 
     let mut toplevel = vec!["foo".to_string(), "baz".to_string(), "cats".to_string()];
-    let mut paths = nd.tree("", Some(1));
+    let mut paths = node.tree("", Some(1));
     paths.sort();
     toplevel.sort();
     assert_eq!(paths, toplevel);
 
-    let v: Vec<String> = vec![];
-    assert_eq!(nd.tree("", Some(0)), v);
+    assert_eq!(node.tree("", Some(0)), Vec::<String>::new());
 }
-*/
 
-/*
 #[test]
 fn test_resolved_val_is_jsonable() {
-    let data = r#"{
+    let json = r#"{
         "foo": {
             "bar": 1,
             "baz": 2
         }
     }"#;
 
-    let n = from_json(data, Hash::SHA2256).unwrap();
+    let node = IpldNode::from_json(json, Hash::SHA2256).unwrap();
     assert_eq!(
-        &n.cid().to_string(),
+        &node.cid().to_string(),
         "bafyreiahcy6ewqmabbh7lcjhxrillpf72zlu3vqcovckanvj2fwdtenvbe"
     );
-    let (val, _) = n.resolve(&vec!["foo"]).unwrap();
-    match val {
-        Either::Left(_) => panic!(""),
-        Either::Right(obj) => {
-            let s = obj_to_json(obj).unwrap();
-            assert_eq!(&s, r#"{"bar":1,"baz":2}"#)
-        }
+
+    if let (Either::Right(obj), _) = node.resolve(&["foo"]).unwrap() {
+        assert_eq!(&obj_to_json(obj).unwrap(), r#"{"bar":1,"baz":2}"#);
+    } else {
+        unreachable!()
     }
 }
-*/
+
+#[test]
+fn test_basic_marshal() {
+    let cid = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
+    let obj = Obj::Map(btreemap! {
+        "name".into() => Obj::Text("foo".to_string()),
+        "bar".into() => Obj::Cid(cid.clone().into()),
+    });
+    let node = IpldNode::from_obj(obj, Hash::SHA2256).unwrap();
+    assert_eq!(
+        &node.cid().to_string(),
+        "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
+    );
+
+    let back = IpldNode::from_cbor(node.raw_data(), Hash::SHA2256).unwrap();
+    assert_eq!(
+        &back.cid().to_string(),
+        "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
+    );
+
+    let (link, _) = back.resolve_link(&["bar"]).unwrap();
+    assert_eq!(link.cid, cid);
+}
+
+#[test]
+fn test_marshal_roundtrip() {
+    let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
+    let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
+    let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
+    let obj = Obj::Map(btreemap! {
+        "foo".into() => Obj::Text("bar".to_string()),
+        "hello".into() => Obj::Cid(c1.clone().into()),
+        "baz".into() => Obj::Array(vec![Obj::Cid(c1.into()), Obj::Cid(c2.clone().into())]),
+        "cats".into() => Obj::Map(btreemap!{
+            "qux".into() => Obj::Cid(c3.into()),
+        }),
+    });
+    let node1 = IpldNode::from_obj(obj, Hash::SHA2256).unwrap();
+    assert_eq!(
+        &node1.cid().to_string(),
+        "bafyreibgx4rjaqolj7c32c7ibxc5tedhisc4d23ihx5t4tgamuvy2hvwjm"
+    );
+    assert_eq!(node1.links().len(), 4);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&node1.to_json().unwrap()).unwrap(),
+        serde_json::json!({
+            "baz":[
+                {"/":"Qma75NN8GaM99ioqsNUF9Ho816SonoGsVrvSnqz9uL4LPF"},
+                {"/":"QmUE28rcN99es8ntD4T3sBScfyrADkF3q8qzM1gEW82oMh"}
+            ],
+            "cats":{
+                "qux":{"/":"QmSsM8Xm1g5WtfwkBvnttZafpDhaW6jkXeSFccECUnx7hg"}
+            },
+            "foo":"bar",
+            "hello":{"/":"Qma75NN8GaM99ioqsNUF9Ho816SonoGsVrvSnqz9uL4LPF"}
+        }),
+    );
+
+    let node2 = IpldNode::from_cbor(node1.raw_data(), Hash::SHA2256).unwrap();
+    assert_eq!(node1.cid(), node2.cid());
+    let (link, rest) = node2.resolve_link(&["baz", "1", "bop"]).unwrap();
+    assert_eq!(link.cid, c2);
+    assert_eq!(rest.len(), 1);
+    assert_eq!(rest[0], "bop");
+}

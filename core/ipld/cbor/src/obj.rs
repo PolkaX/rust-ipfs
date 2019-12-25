@@ -301,7 +301,7 @@ impl TryFrom<serde_cbor::Value> for Obj {
             Value::Text(s) => Ok(Obj::Text(s)),
             Value::Array(arr) => try_from_array(arr),
             Value::Map(map) => try_from_map(map),
-            Value::Tag(tag, value) => try_from_tag(tag, value),
+            Value::Tag(tag, value) => try_from_tag(tag, *value),
             _ => unreachable!("not impl for the hidden variant"),
         }
     }
@@ -328,7 +328,7 @@ fn try_from_map(map: BTreeMap<Value, Value>) -> Result<Obj, IpldCborError> {
     Ok(Obj::Map(m))
 }
 
-fn try_from_tag(tag: u64, value: Box<Value>) -> Result<Obj, IpldCborError> {
+fn try_from_tag(tag: u64, value: Value) -> Result<Obj, IpldCborError> {
     if tag != CID_CBOR_TAG {
         return Err(IpldCborError::ObjErr(format!(
             "obj only accept tag [{}] to represent cid",
@@ -336,7 +336,7 @@ fn try_from_tag(tag: u64, value: Box<Value>) -> Result<Obj, IpldCborError> {
         )));
     }
 
-    if let Value::Bytes(ref bytes) = *value {
+    if let Value::Bytes(ref bytes) = value {
         let cid = deserialize_cid_from_bytes(bytes)?;
         Ok(Obj::Cid(cid.into()))
     } else {

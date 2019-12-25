@@ -11,8 +11,8 @@ pub struct EmptyNode {
     data: Bytes,
 }
 
-impl EmptyNode {
-    pub fn new() -> Self {
+impl Default for EmptyNode {
+    fn default() -> Self {
         let p = Prefix {
             version: Version::V1,
             codec: Codec::Raw,
@@ -23,6 +23,12 @@ impl EmptyNode {
             cid: p.sum(b"").unwrap(),
             data: Bytes::from_static(b""),
         }
+    }
+}
+
+impl EmptyNode {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -78,7 +84,7 @@ impl NavigableNode for N {
     fn fetch_child(&self, child_index: usize) -> Result<Arc<dyn NavigableNode>> {
         self.child
             .get(child_index)
-            .map(|d| d.clone())
+            .cloned()
             .ok_or(FormatError::NoChild(child_index))
     }
 }

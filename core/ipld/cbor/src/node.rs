@@ -153,7 +153,7 @@ impl Resolver for IpldNode {
             // `skip_while` plus `trim_start_matches` would equal to `strings.TrimLeft` in GO
             // but `s` is allocated, use char.utf8_len to peek slice for `t` could avoid allocate.
             let skip = t.chars().skip(path.len()); // equal to `[len(path):]`
-            let s: String = if path.is_empty() {
+            let s: String = if !path.is_empty() {
                 // only filter when path is not "", notice GO not impl for this!
                 skip.skip_while(|c| *c != '/').collect()
             } else {
