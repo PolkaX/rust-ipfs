@@ -47,7 +47,7 @@ fn test_basic_marshal() {
     let c = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
     let mut m = BTreeMap::new();
     m.insert("name".to_string().into(), Obj::Text("foo".to_string()));
-    m.insert("bar".to_string().into(), Obj::Cid(c.clone().into()));
+    m.insert("bar".to_string().into(), Obj::Cid(c.clone()));
     let obj = Obj::Map(m);
 
     let raw = dump_object(&obj).unwrap();
@@ -77,13 +77,13 @@ fn test_marshal_roundtrip() {
 
     let mut m = BTreeMap::new();
     m.insert("foo".to_string().into(), Obj::Text("bar".to_string()));
-    m.insert("hello".to_string().into(), Obj::Cid(c1.clone().into()));
+    m.insert("hello".to_string().into(), Obj::Cid(c1.clone()));
     m.insert(
         "baz".to_string().into(),
-        Obj::Array(vec![Obj::Cid(c1.into()), Obj::Cid(c2.clone().into())]),
+        Obj::Array(vec![Obj::Cid(c1), Obj::Cid(c2.clone())]),
     );
     let mut cats_m = BTreeMap::new();
-    cats_m.insert("qux".to_string().into(), Obj::Cid(c3.into()));
+    cats_m.insert("qux".to_string().into(), Obj::Cid(c3));
     m.insert("cats".to_string().into(), Obj::Map(cats_m));
     let obj = Obj::Map(m);
 
@@ -122,21 +122,17 @@ fn test_tree() {
     let c4 = Cid::new_cid_v0(util::sha2_256_hash(b"something4")).unwrap();
 
     let mut obj_m = BTreeMap::new();
-    obj_m.insert("foo".into(), Obj::Cid(c1.into()));
+    obj_m.insert("foo".into(), Obj::Cid(c1));
     obj_m.insert(
         "baz".into(),
-        Obj::Array(vec![
-            Obj::Cid(c2.into()),
-            Obj::Cid(c3.into()),
-            Obj::Text("c".to_string()),
-        ]),
+        Obj::Array(vec![Obj::Cid(c2), Obj::Cid(c3), Obj::Text("c".to_string())]),
     );
     let mut cats_m = BTreeMap::new();
     {
         let mut qux_m = BTreeMap::new();
         {
             qux_m.insert("boo".into(), Obj::Integer(1));
-            qux_m.insert("baa".into(), Obj::Cid(c4.into()));
+            qux_m.insert("baa".into(), Obj::Cid(c4));
             qux_m.insert("bee".into(), Obj::Integer(3));
             qux_m.insert("bii".into(), Obj::Integer(4));
 
@@ -336,7 +332,7 @@ fn test_objects() {
                 assert_eq!(nd.raw_data(), expected.as_slice());
                 match v {
                     Obj::Cid(cid) => {
-                        assert_eq!(nd.cid(), &cid.0);
+                        assert_eq!(nd.cid(), &cid);
                     }
                     _ => unreachable!(),
                 }
@@ -377,13 +373,13 @@ fn test_cid_and_bigint() {
     #[derive(Serialize, Deserialize, Debug)]
     struct Foo {
         b: CborBigUint,
-        a: CborCid,
+        a: Cid,
     }
     let nd = wrap_obj(Obj::Text("".to_string()), MHashEnum::SHA2256).unwrap();
     let c = nd.cid().clone();
 
     let foo = Foo {
-        a: c.into(),
+        a: c,
         b: CborBigUint(1_u64.into()),
     };
 
@@ -398,17 +394,17 @@ fn test_cid_and_bigint() {
 fn test_empty_cid() {
     #[derive(Serialize, Deserialize, Debug)]
     struct Foo {
-        a: CborCid,
+        a: Cid,
     }
 
     #[derive(Serialize, Deserialize, Debug)]
     struct Bar {
         #[serde(skip)]
-        a: Option<CborCid>,
+        a: Option<Cid>,
     }
 
     let foo = Foo {
-        a: Cid::new_cid_v0(util::sha2_256_hash(b"")).unwrap().into(),
+        a: Cid::new_cid_v0(util::sha2_256_hash(b"")).unwrap(),
     };
     let bar = Bar { a: None };
 

@@ -7,7 +7,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-use cid::{Cid, ToCid};
+use cid::{deserialize_cid_from_bytes, Cid, ToCid, CID_CBOR_TAG};
 use serde::{
     de::{self, Error},
     Deserialize, Serialize,
@@ -16,7 +16,6 @@ use serde_cbor::tags::current_cbor_tag;
 use serde_cbor::Value;
 
 use crate::error::{IpldCborError, Result};
-use crate::localcid::{deserialize_cid_from_bytes, CborCid, CID_CBOR_TAG};
 
 #[derive(Clone, Debug, PartialEq)]
 //#[serde(untagged)]
@@ -29,7 +28,7 @@ pub enum Obj {
     Text(String),
     Array(Vec<Obj>),
     Map(BTreeMap<SortedStr, Obj>),
-    Cid(CborCid),
+    Cid(Cid),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -247,7 +246,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             {
                 match current_cbor_tag() {
                     Some(CID_CBOR_TAG) | None => {
-                        let cid = CborCid::deserialize(deserializer)?;
+                        let cid = Cid::deserialize(deserializer)?;
                         Ok(Obj::Cid(cid))
                     }
                     Some(tag) => Err(D::Error::custom(format!("unexpected tag ({})", tag))),
@@ -356,7 +355,7 @@ pub fn convert_to_cborish_obj(value: Obj) -> Result<Obj> {
                     match link {
                         Obj::Text(s) => {
                             let cid = s.to_cid()?;
-                            *obj = Obj::Cid(CborCid(cid));
+                            *obj = Obj::Cid(cid);
                         }
                         Obj::Cid(cid) => {
                             *obj = Obj::Cid(cid.clone());
@@ -379,7 +378,7 @@ pub fn convert_to_jsonish_obj(value: Obj) -> Result<Obj> {
         match obj {
             // change cid to map { "/", "string" }
             Obj::Cid(local_cid) => {
-                let link = Obj::Text(local_cid.0.to_string());
+                let link = Obj::Text(local_cid.to_string());
                 let mut map = BTreeMap::new();
                 map.insert("/".to_string().into(), link);
                 *obj = Obj::Map(map.into());
@@ -390,7 +389,7 @@ pub fn convert_to_jsonish_obj(value: Obj) -> Result<Obj> {
                 if map.len() == 1 {
                     if let Some(ref mut cid) = map.get("/") {
                         match cid {
-                            Obj::Cid(local_cid) => *cid = &Obj::Text(local_cid.0.to_string()),
+                            Obj::Cid(local_cid) => *cid = &Obj::Text(local_cid.to_string()),
                             Obj::Text(_s) => {} // do nothing,
                             _ => return Err(IpldCborError::NonStringLink), // should not happen
                         }

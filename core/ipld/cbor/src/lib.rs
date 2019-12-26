@@ -7,7 +7,6 @@ extern crate test;
 #[cfg(feature = "bigint")]
 mod bigint;
 mod error;
-mod localcid;
 mod obj;
 #[cfg(test)]
 mod tests;
@@ -27,7 +26,6 @@ use multihash::Hash as MHashEnum;
 #[cfg(feature = "bigint")]
 pub use self::bigint::CborBigUint;
 pub use self::error::{IpldCborError, Result};
-pub use self::localcid::CborCid;
 pub use self::obj::{
     convert_to_cborish_obj, convert_to_jsonish_obj, hack_convert_float_to_int,
     hack_convert_int_to_float, struct_to_cbor_value, Obj,
@@ -87,7 +85,7 @@ impl Resolver for IpldNode {
                     )))?;
                 }
                 Obj::Cid(cid) => {
-                    let link = Link::new_with_cid(cid.0.clone());
+                    let link = Link::new_with_cid(cid.clone());
                     return Ok((
                         Left(link),
                         path.iter().skip(index).map(|s| (*s).to_string()).collect(),
@@ -97,7 +95,7 @@ impl Resolver for IpldNode {
             }
         }
         if let Obj::Cid(cid) = cur {
-            let link = Link::new_with_cid(cid.0.clone());
+            let link = Link::new_with_cid(cid.clone());
             return Ok((Left(link), vec![]));
         }
         let jsonish =
@@ -251,7 +249,7 @@ fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
             tree.push(name);
         }
         if let Obj::Cid(cid) = obj {
-            links.push(Link::new_with_cid(cid.0.clone()))
+            links.push(Link::new_with_cid(cid.clone()))
         }
         Ok(())
     };
