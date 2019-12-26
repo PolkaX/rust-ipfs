@@ -26,7 +26,10 @@ impl Serialize for Cid {
 /// for CIDs must have binary multibase
 pub fn deserialize_cid_from_bytes(res: &[u8]) -> Result<Cid, Error> {
     if res.len() == 0 || res[0] != 0 {
-        return Err(multibase::Error::Other("cbor serialized CIDs must have binary multibase or bytes is empty".to_string()).into())
+        return Err(multibase::Error::Other(
+            "cbor serialized CIDs must have binary multibase or bytes is empty".to_string(),
+        )
+        .into());
     }
 
     let cid = Cid::from(&res[1..])?;

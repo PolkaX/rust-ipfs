@@ -22,7 +22,7 @@ multihash = { package = "parity-multihash", version = "0.2" }
 serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
 ipld-format = { package = "rust-ipld-format", path = "../format" }
 block-format = { package = "rust-block-format", path = "../../block-format" }
-cid = { package = "rust-cid", path = "../../cid" }
+cid = { package = "rust-cid", path = "../../cid", features = ["serde_support"] }
 
 [dev-dependencies]
 util = { package = "rust-ipfs-util", path = "../../util" }

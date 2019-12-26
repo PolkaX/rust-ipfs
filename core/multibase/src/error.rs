@@ -19,7 +19,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::UnknownBase(code) => write!(f, "Unknown base code: {}", code),
             Error::InvalidCharacter => write!(f, "Invalid character"),
-            Error::Other(s)=> write!(f, "Other error: {}", s),
+            Error::Other(s) => write!(f, "Other error: {}", s),
         }
     }
 }
