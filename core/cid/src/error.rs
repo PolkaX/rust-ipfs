@@ -29,6 +29,9 @@ pub enum Error {
     /// Multihash parse failure.
     #[error("Failed to parse multihash: {0}")]
     ParsingError(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Other error
+    #[error("Other err: {0}")]
+    Other(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<std::io::Error> for Error {
