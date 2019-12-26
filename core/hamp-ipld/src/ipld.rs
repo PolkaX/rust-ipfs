@@ -35,19 +35,23 @@ impl<B: Blocks> CborIpldStor<B> {
         let mut codec = Codec::DagCBOR;
 
         // if this type has cid, would use this cid config
-        if let Some(cid) = v.has_cid() {
+        let exp_cid_hash = if let Some(cid) = v.has_cid() {
             let perf = cid.prefix();
             hash_type = perf.mh_type;
             codec = perf.codec;
-        }
+            Some(cid.multihash())
+        } else {
+            None
+        };
 
         let node = ipld_cbor::wrap_object_with_codec(v, hash_type, codec)?;
         let cid = node.cid().clone(); // this cid is calc from node
         self.blocks.add_block(node);
 
-        //        if let Some(exp_cid) = v.has_cid() {
-        //            assert_eq!(exp_cid, &cid);
-        //        }
+        if let Some(hash) = exp_cid_hash {
+            // if has expected cid, then this expected hash
+            assert_eq!(hash, cid.multihash());
+        }
 
         Ok(cid)
     }

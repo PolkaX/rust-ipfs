@@ -1,16 +1,20 @@
 mod error;
 mod hash;
 mod ipld;
+mod node;
 #[cfg(test)]
 mod tests;
 
 use serde::{Deserialize, Serialize};
 
-use crate::hash::hash;
-use crate::ipld::{Blocks, CborIpldStor};
 use cid::Cid;
 use ipld_cbor::CborBigUint;
 
+use crate::hash::hash;
+use crate::ipld::{Blocks, CborIpldStor};
+use crate::node::{Pointer, KV};
+
+const ARRAY_WIDTH: usize = 3;
 const DEFAULT_BIT_WIDTH: usize = 8;
 
 //#[derive(Serialize, Deserialize, Debug)]
@@ -45,15 +49,3 @@ const DEFAULT_BIT_WIDTH: usize = 8;
 //
 //    fn get_value()
 //}
-
-#[derive(Debug)]
-pub struct KV {
-    key: String,
-    value: Vec<u8>,
-}
-
-#[derive(Debug)]
-pub struct Pointer {
-    kvs: Vec<KV>,
-    link: Cid,
-}

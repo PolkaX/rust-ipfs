@@ -9,11 +9,19 @@ edition = "2018"
 [dependencies]
 fasthash = "0.4"
 thiserror = "1.0"
-serde = { version = "1.0", features = ["derive"] }
+serde = "1.0"
+serde_derive = "1.0"
+serde_bytes = "0.11"
+serde_tuple = "0.2.5"
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
 bytes = { version = "0.5", features = ["serde"] }
 
 multihash = { package = "parity-multihash", version = "0.2" }
 
 block-format = { package = "rust-block-format", path = "../block-format" }
-cid = { package = "rust-cid", path = "../cid", features = ["hascid"] }
+cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
 ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor", features = ["bigint"] }
+
+[dev-dependencies]
+util = { package = "rust-ipfs-util", path = "../util" }
+serde_json = "1.0"
