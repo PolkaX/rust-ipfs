@@ -12,8 +12,12 @@ keywords = ["ipfs", "cid"]
 [dependencies]
 thiserror = "1.0"
 integer-encoding = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_bytes = { version = "0.11", optional = true }
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"], optional = true }
 
 multihash = { package = "parity-multihash", version = "0.2" }
 multibase = { package = "rust-multibase", path = "../multibase" }
+
+[features]
+serde_support = [ "serde_cbor", "serde", "serde_bytes" ]
