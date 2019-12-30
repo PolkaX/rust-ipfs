@@ -6,6 +6,7 @@ use cid::Cid;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::*;
+use crate::ipld::Blocks;
 
 use super::NodeP;
 
@@ -44,16 +45,18 @@ pub enum PContent {
 }
 
 #[derive(Debug)]
-pub struct Pointer<P = RcK>
+pub struct Pointer<B, P = RcK>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     pub data: PContent,
-    pub cache: Option<NodeP<P>>,
+    pub cache: Option<NodeP<B, P>>,
 }
 
-impl<P> PartialEq for Pointer<P>
+impl<B, P> PartialEq for Pointer<B, P>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -61,10 +64,16 @@ where
     }
 }
 
-impl<P> Eq for Pointer<P> where P: SharedPointerKind {}
-
-impl<P> Clone for Pointer<P>
+impl<B, P> Eq for Pointer<B, P>
 where
+    B: Blocks,
+    P: SharedPointerKind,
+{
+}
+
+impl<B, P> Clone for Pointer<B, P>
+where
+    B: Blocks,
     P: SharedPointerKind,
 {
     fn clone(&self) -> Self {
@@ -75,8 +84,9 @@ where
     }
 }
 
-impl<P> Serialize for Pointer<P>
+impl<B, P> Serialize for Pointer<B, P>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
@@ -87,8 +97,9 @@ where
     }
 }
 
-impl<'de, P> Deserialize<'de> for Pointer<P>
+impl<'de, B, P> Deserialize<'de> for Pointer<B, P>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
@@ -103,8 +114,9 @@ where
     }
 }
 
-impl<P> Pointer<P>
+impl<B, P> Pointer<B, P>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     pub fn from_kvs(kvs: Vec<KV>) -> Self {
@@ -129,7 +141,7 @@ where
         &mut self.data
     }
 
-    pub fn load_child(&self, _bit_width: u32) -> Result<NodeP<P>> {
+    pub fn load_child(&self, _bit_width: u32) -> Result<NodeP<B, P>> {
         if let Some(ref cache) = self.cache {
             return Ok((*cache).clone());
         }

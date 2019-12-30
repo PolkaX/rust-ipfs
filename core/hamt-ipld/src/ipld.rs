@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
 use block_format::{BasicBlock, Block as BlockT};
 use bytes::Bytes;
 use cid::{Cid, CidT, Codec, HasCid};
 use multihash::Hash as MHashEnum;
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::HashMap;
 
 use crate::error::*;
 
@@ -19,12 +21,23 @@ pub trait BlockStore {
 
 #[derive(Debug)]
 pub struct CborIpldStor<B: Blocks> {
-    blocks: B,
+    blocks: Arc<RwLock<B>>,
+}
+
+impl<B: Blocks> Clone for CborIpldStor<B> {
+    fn clone(&self) -> Self {
+        CborIpldStor {
+            blocks: self.blocks.clone(),
+        }
+    }
 }
 
 impl<B: Blocks> CborIpldStor<B> {
     pub fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T> {
-        let blk = self.blocks.get_block(c)?;
+        let blk = {
+            let b = self.blocks.read().map_err(|_| Error::Lock)?;
+            b.get_block(c)?
+        };
         let data = (*blk).raw_data();
         let r = ipld_cbor::decode_into(data)?;
         Ok(r)
@@ -46,7 +59,10 @@ impl<B: Blocks> CborIpldStor<B> {
 
         let node = ipld_cbor::wrap_object_with_codec(v, hash_type, codec)?;
         let cid = node.cid().clone(); // this cid is calc from node
-        self.blocks.add_block(node);
+        {
+            let mut b = self.blocks.write().map_err(|_| Error::Lock)?;
+            b.add_block(node);
+        }
 
         if let Some(hash) = exp_cid_hash {
             // if has expected cid, then this expected hash
@@ -103,6 +119,6 @@ impl Blocks for MockBlocks {
 
 pub fn new_cbor_store() -> CborIpldStor<MockBlocks> {
     return CborIpldStor {
-        blocks: MockBlocks::new(),
+        blocks: Arc::new(RwLock::new(MockBlocks::new())),
     };
 }

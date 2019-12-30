@@ -1,14 +1,41 @@
 use std::fmt;
 use std::result;
 
-use archery::{RcK, SharedPointer, SharedPointerKind};
+use archery::{RcK, SharedPointerKind};
 use serde::de::{SeqAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{Node, Pointer};
+use crate::ipld::{Blocks, CborIpldStor};
 
-impl<P> PartialEq for Node<P>
+#[derive(Debug)]
+pub struct PartNode<B, P = RcK>
 where
+    B: Blocks,
+    P: SharedPointerKind,
+{
+    bitfield: u64,
+    pointers: Vec<Pointer<B, P>>,
+}
+
+impl<B, P> PartNode<B, P>
+where
+    B: Blocks,
+    P: SharedPointerKind,
+{
+    pub fn into_node(self, store: CborIpldStor<B>, bit_width: u32) -> Node<B, P> {
+        Node {
+            bitfield: self.bitfield,
+            pointers: self.pointers,
+            store,
+            bit_width,
+        }
+    }
+}
+
+impl<B, P> PartialEq for Node<B, P>
+where
+    B: Blocks,
     P: SharedPointerKind,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -18,23 +45,31 @@ where
     }
 }
 
-impl<P> Eq for Node<P> where P: SharedPointerKind {}
-
-impl<P> Clone for Node<P>
+impl<B, P> Eq for Node<B, P>
 where
+    B: Blocks,
+    P: SharedPointerKind,
+{
+}
+
+impl<B, P> Clone for Node<B, P>
+where
+    B: Blocks,
     P: SharedPointerKind,
 {
     fn clone(&self) -> Self {
         Node {
             bitfield: self.bitfield,
             pointers: self.pointers.clone(),
+            store: self.store.clone(),
             bit_width: self.bit_width,
         }
     }
 }
 
-impl<P> Serialize for Node<P>
+impl<B, P> Serialize for Node<B, P>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
@@ -53,20 +88,25 @@ where
     }
 }
 
-impl<'de, P> Deserialize<'de> for Node<P>
+impl<'de, B, P> Deserialize<'de> for PartNode<B, P>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct TupleVisitor<P: SharedPointerKind>(std::marker::PhantomData<P>);
-        impl<'de, P> Visitor<'de> for TupleVisitor<P>
+        struct TupleVisitor<B: Blocks, P: SharedPointerKind>(
+            std::marker::PhantomData<B>,
+            std::marker::PhantomData<P>,
+        );
+        impl<'de, B, P> Visitor<'de> for TupleVisitor<B, P>
         where
+            B: Blocks,
             P: SharedPointerKind,
         {
-            type Value = (serde_bytes::ByteBuf, Vec<Pointer<P>>);
+            type Value = (serde_bytes::ByteBuf, Vec<Pointer<B, P>>);
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "tuple must be 2 item, bytes and Vec<Pointer>")
@@ -75,17 +115,19 @@ where
             where
                 A: SeqAccess<'de>,
             {
-                let secs = seq
+                let first = seq
                     .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                let nanos = seq
+                let second = seq
                     .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-                Ok((secs, nanos))
+                Ok((first, second))
             }
         }
-        let (byte_buf, pointers) =
-            deserializer.deserialize_tuple(2, TupleVisitor::<P>(std::marker::PhantomData))?;
+        let (byte_buf, pointers) = deserializer.deserialize_tuple(
+            2,
+            TupleVisitor::<B, P>(std::marker::PhantomData, std::marker::PhantomData),
+        )?;
 
         // it's big ending bytes, we copy value from end.
         // the buf is size of `u64` u8 array, notice could not out of bounds.
@@ -100,10 +142,6 @@ where
         }
         let bitfield = u64::from_be_bytes(buf);
 
-        Ok(Node {
-            bitfield,
-            pointers,
-            bit_width: 0,
-        })
+        Ok(PartNode { bitfield, pointers })
     }
 }

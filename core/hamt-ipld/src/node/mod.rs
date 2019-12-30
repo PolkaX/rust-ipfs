@@ -8,23 +8,25 @@ use serde::{de::DeserializeOwned, Serialize};
 use self::entry::{PContent, Pointer, KV};
 use crate::error::*;
 use crate::hash::{hash, HashBits};
+use crate::ipld::{Blocks, CborIpldStor};
 
 const ARRAY_WIDTH: usize = 3;
 const DEFAULT_BIT_WIDTH: u32 = 8;
 
-pub type NodeP<P: SharedPointerKind> = SharedPointer<Node<P>, P>;
+pub type NodeP<B, P> = SharedPointer<Node<B, P>, P>;
 
 #[derive(Debug)]
-pub struct Node<P = RcK>
+pub struct Node<B, P = RcK>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     // we use u64 here, for normally a branch of node would not over 64, 64 branch's wide is so large, if larger then 64, panic
     bitfield: u64,
-    pointers: Vec<Pointer<P>>,
+    pointers: Vec<Pointer<B, P>>,
 
     /// for fetching and storing children
-    //    store: &'a mut CborIpldStor<B>,
+    store: CborIpldStor<B>,
     bit_width: u32,
 }
 
@@ -50,23 +52,32 @@ pub fn index_for_bitpos(bitmap: u64, bit_pos: u32) -> u32 {
     (bitmap & mask).count_ones()
 }
 
-impl<P> Node<P>
+impl<B, P> Node<B, P>
 where
+    B: Blocks,
     P: SharedPointerKind,
 {
     #[cfg(test)]
-    pub fn test_init(bitfield: u64, pointers: Vec<Pointer<P>>, bit_width: u32) -> Self {
+    pub fn test_init(
+        store: CborIpldStor<B>,
+        bitfield: u64,
+        pointers: Vec<Pointer<B, P>>,
+        bit_width: u32,
+    ) -> Self {
         Node {
             bitfield,
             pointers,
+            store,
             bit_width,
         }
     }
 
-    pub fn new() -> Node {
+    pub fn new(store: CborIpldStor<B>) -> Node<B, P> {
+        // TODO
         let nd = Node {
             bitfield: 0,
             pointers: vec![],
+            store,
             bit_width: DEFAULT_BIT_WIDTH,
         };
         nd
@@ -192,9 +203,10 @@ where
 
                 // If the array is full, create a subshard and insert everything into it
                 if kvs.len() >= ARRAY_WIDTH {
-                    let mut sub = Node::<P> {
+                    let mut sub = Node::<B, P> {
                         bitfield: 0,
                         pointers: vec![],
+                        store: self.store.clone(),
                         bit_width: self.bit_width,
                     };
                     let mut hash_copy = hv.clone();
@@ -240,7 +252,7 @@ where
         Ok(())
     }
 
-    fn clean_child(&mut self, child_node: NodeP<P>, idx: u32) -> Result<()> {
+    fn clean_child(&mut self, child_node: NodeP<B, P>, idx: u32) -> Result<()> {
         let len = child_node.pointers.len();
         match len {
             0 => {
@@ -287,7 +299,7 @@ where
         Ok(())
     }
 
-    fn set_child(&mut self, idx: u32, p: Pointer<P>) -> Result<()> {
+    fn set_child(&mut self, idx: u32, p: Pointer<B, P>) -> Result<()> {
         let v = self.pointers.get_mut(idx as usize).ok_or(Error::Tmp)?;
         *v = p;
         Ok(())

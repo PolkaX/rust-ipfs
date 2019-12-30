@@ -11,7 +11,10 @@ pub enum Error {
     #[error("ipld cbor error: {0:?}")]
     IpldCbor(#[from] IpldCborError),
     #[error("other err: {0}")]
-    Other(Box<dyn std::error::Error>),
+    Other(#[from] Box<dyn std::error::Error>),
+
+    #[error("locking RwLock failed")]
+    Lock,
 
     #[error("tmp holder")]
     Tmp,
