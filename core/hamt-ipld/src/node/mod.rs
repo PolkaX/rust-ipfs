@@ -2,14 +2,15 @@ pub mod entry;
 mod trait_impl;
 
 use archery::{RcK, SharedPointer, SharedPointerKind};
+use bytes::Bytes;
+use serde::{de::DeserializeOwned, Serialize};
 
+use self::entry::{PContent, Pointer, KV};
 use crate::error::*;
 use crate::hash::{hash, HashBits};
 
-use self::entry::{PContent, Pointer, KV};
-
 const ARRAY_WIDTH: usize = 3;
-const DEFAULT_BIT_WIDTH: usize = 8;
+const DEFAULT_BIT_WIDTH: u32 = 8;
 
 pub type NodeP<P: SharedPointerKind> = SharedPointer<Node<P>, P>;
 
@@ -59,6 +60,76 @@ where
             bitfield,
             pointers,
             bit_width,
+        }
+    }
+
+    pub fn new() -> Node {
+        let nd = Node {
+            bitfield: 0,
+            pointers: vec![],
+            bit_width: DEFAULT_BIT_WIDTH,
+        };
+        nd
+    }
+
+    pub fn find<Output: DeserializeOwned>(&self, k: &str) -> Result<Output> {
+        let hash = hash(k);
+        let mut hash_bits = HashBits::new(hash.as_ref());
+        self.get_value(&mut hash_bits, k)
+            .and_then(|v| ipld_cbor::decode_into(&v).map_err(Error::IpldCbor))
+    }
+
+    pub fn delete(&mut self, k: &str) -> Result<()> {
+        let hash = hash(k);
+        let mut hash_bits = HashBits::new(hash.as_ref());
+        self.modify_value(&mut hash_bits, k, None)
+    }
+
+    pub fn set<V: Serialize>(&mut self, k: &str, v: V) -> Result<()> {
+        let hash = hash(k);
+        let mut hash_bits = HashBits::new(hash.as_ref());
+        let b = ipld_cbor::dump_object(&v).map_err(Error::IpldCbor)?;
+
+        self.modify_value(&mut hash_bits, k, Some(b))
+    }
+
+    pub fn flush(&mut self) -> Result<()> {
+        for p in self.pointers.iter_mut() {
+            if let Some(ref mut cache) = p.cache {
+                SharedPointer::make_mut(cache).flush()?;
+                // TODO
+                // n.store.put
+            }
+        }
+        Ok(())
+    }
+
+    pub fn check_size() -> Result<u64> {
+        Ok(0)
+    }
+
+    fn get_value<'hash>(&self, hash_bits: &mut HashBits<'hash>, k: &str) -> Result<Bytes> {
+        // TODO
+        let idx = hash_bits.next(self.bit_width).ok_or(Error::Tmp)?;
+        if bit(self.bitfield, idx) == 0 {
+            return Err(Error::Tmp);
+        }
+        let child_index = index_for_bitpos(self.bitfield, idx) as usize;
+        let child = self.pointers.get(child_index).ok_or(Error::Tmp)?;
+        match child.data {
+            PContent::Link(_) => {
+                let child_node = child.load_child(self.bit_width)?;
+                child_node.get_value(hash_bits, k)
+            }
+            PContent::KVs(ref kvs) => {
+                for kv in kvs.iter() {
+                    if kv.key == k {
+                        return Ok(kv.value.clone());
+                    }
+                }
+                // TODO not find
+                Err(Error::Tmp)
+            }
         }
     }
 
