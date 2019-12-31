@@ -1,6 +1,7 @@
 pub mod entry;
+mod trait_impl;
 
-use archery::{SharedPointer, SharedPointerKind};
+use archery::{RcK, SharedPointer, SharedPointerKind};
 
 use crate::error::*;
 use crate::hash::{hash, HashBits};
@@ -10,15 +11,15 @@ use self::entry::{PContent, Pointer, KV};
 const ARRAY_WIDTH: usize = 3;
 const DEFAULT_BIT_WIDTH: usize = 8;
 
-pub type NodeP<P> = SharedPointer<Node<P>, P>;
+pub type NodeP<P: SharedPointerKind> = SharedPointer<Node<P>, P>;
 
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub struct Node<P>
+#[derive(Debug)]
+pub struct Node<P = RcK>
 where
-    //    B: Blocks,
-    P: SharedPointerKind + Clone,
+    P: SharedPointerKind,
 {
-    bitfield: usize,
+    // we use u64 here, for normally a branch of node would not over 64, 64 branch's wide is so large, if larger then 64, panic
+    bitfield: u64,
     pointers: Vec<Pointer<P>>,
 
     /// for fetching and storing children
@@ -27,44 +28,54 @@ where
 }
 
 #[inline]
-fn bit(input: usize, n: usize) -> usize {
-    input & (1 << n)
+fn bit(input: u64, n: u32) -> u64 {
+    input & (1 << n as u64)
 }
 
 #[inline]
-fn set_bit(input: &mut usize, n: usize) {
-    *input |= 1 << n
+fn set_bit(input: &mut u64, n: u32) {
+    *input |= 1 << n as u64
 }
 
 #[inline]
-fn unset_bit(input: &mut usize, n: usize) {
-    *input &= !(1 << n)
+fn unset_bit(input: &mut u64, n: u32) {
+    *input &= !(1 << n as u64)
 }
 
 /// index for bit position in this bitmap
 #[inline]
-pub fn index_for_bitpos(bitmap: usize, bp: usize) -> u32 {
-    let mask = (1_usize << bp) - 1;
+pub fn index_for_bitpos(bitmap: u64, bit_pos: u32) -> u32 {
+    let mask = (1_u64 << bit_pos as u64) - 1;
     (bitmap & mask).count_ones()
 }
 
 impl<P> Node<P>
 where
-    P: SharedPointerKind + Clone,
+    P: SharedPointerKind,
 {
+    #[cfg(test)]
+    pub fn test_init(bitfield: u64, pointers: Vec<Pointer<P>>, bit_width: u32) -> Self {
+        Node {
+            bitfield,
+            pointers,
+            bit_width,
+        }
+    }
+
     fn modify_value<'hash>(
         &mut self,
         hv: &mut HashBits<'hash>,
         k: &str,
         v: Option<Vec<u8>>,
     ) -> Result<()> {
-        let idx = hv.next(self.bit_width).ok_or(Error::Tmp)?; // TODO
-                                                              // bitmap do not have this bit, it's a new key for this bit position.
-        if bit(self.bitfield, idx as usize) != 1 {
+        // TODO
+        let idx = hv.next(self.bit_width).ok_or(Error::Tmp)?;
+        // bitmap do not have this bit, it's a new key for this bit position.
+        if bit(self.bitfield, idx) != 1 {
             return self.insert_child(idx, k, v);
         }
 
-        let cindex = index_for_bitpos(self.bitfield, idx as usize);
+        let cindex = index_for_bitpos(self.bitfield, idx);
         let child = self.pointers.get_mut(cindex as usize).ok_or(Error::Tmp)?; // todo
 
         match child.data {
@@ -148,9 +159,9 @@ where
         // in insert, the value must exist, `None` represent delete this key.
         let v = v.ok_or(Error::Tmp)?; // todo
 
-        let i = index_for_bitpos(self.bitfield, idx as usize);
+        let i = index_for_bitpos(self.bitfield, idx);
         // set bit for index i
-        set_bit(&mut self.bitfield, i as usize);
+        set_bit(&mut self.bitfield, i);
 
         // net pointer
         let p = Pointer::from_kvs(vec![KV::new(k.to_string(), v)]);
@@ -201,7 +212,7 @@ where
         }
         self.pointers.remove(idx as usize);
         // set idx pos bit is zero
-        unset_bit(&mut self.bitfield, idx as usize);
+        unset_bit(&mut self.bitfield, idx);
         Ok(())
     }
 

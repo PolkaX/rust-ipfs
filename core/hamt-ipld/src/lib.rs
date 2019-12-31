@@ -4,3 +4,8 @@ mod ipld;
 pub mod node;
 #[cfg(test)]
 mod tests;
+
+use node::{
+    entry::{PContent, Pointer, KV},
+    Node,
+};

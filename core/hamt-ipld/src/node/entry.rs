@@ -1,6 +1,6 @@
 use std::result;
 
-use archery::SharedPointerKind;
+use archery::{RcK, SharedPointerKind};
 
 use cid::Cid;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -43,18 +43,29 @@ pub enum PContent {
     KVs(Vec<KV>),
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct Pointer<P>
+#[derive(Debug)]
+pub struct Pointer<P = RcK>
 where
-    P: SharedPointerKind + Clone,
+    P: SharedPointerKind,
 {
     pub data: PContent,
     pub cache: Option<NodeP<P>>,
 }
 
+impl<P> PartialEq for Pointer<P>
+where
+    P: SharedPointerKind,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data
+    }
+}
+
+impl<P> Eq for Pointer<P> where P: SharedPointerKind {}
+
 impl<P> Clone for Pointer<P>
 where
-    P: SharedPointerKind + Clone,
+    P: SharedPointerKind,
 {
     fn clone(&self) -> Self {
         Pointer {
@@ -66,7 +77,7 @@ where
 
 impl<P> Serialize for Pointer<P>
 where
-    P: SharedPointerKind + Clone,
+    P: SharedPointerKind,
 {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
     where
@@ -78,7 +89,7 @@ where
 
 impl<'de, P> Deserialize<'de> for Pointer<P>
 where
-    P: SharedPointerKind + Clone,
+    P: SharedPointerKind,
 {
     fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
     where
@@ -94,7 +105,7 @@ where
 
 impl<P> Pointer<P>
 where
-    P: SharedPointerKind + Clone,
+    P: SharedPointerKind,
 {
     pub fn from_kvs(kvs: Vec<KV>) -> Self {
         Pointer {

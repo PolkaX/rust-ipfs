@@ -1,5 +1,5 @@
 use super::*;
-use crate::hash::HashBits;
+use crate::hash::{hash, HashBits};
 
 #[test]
 fn test_hash() {
