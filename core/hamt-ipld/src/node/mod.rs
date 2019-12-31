@@ -110,7 +110,7 @@ where
 
     pub fn flush(&mut self) -> Result<()> {
         for p in self.pointers.iter_mut() {
-            if let Some(ref mut cache) = p.cache {
+            if let Some(cache) = p.cache.get_mut(){
                 SharedPointer::make_mut(cache).flush()?;
                 // TODO
                 // n.store.put

@@ -1,3 +1,5 @@
+use log::trace;
+use std::cell::RefCell;
 use std::result;
 
 use archery::{RcK, SharedPointer, SharedPointerKind};
@@ -8,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::error::*;
 use crate::ipld::{Blocks, CborIpldStor};
 
-use super::NodeP;
+use super::{load_node, NodeP};
 
 mod kv {
     use bytes::Bytes;
@@ -34,7 +36,6 @@ mod kv {
     }
 }
 
-use crate::node::load_node;
 pub use kv::KV;
 
 #[derive(Debug, Clone, Eq, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
@@ -52,7 +53,7 @@ where
     P: SharedPointerKind,
 {
     pub data: PContent,
-    pub cache: Option<NodeP<B, P>>,
+    pub cache: RefCell<Option<NodeP<B, P>>>,
 }
 
 impl<B, P> PartialEq for Pointer<B, P>
@@ -110,7 +111,7 @@ where
         let link = PContent::deserialize(deserializer)?;
         Ok(Pointer {
             data: link,
-            cache: None,
+            cache: RefCell::new(None),
         })
     }
 }
@@ -123,14 +124,14 @@ where
     pub fn from_kvs(kvs: Vec<KV>) -> Self {
         Pointer {
             data: PContent::KVs(kvs),
-            cache: None,
+            cache: RefCell::new(None),
         }
     }
 
     pub fn from_link(cid: Cid) -> Self {
         Pointer {
             data: PContent::Link(cid),
-            cache: None,
+            cache: RefCell::new(None),
         }
     }
 
@@ -143,13 +144,18 @@ where
     }
 
     pub fn load_child(&self, cs: CborIpldStor<B>, bit_width: u32) -> Result<NodeP<B, P>> {
-        if let Some(ref cache) = self.cache {
+        if let Some(cache) = self.cache.borrow().as_ref() {
             return Ok((*cache).clone());
         }
         if let PContent::Link(ref cid) = self.data {
             let node = load_node(cs, bit_width, cid)?;
             let node_p = SharedPointer::new(node);
-            self.cache = Some(node_p.clone());
+            // just try to get borrow mut, if failed, means other thread is borrow this node cache, would not set cache.
+            if let Ok(mut r) = self.cache.try_borrow_mut() {
+                *r = Some(node_p.clone());
+            } else {
+                trace!(target: "hamt-pointer", "try to get borrow mut for cache failed, other thread hold this borrow. cid:{:}", cid.to_string());
+            }
             Ok(node_p)
         } else {
             // TODO must be link
