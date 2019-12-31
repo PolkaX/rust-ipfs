@@ -1,5 +1,5 @@
 pub mod entry;
-mod trait_impl;
+pub mod trait_impl;
 
 use archery::{RcK, SharedPointer, SharedPointerKind};
 use bytes::Bytes;
@@ -13,7 +13,7 @@ use crate::hash::{hash, HashBits};
 use crate::ipld::{Blocks, CborIpldStor};
 
 const ARRAY_WIDTH: usize = 3;
-const DEFAULT_BIT_WIDTH: u32 = 8;
+pub const DEFAULT_BIT_WIDTH: u32 = 8;
 
 pub type NodeP<B, P> = SharedPointer<Node<B, P>, P>;
 
@@ -110,17 +110,31 @@ where
 
     pub fn flush(&mut self) -> Result<()> {
         for p in self.pointers.iter_mut() {
-            if let Some(cache) = p.cache.get_mut(){
-                SharedPointer::make_mut(cache).flush()?;
-                // TODO
-                // n.store.put
+            // replace old cache with None to clear cache, old cache could be None or Some(cache)
+            let old = p.cache.replace(None);
+            if let Some(mut cache) = old {
+                // if cache exist
+                SharedPointer::make_mut(&mut cache).flush()?;
+                let cid = self.store.put(cache.as_ref())?;
+                // change cache to the cid link
+                p.data = PContent::Link(cid);
             }
         }
         Ok(())
     }
 
-    pub fn check_size() -> Result<u64> {
-        Ok(0)
+    pub fn check_size(&self) -> Result<u64> {
+        let cid = self.store.put(&self)?;
+        let blk = self.store.get_block(&cid)?;
+        let mut total_size = blk.raw_data().len() as u64;
+        for child in self.pointers.iter() {
+            if child.is_shared() {
+                let child_node = child.load_child(self.store.clone(), self.bit_width)?;
+                let child_size = child_node.check_size()?;
+                total_size += child_size;
+            }
+        }
+        Ok(total_size)
     }
 
     fn get_value<'hash>(&self, hash_bits: &mut HashBits<'hash>, k: &str) -> Result<Bytes> {

@@ -162,6 +162,13 @@ where
             Err(Error::Tmp)
         }
     }
+
+    pub fn is_shared(&self) -> bool {
+        match self.data {
+            PContent::Link(_) => true,
+            PContent::KVs(_) => false,
+        }
+    }
 }
 
 // hack for compile pass `Serialize_tuple` and `Deserialize_tuple`, use an empty struct to import `Serialize` and `Deserialize`

@@ -28,11 +28,11 @@ fn test_pointer_and_node() {
         vec![161, 97, 49, 130, 130, 99, 49, 50, 51, 67, 1, 2, 3, 130, 99, 49, 50, 51, 67, 1, 2, 3]
     );
 
-    let p2: Pointer<RcK> = serde_cbor::from_slice(&r).unwrap();
+    let p2: Pointer<_, RcK> = serde_cbor::from_slice(&r).unwrap();
     assert_eq!(p2, pointer);
 
     let cid = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
-    let pointer2 = Pointer::<RcK>::from_link(cid);
+    let pointer2 = Pointer::<_, RcK>::from_link(cid);
     let r = serde_cbor::to_vec(&pointer2).unwrap();
     println!("{:?}", r);
     assert_eq!(
@@ -44,8 +44,10 @@ fn test_pointer_and_node() {
         ]
     );
 
+    let store = new_cbor_store();
+    let bit_width = DEFAULT_BIT_WIDTH;
     // bitfield is 0
-    let node = Node::test_init(0, vec![pointer.clone(), pointer2.clone()], 0);
+    let node = Node::test_init(store.clone(), 0, vec![pointer.clone(), pointer2.clone()], 0);
     let r = serde_cbor::to_vec(&node).unwrap();
     println!("{:?}", r);
     assert_eq!(
@@ -57,11 +59,17 @@ fn test_pointer_and_node() {
             54, 252, 167, 72, 19, 203
         ]
     );
-    let node: Node<RcK> = serde_cbor::from_slice(&r).unwrap();
+    let node: PartNode<_, RcK> = serde_cbor::from_slice(&r).unwrap();
+    let node = node.into_node(store.clone(), bit_width);
     println!("{:?}", node);
 
     // bitfield is 9999
-    let node = Node::test_init(9999, vec![pointer.clone(), pointer2.clone()], 0);
+    let node = Node::test_init(
+        store.clone(),
+        9999,
+        vec![pointer.clone(), pointer2.clone()],
+        0,
+    );
     let r = serde_cbor::to_vec(&node).unwrap();
     println!("{:?}", r);
     assert_eq!(
@@ -73,11 +81,17 @@ fn test_pointer_and_node() {
             170, 165, 54, 252, 167, 72, 19, 203
         ]
     );
-    let node: Node<RcK> = serde_cbor::from_slice(&r).unwrap();
+    let node: PartNode<_, RcK> = serde_cbor::from_slice(&r).unwrap();
+    let node = node.into_node(store.clone(), bit_width);
     println!("{:?}", node);
 
     // bitfield is 0x12345678
-    let node = Node::test_init(305419896, vec![pointer.clone(), pointer2.clone()], 0);
+    let node = Node::test_init(
+        store.clone(),
+        305419896,
+        vec![pointer.clone(), pointer2.clone()],
+        0,
+    );
     let r = serde_cbor::to_vec(&node).unwrap();
     println!("{:?}", r);
     assert_eq!(
@@ -89,6 +103,7 @@ fn test_pointer_and_node() {
             224, 1, 170, 165, 54, 252, 167, 72, 19, 203
         ]
     );
-    let node: Node<RcK> = serde_cbor::from_slice(&r).unwrap();
+    let node: PartNode<_, RcK> = serde_cbor::from_slice(&r).unwrap();
+    let node = node.into_node(store.clone(), bit_width);
     println!("{:?}", node);
 }

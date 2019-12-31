@@ -1,8 +1,6 @@
-use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use block_format::{BasicBlock, Block as BlockT};
-use bytes::Bytes;
+use block_format::Block as BlockT;
 use cid::{Cid, CidT, Codec, HasCid};
 use multihash::Hash as MHashEnum;
 use serde::{de::DeserializeOwned, Serialize};
@@ -32,7 +30,25 @@ impl<B: Blocks> Clone for CborIpldStor<B> {
     }
 }
 
+impl<B: Blocks> Blocks for CborIpldStor<B> {
+    fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>> {
+        let b = self.blocks.read().map_err(|_| Error::Lock)?;
+        b.get_block(cid)
+    }
+
+    fn add_block(&mut self, blk: impl BlockT) -> Result<()> {
+        let mut b = self.blocks.write().map_err(|_| Error::Lock)?;
+        b.add_block(blk)
+    }
+}
+
 impl<B: Blocks> CborIpldStor<B> {
+    pub fn new(b: B) -> Self {
+        CborIpldStor {
+            blocks: Arc::new(RwLock::new(b)),
+        }
+    }
+
     pub fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T> {
         let blk = {
             let b = self.blocks.read().map_err(|_| Error::Lock)?;
@@ -43,7 +59,7 @@ impl<B: Blocks> CborIpldStor<B> {
         Ok(r)
     }
 
-    pub fn put<T: Serialize + HasCid>(&mut self, v: T) -> Result<Cid> {
+    pub fn put<T: Serialize + HasCid>(&self, v: T) -> Result<Cid> {
         let mut hash_type = MHashEnum::Blake2b256;
         let mut codec = Codec::DagCBOR;
 
@@ -61,7 +77,7 @@ impl<B: Blocks> CborIpldStor<B> {
         let cid = node.cid().clone(); // this cid is calc from node
         {
             let mut b = self.blocks.write().map_err(|_| Error::Lock)?;
-            b.add_block(node);
+            b.add_block(node)?;
         }
 
         if let Some(hash) = exp_cid_hash {
@@ -85,40 +101,4 @@ impl<BS: BlockStore> Blocks for BsWrapper<BS> {
     fn add_block(&mut self, blk: impl BlockT) -> Result<()> {
         self.bs.put(blk)
     }
-}
-
-#[allow(unused)]
-pub struct MockBlocks {
-    data: HashMap<Cid, Vec<u8>>,
-}
-
-impl MockBlocks {
-    pub fn new() -> Self {
-        MockBlocks {
-            data: Default::default(),
-        }
-    }
-}
-
-impl Blocks for MockBlocks {
-    fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>> {
-        let blk = self
-            .data
-            .get(cid)
-            .map(|data| BasicBlock::new(Bytes::copy_from_slice(data)))
-            .ok_or(Error::NotFound(cid.clone()))?;
-        Ok(Box::new(blk))
-    }
-
-    fn add_block(&mut self, block: impl BlockT) -> Result<()> {
-        let cid = block.cid().clone();
-        self.data.insert(cid, block.raw_data().to_vec());
-        Ok(())
-    }
-}
-
-pub fn new_cbor_store() -> CborIpldStor<MockBlocks> {
-    return CborIpldStor {
-        blocks: Arc::new(RwLock::new(MockBlocks::new())),
-    };
 }

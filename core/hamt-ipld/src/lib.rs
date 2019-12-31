@@ -5,7 +5,8 @@ pub mod node;
 #[cfg(test)]
 mod tests;
 
-use node::{
+pub use ipld::{BlockStore, Blocks, CborIpldStor};
+pub use node::{
     entry::{PContent, Pointer, KV},
-    Node,
+    Node, DEFAULT_BIT_WIDTH,
 };
