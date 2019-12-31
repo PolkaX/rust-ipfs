@@ -1,0 +1,13 @@
+[package]
+name = "rust-multihash"
+version = "0.1.0"
+authors = ["Aten <jincxmain@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+parity-multihash = { version = "0.2" }
+bytes = "0.4.12"
+blake2 = { version = "0.8", default-features = false }
+unsigned-varint = "0.2"
