@@ -1,12 +1,12 @@
 use std::result;
 
-use archery::{RcK, SharedPointerKind};
+use archery::{RcK, SharedPointer, SharedPointerKind};
 
 use cid::Cid;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::*;
-use crate::ipld::Blocks;
+use crate::ipld::{Blocks, CborIpldStor};
 
 use super::NodeP;
 
@@ -34,6 +34,7 @@ mod kv {
     }
 }
 
+use crate::node::load_node;
 pub use kv::KV;
 
 #[derive(Debug, Clone, Eq, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
@@ -141,13 +142,19 @@ where
         &mut self.data
     }
 
-    pub fn load_child(&self, _bit_width: u32) -> Result<NodeP<B, P>> {
+    pub fn load_child(&self, cs: CborIpldStor<B>, bit_width: u32) -> Result<NodeP<B, P>> {
         if let Some(ref cache) = self.cache {
             return Ok((*cache).clone());
         }
-        // TODO
-        //        Ok(())
-        Err(Error::Tmp)
+        if let PContent::Link(ref cid) = self.data {
+            let node = load_node(cs, bit_width, cid)?;
+            let node_p = SharedPointer::new(node);
+            self.cache = Some(node_p.clone());
+            Ok(node_p)
+        } else {
+            // TODO must be link
+            Err(Error::Tmp)
+        }
     }
 }
 

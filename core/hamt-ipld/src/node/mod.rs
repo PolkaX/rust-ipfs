@@ -3,9 +3,11 @@ mod trait_impl;
 
 use archery::{RcK, SharedPointer, SharedPointerKind};
 use bytes::Bytes;
+use cid::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 
 use self::entry::{PContent, Pointer, KV};
+use self::trait_impl::PartNode;
 use crate::error::*;
 use crate::hash::{hash, HashBits};
 use crate::ipld::{Blocks, CborIpldStor};
@@ -22,7 +24,9 @@ where
     P: SharedPointerKind,
 {
     // we use u64 here, for normally a branch of node would not over 64, 64 branch's wide is so large, if larger then 64, panic
+    /// bitmap
     bitfield: u64,
+    /// branch node
     pointers: Vec<Pointer<B, P>>,
 
     /// for fetching and storing children
@@ -129,7 +133,7 @@ where
         let child = self.pointers.get(child_index).ok_or(Error::Tmp)?;
         match child.data {
             PContent::Link(_) => {
-                let child_node = child.load_child(self.bit_width)?;
+                let child_node = child.load_child(self.store.clone(), self.bit_width)?;
                 child_node.get_value(hash_bits, k)
             }
             PContent::KVs(ref kvs) => {
@@ -162,7 +166,7 @@ where
 
         match child.data {
             PContent::Link(_) => {
-                let mut child_node_p = child.load_child(self.bit_width)?;
+                let mut child_node_p = child.load_child(self.store.clone(), self.bit_width)?;
 
                 let need_delete = v.is_none();
                 SharedPointer::make_mut(&mut child_node_p).modify_value(hv, k, v)?;
@@ -304,4 +308,13 @@ where
         *v = p;
         Ok(())
     }
+}
+
+pub fn load_node<B, P>(cs: CborIpldStor<B>, bit_width: u32, cid: &Cid) -> Result<Node<B, P>>
+where
+    B: Blocks,
+    P: SharedPointerKind,
+{
+    let pn: PartNode<B, P> = cs.get(cid)?;
+    Ok(pn.into_node(cs, bit_width))
 }
