@@ -15,6 +15,7 @@ serde_bytes = "0.11"
 serde_tuple = "0.2.5"
 serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
 bytes = { version = "0.5", features = ["serde"] }
+archery = "0.3"
 
 multihash = { package = "parity-multihash", version = "0.2" }
 

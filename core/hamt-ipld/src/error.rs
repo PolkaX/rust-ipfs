@@ -12,4 +12,7 @@ pub enum Error {
     IpldCbor(#[from] IpldCborError),
     #[error("other err: {0}")]
     Other(Box<dyn std::error::Error>),
+
+    #[error("tmp holder")]
+    Tmp,
 }

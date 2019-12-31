@@ -20,7 +20,7 @@ pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 8] {
 /// hashBits is a helper that allows the reading of the 'next n bits' as an integer.
 /// e.g. bytes: [1, 66, 3], ([0b00000001, 0b01000010, 0b00000011]), read 10 bits would like
 /// [0b________, 0b__0000010, 0b00000011], and return 0b0000000001 = 2 (u32)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HashBits<'a> {
     b: &'a [u8],
     consumed: u32,
@@ -28,10 +28,15 @@ pub struct HashBits<'a> {
 
 impl<'a> HashBits<'a> {
     pub fn new(buf: &'a [u8]) -> HashBits<'a> {
-        HashBits {
-            b: buf,
-            consumed: 0,
-        }
+        Self::new_with_consumed(buf, 0)
+    }
+
+    pub fn new_with_consumed(buf: &'a [u8], consumed: u32) -> HashBits<'a> {
+        HashBits { b: buf, consumed }
+    }
+
+    pub fn consumed(&self) -> u32 {
+        self.consumed
     }
 
     /// Next returns the next 'i' bits of the hashBits value as an u32,
