@@ -18,7 +18,7 @@ serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", feat
 bytes = { version = "0.5", features = ["serde"] }
 archery = "0.3"
 
-multihash = { package = "parity-multihash", version = "0.2" }
+multihash = { package = "rust-multihash", path = "../multihash" }
 
 block-format = { package = "rust-block-format", path = "../block-format" }
 cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
