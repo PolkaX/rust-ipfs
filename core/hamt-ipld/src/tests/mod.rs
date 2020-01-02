@@ -1,5 +1,7 @@
 mod cbor_test;
+mod hamt_test;
 mod hash_test;
+mod ipld_test;
 
 use std::collections::HashMap;
 

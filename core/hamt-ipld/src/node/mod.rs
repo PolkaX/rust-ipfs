@@ -35,17 +35,17 @@ where
 }
 
 #[inline]
-fn bit(input: u64, n: u32) -> u64 {
+pub fn bit(input: u64, n: u32) -> u64 {
     input & (1 << n as u64)
 }
 
 #[inline]
-fn set_bit(input: &mut u64, n: u32) {
+pub fn set_bit(input: &mut u64, n: u32) {
     *input |= 1 << n as u64
 }
 
 #[inline]
-fn unset_bit(input: &mut u64, n: u32) {
+pub fn unset_bit(input: &mut u64, n: u32) {
     *input &= !(1 << n as u64)
 }
 
@@ -85,6 +85,22 @@ where
             bit_width: DEFAULT_BIT_WIDTH,
         };
         nd
+    }
+
+    pub fn new_pointer_node(store: CborIpldStor<B>) -> NodeP<B, P> {
+        SharedPointer::new(Self::new(store))
+    }
+
+    pub fn get_mut_bitfield(&mut self) -> &mut u64 {
+        &mut self.bitfield
+    }
+
+    pub fn get_mut_pointers(&mut self) -> &mut Vec<Pointer<B, P>> {
+        &mut self.pointers
+    }
+
+    pub fn get_width(&self) -> u32 {
+        self.bit_width
     }
 
     pub fn find<Output: DeserializeOwned>(&self, k: &str) -> Result<Output> {
