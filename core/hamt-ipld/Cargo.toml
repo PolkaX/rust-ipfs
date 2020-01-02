@@ -27,3 +27,7 @@ ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor", features = ["bi
 [dev-dependencies]
 util = { package = "rust-ipfs-util", path = "../util" }
 serde_json = "1.0"
+rand = "0.7"
+
+[features]
+test-hash = []

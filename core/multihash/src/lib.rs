@@ -1,20 +1,20 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+//! wrapper for parity-multihash, current support `Blake2b256` and `Blake2s128`
+
 use bytes::{BufMut, BytesMut};
 use parity_multihash::encode as parity_encode;
-/// wrapper for parity-multihash
-///
-///
-///
+
 pub use parity_multihash::{
     to_hex, DecodeError, DecodeOwnedError, EncodeError, Hash, Multihash, MultihashRef,
 };
 
 use blake2::{
-    digest::{Digest, Input, VariableOutput},
+    digest::{Input, VariableOutput},
     VarBlake2b, VarBlake2s,
 };
 
 fn encode_hash(hash: Hash) -> (usize, BytesMut) {
-    use unsigned_varint::{decode, encode};
+    use unsigned_varint::encode;
     let mut buf = encode::u16_buffer();
     let code = encode::u16(hash.code(), &mut buf);
 

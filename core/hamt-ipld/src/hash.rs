@@ -1,3 +1,4 @@
+#[cfg(not(feature = "test-hash"))]
 use fasthash::murmur3::hash128;
 
 /// ```go
@@ -7,13 +8,29 @@ use fasthash::murmur3::hash128;
 /// }
 /// ```
 /// murmur3 hash for a bytes value. using hash128 but just pick half for result
+#[cfg(not(feature = "test-hash"))]
 pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 8] {
     let result = hash128(v);
+    // to big-ending sequence
+    let all: [u8; 16] = result.to_be_bytes();
     // digest64 is half a digest128.
-    let half = result as u64;
+    let mut bytes = [0_u8; 8];
+    // drop other half
+    bytes.copy_from_slice(&all[8..]);
+    bytes
+}
 
-    use std::mem::transmute;
-    let bytes: [u8; 8] = unsafe { transmute(half.to_be()) };
+/// replace hash function. jus for testing
+/// `identityHash` just copy v to output
+#[cfg(all(feature = "test-hash", test))]
+pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 32] {
+    let mut bytes = [0_u8; 32];
+
+    let mut index = 0;
+    for i in v.as_ref().iter().take(32) {
+        bytes[index] = *i;
+        index += 1;
+    }
     bytes
 }
 

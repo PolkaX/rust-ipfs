@@ -1,5 +1,6 @@
 use crate::hash::{hash, HashBits};
 
+#[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_hash() {
     let h1 = hash("abcd");
@@ -10,6 +11,15 @@ fn test_hash() {
 
     assert_eq!(h1, first);
     assert_eq!(h2, second);
+
+    let h3 = hash("hello world");
+    assert_eq!(h3, [83, 63, 96, 70, 235, 127, 97, 14]);
+
+    let h4 = hash(b"hello world");
+    assert_eq!(h4, [83, 63, 96, 70, 235, 127, 97, 14]);
+
+    let h5 = hash("一二三");
+    assert_eq!(h5, [37, 41, 47, 183, 147, 168, 177, 225]);
 }
 
 #[test]

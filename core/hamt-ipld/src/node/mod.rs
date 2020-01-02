@@ -1,13 +1,13 @@
 pub mod entry;
 pub mod trait_impl;
 
-use archery::{RcK, SharedPointer, SharedPointerKind};
+use archery::{ArcK, RcK, SharedPointer, SharedPointerKind};
 use bytes::Bytes;
 use cid::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 
 use self::entry::{PContent, Pointer, KV};
-use self::trait_impl::PartNode;
+pub use self::trait_impl::PartNode;
 use crate::error::*;
 use crate::hash::{hash, HashBits};
 use crate::ipld::{Blocks, CborIpldStor};
@@ -16,6 +16,10 @@ const ARRAY_WIDTH: usize = 3;
 pub const DEFAULT_BIT_WIDTH: u32 = 8;
 
 pub type NodeP<B, P> = SharedPointer<Node<B, P>, P>;
+pub type NodeRc<B> = Node<B, RcK>;
+pub type NodeArc<B> = Node<B, ArcK>;
+pub type PartNodeRc<B> = PartNode<B, RcK>;
+pub type PartNodeArc<B> = PartNode<B, ArcK>;
 
 #[derive(Debug)]
 pub struct Node<B, P = RcK>

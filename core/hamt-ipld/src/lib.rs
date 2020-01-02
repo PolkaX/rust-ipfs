@@ -8,5 +8,5 @@ mod tests;
 pub use ipld::{BlockStore, Blocks, CborIpldStor};
 pub use node::{
     entry::{PContent, Pointer, KV},
-    Node, DEFAULT_BIT_WIDTH,
+    Node, NodeArc, NodeRc, PartNode, PartNodeArc, PartNodeRc, DEFAULT_BIT_WIDTH,
 };
