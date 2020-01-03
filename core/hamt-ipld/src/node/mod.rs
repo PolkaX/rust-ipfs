@@ -2,6 +2,7 @@ pub mod entry;
 pub mod trait_impl;
 
 use archery::{ArcK, RcK, SharedPointer, SharedPointerKind};
+use bigint::U256;
 use bytes::Bytes;
 use cid::Cid;
 use serde::{de::DeserializeOwned, Serialize};
@@ -29,7 +30,7 @@ where
 {
     // we use u64 here, for normally a branch of node would not over 64, 64 branch's wide is so large, if larger then 64, panic
     /// bitmap
-    bitfield: u64,
+    bitfield: U256,
     /// branch node
     pointers: Vec<Pointer<B, P>>,
 
@@ -39,25 +40,24 @@ where
 }
 
 #[inline]
-pub fn bit(input: u64, n: u32) -> u64 {
-    input & (1 << n as u64)
+pub fn set_bit(input: &mut U256, n: u32) {
+    let one: U256 = 1.into();
+    *input = *input | (one << n as usize)
 }
 
 #[inline]
-pub fn set_bit(input: &mut u64, n: u32) {
-    *input |= 1 << n as u64
-}
-
-#[inline]
-pub fn unset_bit(input: &mut u64, n: u32) {
-    *input &= !(1 << n as u64)
+pub fn unset_bit(input: &mut U256, n: u32) {
+    let one: U256 = 1.into();
+    *input = *input & !(one << n as usize)
 }
 
 /// index for bit position in this bitmap
 #[inline]
-pub fn index_for_bitpos(bitmap: u64, bit_pos: u32) -> u32 {
-    let mask = (1_u64 << bit_pos as u64) - 1;
-    (bitmap & mask).count_ones()
+pub fn index_for_bitpos(bitmap: &U256, bit_pos: u32) -> u32 {
+    let one: U256 = 1.into();
+    let mask: U256 = (one << bit_pos as usize) - one;
+    let r: U256 = mask & *bitmap;
+    r.0.iter().fold(0, |a, b| a + b.count_ones())
 }
 
 impl<B, P> Node<B, P>
@@ -68,12 +68,12 @@ where
     #[cfg(test)]
     pub fn test_init(
         store: CborIpldStor<B>,
-        bitfield: u64,
+        bitfield: &str,
         pointers: Vec<Pointer<B, P>>,
         bit_width: u32,
     ) -> Self {
         Node {
-            bitfield,
+            bitfield: U256::from_dec_str(bitfield).unwrap(),
             pointers,
             store,
             bit_width,
@@ -81,12 +81,15 @@ where
     }
 
     pub fn new(store: CborIpldStor<B>) -> Node<B, P> {
-        // TODO
+        Self::new_with_bitwidth(store, DEFAULT_BIT_WIDTH)
+    }
+
+    pub fn new_with_bitwidth(store: CborIpldStor<B>, bit_width: u32) -> Node<B, P> {
         let nd = Node {
-            bitfield: 0,
+            bitfield: 0.into(),
             pointers: vec![],
             store,
-            bit_width: DEFAULT_BIT_WIDTH,
+            bit_width,
         };
         nd
     }
@@ -95,7 +98,7 @@ where
         SharedPointer::new(Self::new(store))
     }
 
-    pub fn get_mut_bitfield(&mut self) -> &mut u64 {
+    pub fn get_mut_bitfield(&mut self) -> &mut U256 {
         &mut self.bitfield
     }
 
@@ -160,10 +163,10 @@ where
     fn get_value<'hash>(&self, hash_bits: &mut HashBits<'hash>, k: &str) -> Result<Bytes> {
         // TODO
         let idx = hash_bits.next(self.bit_width).ok_or(Error::Tmp)?;
-        if bit(self.bitfield, idx) == 0 {
+        if self.bitfield.bit(idx as usize) == false {
             return Err(Error::Tmp);
         }
-        let child_index = index_for_bitpos(self.bitfield, idx) as usize;
+        let child_index = index_for_bitpos(&self.bitfield, idx) as usize;
         let child = self.pointers.get(child_index).ok_or(Error::Tmp)?;
         match child.data {
             PContent::Link(_) => {
@@ -191,11 +194,11 @@ where
         // TODO
         let idx = hv.next(self.bit_width).ok_or(Error::Tmp)?;
         // bitmap do not have this bit, it's a new key for this bit position.
-        if bit(self.bitfield, idx) != 1 {
+        if self.bitfield.bit(idx as usize) == false {
             return self.insert_child(idx, k, v);
         }
 
-        let cindex = index_for_bitpos(self.bitfield, idx);
+        let cindex = index_for_bitpos(&self.bitfield, idx);
         let child = self.pointers.get_mut(cindex as usize).ok_or(Error::Tmp)?; // todo
 
         match child.data {
@@ -241,12 +244,8 @@ where
 
                 // If the array is full, create a subshard and insert everything into it
                 if kvs.len() >= ARRAY_WIDTH {
-                    let mut sub = Node::<B, P> {
-                        bitfield: 0,
-                        pointers: vec![],
-                        store: self.store.clone(),
-                        bit_width: self.bit_width,
-                    };
+                    let mut sub =
+                        Node::<B, P>::new_with_bitwidth(self.store.clone(), self.bit_width);
                     let mut hash_copy = hv.clone();
                     sub.modify_value(&mut hash_copy, k, v)?;
 
@@ -280,7 +279,7 @@ where
         // in insert, the value must exist, `None` represent delete this key.
         let v = v.ok_or(Error::Tmp)?; // todo
 
-        let i = index_for_bitpos(self.bitfield, idx);
+        let i = index_for_bitpos(&self.bitfield, idx);
         // set bit for index i
         set_bit(&mut self.bitfield, i);
 

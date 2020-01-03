@@ -2,6 +2,7 @@ use std::fmt;
 use std::result;
 
 use archery::{RcK, SharedPointerKind};
+use bigint::U256;
 use serde::de::{SeqAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -14,7 +15,7 @@ where
     B: Blocks,
     P: SharedPointerKind,
 {
-    bitfield: u64,
+    bitfield: U256,
     pointers: Vec<Pointer<B, P>>,
 }
 
@@ -76,7 +77,8 @@ where
     where
         S: Serializer,
     {
-        let bitmap_bytes = self.bitfield.to_be_bytes();
+        let mut bitmap_bytes = [0_u8; std::mem::size_of::<U256>()]; // u256
+        self.bitfield.to_big_endian(&mut bitmap_bytes);
         // remove left 0 bytes, if all is 0, means an empty "" bytes.
         let index = bitmap_bytes
             .iter()
@@ -131,8 +133,8 @@ where
 
         // it's big ending bytes, we copy value from end.
         // the buf is size of `u64` u8 array, notice could not out of bounds.
-        let mut buf = [0_u8; std::mem::size_of::<u64>()];
-        let mut index = std::mem::size_of::<u64>();
+        let mut buf = [0_u8; std::mem::size_of::<U256>()];
+        let mut index = std::mem::size_of::<U256>();
         for i in byte_buf.iter().rev() {
             index -= 1;
             buf[index] = *i;
@@ -140,7 +142,8 @@ where
                 break;
             }
         }
-        let bitfield = u64::from_be_bytes(buf);
+        // U256 receipt a big ending array
+        let bitfield = buf.into();
 
         Ok(PartNode { bitfield, pointers })
     }

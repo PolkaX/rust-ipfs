@@ -17,6 +17,7 @@ serde_tuple = "0.2.5"
 serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
 bytes = { version = "0.5", features = ["serde"] }
 archery = "0.3"
+bigint = { version = "4.4" }
 
 multihash = { package = "rust-multihash", path = "../multihash" }
 
