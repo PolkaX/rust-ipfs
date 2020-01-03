@@ -56,6 +56,50 @@ fn test_canonical_structure() {
     add_and_remove_keys(DEFAULT_BIT_WIDTH, &k1, &k2);
 }
 
+#[cfg(feature = "test-hash")]
+#[test]
+fn test_canonical_structure_alternate_bit_width() {
+    add_and_remove_keys(7, ["K"].as_ref(), ["B"].as_ref());
+    add_and_remove_keys(
+        7,
+        ["K0", "K1", "KAA1", "KAA2", "KAA3"].as_ref(),
+        ["KAA4"].as_ref(),
+    );
+    add_and_remove_keys(6, ["K"].as_ref(), ["B"].as_ref());
+    add_and_remove_keys(
+        6,
+        ["K0", "K1", "KAA1", "KAA2", "KAA3"].as_ref(),
+        ["KAA4"].as_ref(),
+    );
+    add_and_remove_keys(5, ["K"].as_ref(), ["B"].as_ref());
+    add_and_remove_keys(
+        5,
+        ["K0", "K1", "KAA1", "KAA2", "KAA3"].as_ref(),
+        ["KAA4"].as_ref(),
+    );
+}
+
+#[cfg(feature = "test-hash")]
+#[test]
+fn test_overflow() {
+    let keys = [
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA3",
+    ];
+    let cs = new_cbor_store();
+    let mut node = NodeRc::new(cs);
+    for k in &keys[..3] {
+        node.set(k, b"foobar".to_vec()).unwrap();
+    }
+
+    let r = node.set(keys[3], b"foobar".to_vec());
+    assert!(r.is_err(), true);
+    // Try forcing the depth beyond 32
+    node.set(&keys[3][1..], b"foobar".to_vec()).unwrap();
+}
+
 #[test]
 fn test_basic() {
     let cs = new_cbor_store();
