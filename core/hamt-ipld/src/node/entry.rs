@@ -1,6 +1,6 @@
-use log::trace;
-use std::cell::RefCell;
+use std::ops::DerefMut;
 use std::result;
+use std::sync::RwLock;
 
 use archery::{RcK, SharedPointer, SharedPointerKind};
 
@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::error::*;
 use crate::ipld::{Blocks, CborIpldStor};
 
-use super::{load_node, NodeP};
+use super::{load_node, Node};
 
 mod kv {
     use bytes::Bytes;
@@ -53,7 +53,7 @@ where
     P: SharedPointerKind,
 {
     pub data: PContent,
-    pub cache: RefCell<Option<NodeP<B, P>>>,
+    pub cache: SharedPointer<RwLock<Option<Node<B, P>>>, P>,
 }
 
 impl<B, P> PartialEq for Pointer<B, P>
@@ -111,7 +111,7 @@ where
         let link = PContent::deserialize(deserializer)?;
         Ok(Pointer {
             data: link,
-            cache: RefCell::new(None),
+            cache: SharedPointer::new(RwLock::new(None)),
         })
     }
 }
@@ -124,14 +124,14 @@ where
     pub fn from_kvs(kvs: Vec<KV>) -> Self {
         Pointer {
             data: PContent::KVs(kvs),
-            cache: RefCell::new(None),
+            cache: SharedPointer::new(RwLock::new(None)),
         }
     }
 
     pub fn from_link(cid: Cid) -> Self {
         Pointer {
             data: PContent::Link(cid),
-            cache: RefCell::new(None),
+            cache: SharedPointer::new(RwLock::new(None)),
         }
     }
 
@@ -143,20 +143,24 @@ where
         &mut self.data
     }
 
-    pub fn load_child(&self, cs: CborIpldStor<B>, bit_width: u32) -> Result<NodeP<B, P>> {
-        if let Some(cache) = self.cache.borrow().as_ref() {
-            return Ok((*cache).clone());
+    pub fn load_child(
+        &self,
+        cs: CborIpldStor<B>,
+        bit_width: u32,
+    ) -> Result<SharedPointer<RwLock<Option<Node<B, P>>>, P>> {
+        {
+            if self.cache.read().map_err(|_| Error::Lock)?.is_some() {
+                return Ok(self.cache.clone());
+            }
         }
+
         if let PContent::Link(ref cid) = self.data {
             let node = load_node(cs, bit_width, cid)?;
-            let node_p = SharedPointer::new(node);
-            // just try to get borrow mut, if failed, means other thread is borrow this node cache, would not set cache.
-            if let Ok(mut r) = self.cache.try_borrow_mut() {
-                *r = Some(node_p.clone());
-            } else {
-                trace!(target: "hamt-pointer", "try to get borrow mut for cache failed, other thread hold this borrow. cid:{:}", cid.to_string());
+            {
+                let mut guard = self.cache.write().map_err(|_| Error::Lock)?;
+                *(guard.deref_mut()) = Some(node);
             }
-            Ok(node_p)
+            Ok(self.cache.clone())
         } else {
             // TODO must be link
             Err(Error::Tmp)

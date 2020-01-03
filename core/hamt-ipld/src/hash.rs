@@ -22,7 +22,7 @@ pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 8] {
 
 /// replace hash function. jus for testing
 /// `identityHash` just copy v to output
-#[cfg(all(feature = "test-hash", test))]
+#[cfg(feature = "test-hash")]
 pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 32] {
     let mut bytes = [0_u8; 32];
 

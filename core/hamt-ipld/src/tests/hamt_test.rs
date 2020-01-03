@@ -1,5 +1,4 @@
 use super::*;
-use crate::node::NodeP;
 
 fn rand_value() -> Vec<u8> {
     use rand::distributions::Alphanumeric;
@@ -9,19 +8,19 @@ fn rand_value() -> Vec<u8> {
 }
 
 fn add_and_remove_keys(bit_width: u32, keys: &[&str], extra_keys: &[&str]) {
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
 
     let all: Vec<(&str, Vec<u8>)> = keys.iter().map(|k| (*k, rand_value())).collect();
 
     let cs = new_cbor_store();
-    let mut begin_node = NodeRc::new(cs.clone());
+    let mut begin_node = NodeRc::new_with_bitwidth(cs.clone(), bit_width);
     for (k, v) in all.iter() {
         begin_node.set(k, v.clone()).unwrap();
     }
     println!("start flush");
     let now = Instant::now();
     begin_node.flush().unwrap();
-    println!("flush took: {}", now.elapsed().as_nanos());
+    println!("flush took: {}", now.elapsed().as_micros());
 
     let cid = cs.put(&begin_node).unwrap();
     let part_node: PartNodeRc<_> = cs.get(&cid).unwrap();

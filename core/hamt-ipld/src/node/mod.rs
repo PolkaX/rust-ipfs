@@ -6,6 +6,7 @@ use bigint::U256;
 use bytes::Bytes;
 use cid::Cid;
 use serde::{de::DeserializeOwned, Serialize};
+use std::ops::{Deref, DerefMut};
 
 use self::entry::{PContent, Pointer, KV};
 pub use self::trait_impl::PartNode;
@@ -133,15 +134,22 @@ where
 
     pub fn flush(&mut self) -> Result<()> {
         for p in self.pointers.iter_mut() {
-            // replace old cache with None to clear cache, old cache could be None or Some(cache)
-            let old = p.cache.replace(None);
-            if let Some(mut cache) = old {
-                // if cache exist
-                SharedPointer::make_mut(&mut cache).flush()?;
-                let cid = self.store.put(cache.as_ref())?;
-                // change cache to the cid link
+            let mut child = p.cache.write().map_err(|_| Error::Lock)?;
+            if let Some(ref mut cache) = child.deref_mut() {
+                cache.flush()?;
+                let cid = self.store.put(cache)?;
                 p.data = PContent::Link(cid);
             }
+            *child = None;
+            //            // replace old cache with None to clear cache, old cache could be None or Some(cache)
+            //            let old = p.cache.replace(None);
+            //            if let Some(mut cache) = old {
+            //                // if cache exist
+            ////                SharedPointer::make_mut(&mut cache).flush()?;
+            //                let cid = self.store.put(cache.as_ref())?;
+            //                // change cache to the cid link
+            //                p.data = PContent::Link(cid);
+            //            }
         }
         Ok(())
     }
@@ -153,8 +161,12 @@ where
         for child in self.pointers.iter() {
             if child.is_shared() {
                 let child_node = child.load_child(self.store.clone(), self.bit_width)?;
-                let child_size = child_node.check_size()?;
-                total_size += child_size;
+
+                let mut node = child_node.write().map_err(|_| Error::Lock)?;
+                if let Some(ref mut n) = node.deref_mut() {
+                    let child_size = n.check_size()?;
+                    total_size += child_size;
+                }
             }
         }
         Ok(total_size)
@@ -171,7 +183,12 @@ where
         match child.data {
             PContent::Link(_) => {
                 let child_node = child.load_child(self.store.clone(), self.bit_width)?;
-                child_node.get_value(hash_bits, k)
+                let guard = child_node.read().map_err(|_| Error::Lock)?;
+                if let Some(node) = guard.deref() {
+                    node.get_value(hash_bits, k)
+                } else {
+                    unreachable!()
+                }
             }
             PContent::KVs(ref kvs) => {
                 for kv in kvs.iter() {
@@ -203,13 +220,23 @@ where
 
         match child.data {
             PContent::Link(_) => {
-                let mut child_node_p = child.load_child(self.store.clone(), self.bit_width)?;
-
+                let child_node_p = child.load_child(self.store.clone(), self.bit_width)?;
                 let need_delete = v.is_none();
-                SharedPointer::make_mut(&mut child_node_p).modify_value(hv, k, v)?;
-
+                {
+                    let mut guard = child_node_p.write().map_err(|_| Error::Lock)?;
+                    if let Some(n) = guard.deref_mut() {
+                        n.modify_value(hv, k, v)?;
+                    } else {
+                        unreachable!("");
+                    }
+                }
                 if need_delete {
-                    return self.clean_child(child_node_p, cindex);
+                    let guard = child_node_p.read().map_err(|_| Error::Lock)?;
+                    if let Some(ref node) = guard.deref() {
+                        return self.clean_child(node, cindex);
+                    } else {
+                        unreachable!("");
+                    }
                 }
                 Ok(())
             }
@@ -222,7 +249,7 @@ where
 
                     let result = if kvs.len() == 0 {
                         // no pair left, remove this child node
-                        self.remove_child(idx)
+                        self.remove_child(cindex, idx)
                     } else if old_len == kvs.len() {
                         // no pair could be removed
                         Err(Error::Tmp)
@@ -256,11 +283,9 @@ where
                         sub.modify_value(&mut ch_hv, p.key.as_str(), Some(p.value.to_vec()))?;
                     }
 
-                    // TODO
-                    // let c = self.store.put(sub)
-                    // let pointer = Pointer::from_link(c);
-                    // return self.set_child(cindex, pointer)
-                    return Ok(());
+                    let c = self.store.put(sub)?;
+                    let pointer = Pointer::from_link(c);
+                    return self.set_child(cindex, pointer);
                 }
 
                 // otherwise insert the new element into the array in order
@@ -281,15 +306,15 @@ where
 
         let i = index_for_bitpos(&self.bitfield, idx);
         // set bit for index i
-        set_bit(&mut self.bitfield, i);
+        set_bit(&mut self.bitfield, idx);
 
         // net pointer
         let p = Pointer::from_kvs(vec![KV::new(k.to_string(), v)]);
-        self.pointers.push(p);
+        self.pointers.insert(i as usize, p);
         Ok(())
     }
 
-    fn clean_child(&mut self, child_node: NodeP<B, P>, idx: u32) -> Result<()> {
+    fn clean_child(&mut self, child_node: &Node<B, P>, idx: u32) -> Result<()> {
         let len = child_node.pointers.len();
         match len {
             0 => {
@@ -326,11 +351,8 @@ where
         }
     }
 
-    fn remove_child(&mut self, idx: u32) -> Result<()> {
-        if idx as usize >= self.pointers.len() {
-            return Err(Error::Tmp); // TODO
-        }
-        self.pointers.remove(idx as usize);
+    fn remove_child(&mut self, i: u32, idx: u32) -> Result<()> {
+        self.pointers.remove(i as usize);
         // set idx pos bit is zero
         unset_bit(&mut self.bitfield, idx);
         Ok(())
