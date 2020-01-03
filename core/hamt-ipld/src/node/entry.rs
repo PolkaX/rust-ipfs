@@ -162,8 +162,7 @@ where
             }
             Ok(self.cache.clone())
         } else {
-            // TODO must be link
-            Err(Error::Tmp)
+            unreachable!("current data must be a link");
         }
     }
 

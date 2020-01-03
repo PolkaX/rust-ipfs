@@ -95,7 +95,7 @@ fn test_overflow() {
     }
 
     let r = node.set(keys[3], b"foobar".to_vec());
-    assert!(r.is_err(), true);
+    matches!(r, Err(Error::MaxDepth));
     // Try forcing the depth beyond 32
     node.set(&keys[3][1..], b"foobar".to_vec()).unwrap();
 }

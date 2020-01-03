@@ -134,22 +134,14 @@ where
 
     pub fn flush(&mut self) -> Result<()> {
         for p in self.pointers.iter_mut() {
-            let mut child = p.cache.write().map_err(|_| Error::Lock)?;
-            if let Some(ref mut cache) = child.deref_mut() {
+            let mut guard_cache = p.cache.write().map_err(|_| Error::Lock)?;
+            if let Some(ref mut cache) = guard_cache.deref_mut() {
                 cache.flush()?;
                 let cid = self.store.put(cache)?;
                 p.data = PContent::Link(cid);
             }
-            *child = None;
-            //            // replace old cache with None to clear cache, old cache could be None or Some(cache)
-            //            let old = p.cache.replace(None);
-            //            if let Some(mut cache) = old {
-            //                // if cache exist
-            ////                SharedPointer::make_mut(&mut cache).flush()?;
-            //                let cid = self.store.put(cache.as_ref())?;
-            //                // change cache to the cid link
-            //                p.data = PContent::Link(cid);
-            //            }
+            // clear cache
+            *guard_cache = None;
         }
         Ok(())
     }
@@ -162,10 +154,12 @@ where
             if child.is_shared() {
                 let child_node = child.load_child(self.store.clone(), self.bit_width)?;
 
-                let mut node = child_node.write().map_err(|_| Error::Lock)?;
-                if let Some(ref mut n) = node.deref_mut() {
+                let node = child_node.read().map_err(|_| Error::Lock)?;
+                if let Some(n) = node.deref() {
                     let child_size = n.check_size()?;
                     total_size += child_size;
+                } else {
+                    unreachable!("node cache must be `Some()` here")
                 }
             }
         }
@@ -173,13 +167,15 @@ where
     }
 
     fn get_value<'hash>(&self, hash_bits: &mut HashBits<'hash>, k: &str) -> Result<Bytes> {
-        // TODO
-        let idx = hash_bits.next(self.bit_width).ok_or(Error::Tmp)?;
+        let idx = hash_bits.next(self.bit_width).ok_or(Error::MaxDepth)?;
         if self.bitfield.bit(idx as usize) == false {
-            return Err(Error::Tmp);
+            return Err(Error::NotFound(k.to_string()));
         }
         let child_index = index_for_bitpos(&self.bitfield, idx) as usize;
-        let child = self.pointers.get(child_index).ok_or(Error::Tmp)?;
+        let child = self
+            .pointers
+            .get(child_index)
+            .expect("[get_value]should not happen, bit counts must match pointers");
         match child.data {
             PContent::Link(_) => {
                 let child_node = child.load_child(self.store.clone(), self.bit_width)?;
@@ -187,7 +183,7 @@ where
                 if let Some(node) = guard.deref() {
                     node.get_value(hash_bits, k)
                 } else {
-                    unreachable!()
+                    unreachable!("node cache must be `Some()` here");
                 }
             }
             PContent::KVs(ref kvs) => {
@@ -196,8 +192,7 @@ where
                         return Ok(kv.value.clone());
                     }
                 }
-                // TODO not find
-                Err(Error::Tmp)
+                Err(Error::NotFound(k.to_string()))
             }
         }
     }
@@ -208,15 +203,17 @@ where
         k: &str,
         v: Option<Vec<u8>>,
     ) -> Result<()> {
-        // TODO
-        let idx = hv.next(self.bit_width).ok_or(Error::Tmp)?;
+        let idx = hv.next(self.bit_width).ok_or(Error::MaxDepth)?;
         // bitmap do not have this bit, it's a new key for this bit position.
         if self.bitfield.bit(idx as usize) == false {
             return self.insert_child(idx, k, v);
         }
 
         let cindex = index_for_bitpos(&self.bitfield, idx);
-        let child = self.pointers.get_mut(cindex as usize).ok_or(Error::Tmp)?; // todo
+        let child = self
+            .pointers
+            .get_mut(cindex as usize)
+            .expect("[modify_value]should not happen, bit counts must match pointers");
 
         match child.data {
             PContent::Link(_) => {
@@ -227,7 +224,7 @@ where
                     if let Some(n) = guard.deref_mut() {
                         n.modify_value(hv, k, v)?;
                     } else {
-                        unreachable!("");
+                        unreachable!("node cache must be `Some()` here");
                     }
                 }
                 if need_delete {
@@ -235,7 +232,7 @@ where
                     if let Some(ref node) = guard.deref() {
                         return self.clean_child(node, cindex);
                     } else {
-                        unreachable!("");
+                        unreachable!("node cache must be `Some()` here");
                     }
                 }
                 Ok(())
@@ -252,7 +249,7 @@ where
                         self.remove_child(cindex, idx)
                     } else if old_len == kvs.len() {
                         // no pair could be removed
-                        Err(Error::Tmp)
+                        Err(Error::NotFound(k.to_string()))
                     } else {
                         // normally remove one pair from kvs.
                         Ok(())
@@ -302,7 +299,7 @@ where
     /// insert k,v to this bit position.
     fn insert_child(&mut self, idx: u32, k: &str, v: Option<Vec<u8>>) -> Result<()> {
         // in insert, the value must exist, `None` represent delete this key.
-        let v = v.ok_or(Error::Tmp)?; // todo
+        let v = v.expect("in insert, the value must exist");
 
         let i = index_for_bitpos(&self.bitfield, idx);
         // set bit for index i
@@ -317,12 +314,13 @@ where
     fn clean_child(&mut self, child_node: &Node<B, P>, idx: u32) -> Result<()> {
         let len = child_node.pointers.len();
         match len {
-            0 => {
-                Err(Error::Tmp) // TODO "incorrectly formed HAMT"
-            }
+            0 => Err(Error::InvalidFormatHAMT),
             1 => {
                 // TODO: only do this if its a value, cant do this for shards unless pairs requirements are met.
-                let p = child_node.pointers.get(0).ok_or(Error::Tmp)?; // TODO
+                let p = child_node
+                    .pointers
+                    .get(0)
+                    .expect("[clean_child]should not happen, bit counts must match pointers");
                 if let PContent::Link(ref _cid) = p.data {
                     // don't know why... todo
                     return Ok(());
@@ -359,7 +357,10 @@ where
     }
 
     fn set_child(&mut self, idx: u32, p: Pointer<B, P>) -> Result<()> {
-        let v = self.pointers.get_mut(idx as usize).ok_or(Error::Tmp)?;
+        let v = self
+            .pointers
+            .get_mut(idx as usize)
+            .expect("[set_child]should not happen, bit counts must match pointers");
         *v = p;
         Ok(())
     }
