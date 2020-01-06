@@ -99,6 +99,20 @@ where
         SharedPointer::new(Self::new(store))
     }
 
+    pub fn load_node(store: CborIpldStor<B>, c: Cid) -> Result<Node<B, P>> {
+        Self::load_node_with_bitwidth(store, c, DEFAULT_BIT_WIDTH)
+    }
+
+    pub fn load_node_with_bitwidth(
+        store: CborIpldStor<B>,
+        c: Cid,
+        bit_width: u32,
+    ) -> Result<Node<B, P>> {
+        let pn: PartNode<B, P> = store.get(&c)?;
+        let node = pn.into_node(store, bit_width);
+        Ok(node)
+    }
+
     pub fn get_mut_bitfield(&mut self) -> &mut U256 {
         &mut self.bitfield
     }
@@ -107,8 +121,16 @@ where
         &mut self.pointers
     }
 
-    pub fn get_width(&self) -> u32 {
+    pub fn get_pointers(&self) -> &Vec<Pointer<B, P>> {
+        &self.pointers
+    }
+
+    pub fn get_bitwidth(&self) -> u32 {
         self.bit_width
+    }
+
+    pub fn get_store(&self) -> CborIpldStor<B> {
+        self.store.clone()
     }
 
     pub fn find<Output: DeserializeOwned>(&self, k: &str) -> Result<Output> {
@@ -299,7 +321,7 @@ where
     /// insert k,v to this bit position.
     fn insert_child(&mut self, idx: u32, k: &str, v: Option<Vec<u8>>) -> Result<()> {
         // in insert, the value must exist, `None` represent delete this key.
-        let v = v.expect("in insert, the value must exist");
+        let v = v.ok_or(Error::NotFound(k.to_string()))?;
 
         let i = index_for_bitpos(&self.bitfield, idx);
         // set bit for index i
@@ -363,6 +385,15 @@ where
             .expect("[set_child]should not happen, bit counts must match pointers");
         *v = p;
         Ok(())
+    }
+
+    pub fn deep_copy(&self) -> Node<B, P> {
+        Node::<B, P> {
+            bitfield: self.bitfield,
+            pointers: self.pointers.iter().map(|p| p.deep_copy()).collect(),
+            store: self.store.clone(),
+            bit_width: self.bit_width,
+        }
     }
 }
 

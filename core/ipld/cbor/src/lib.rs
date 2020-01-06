@@ -20,7 +20,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use block_format::{BasicBlock, Block};
 use cid::{Cid, CidT, Codec};
-use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
+pub use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 use multihash::Hash as MHashEnum;
 
 #[cfg(feature = "bigint")]
@@ -30,6 +30,7 @@ pub use self::obj::{
     convert_to_cborish_obj, convert_to_jsonish_obj, hack_convert_float_to_int,
     hack_convert_int_to_float, struct_to_cbor_value, Obj,
 };
+use std::ops::Deref;
 
 /// `IpldNode` represents an IPLD node.
 #[derive(Debug, Clone, PartialEq)]
@@ -299,6 +300,11 @@ where
 fn decode_block(block: &impl Block) -> Result<IpldNode> {
     let obj: Obj = decode_into(block.raw_data())?;
     IpldNode::new_node(block, obj)
+}
+
+pub fn decode_block_from_box(block: &Box<dyn Block>) -> Result<IpldNode> {
+    let obj: Obj = decode_into(block.raw_data())?;
+    IpldNode::new_node(block.deref().clone(), obj)
 }
 
 pub fn decode_block_for_coding(block: &impl Block) -> Result<Box<dyn Node>> {

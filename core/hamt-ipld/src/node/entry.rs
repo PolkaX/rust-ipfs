@@ -1,4 +1,4 @@
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::result;
 use std::sync::RwLock;
 
@@ -170,6 +170,22 @@ where
         match self.data {
             PContent::Link(_) => true,
             PContent::KVs(_) => false,
+        }
+    }
+
+    pub fn deep_copy(&self) -> Pointer<B, P> {
+        let cache = {
+            let guard = self.cache.read().expect("must could get read lock here");
+            if let Some(c) = guard.deref() {
+                Some(c.deep_copy())
+            } else {
+                None
+            }
+        };
+
+        Pointer {
+            data: self.data.clone(),
+            cache: SharedPointer::new(RwLock::new(cache)),
         }
     }
 }
