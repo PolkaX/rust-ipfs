@@ -13,25 +13,22 @@ use crate::ipld::{Blocks, CborIpldStor};
 use super::{load_node, Node};
 
 mod kv {
-    use bytes::Bytes;
+    use serde_cbor::Value;
     use serde_derive;
     use serde_tuple::*;
     #[derive(Debug, Clone, Eq, PartialEq, Serialize_tuple, Deserialize_tuple)]
     pub struct KV {
         pub key: String,
-        pub value: Bytes,
+        pub value: Value,
     }
 
     impl KV {
-        pub fn new(key: String, value: Vec<u8>) -> KV {
-            KV {
-                key,
-                value: value.into(),
-            }
+        pub fn new(key: String, value: Value) -> KV {
+            KV { key, value }
         }
 
-        pub fn set_value(&mut self, value: Vec<u8>) {
-            self.value = value.into();
+        pub fn set_value(&mut self, value: Value) {
+            self.value = value;
         }
     }
 }

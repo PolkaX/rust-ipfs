@@ -1,11 +1,15 @@
 use super::*;
 
 use archery::RcK;
+use bytes::Bytes;
 use cid::Cid;
+use ipld_cbor::struct_to_cbor_value;
 
 #[test]
 fn test_kv() {
-    let kv = KV::new("123".to_string(), vec![1_u8, 2, 3]);
+    let b: Bytes = vec![1_u8, 2, 3].into();
+    let v = struct_to_cbor_value(&b).unwrap();
+    let kv = KV::new("123".to_string(), v);
 
     let r = serde_cbor::to_vec(&kv).unwrap();
     println!("{:?}", r);
@@ -19,7 +23,9 @@ fn test_kv() {
 
 #[test]
 fn test_pointer_and_node() {
-    let kv = KV::new("123".to_string(), vec![1_u8, 2, 3]);
+    let b: Bytes = vec![1_u8, 2, 3].into();
+    let v = struct_to_cbor_value(&b).unwrap();
+    let kv = KV::new("123".to_string(), v);
     let pointer = Pointer::from_kvs(vec![kv.clone(), kv]);
     let r = serde_cbor::to_vec(&pointer).unwrap();
     println!("{:?}", r);

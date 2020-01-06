@@ -3,9 +3,10 @@ pub mod trait_impl;
 
 use archery::{ArcK, RcK, SharedPointer, SharedPointerKind};
 use bigint::U256;
-use bytes::Bytes;
 use cid::Cid;
+use ipld_cbor::{cbor_value_to_struct, struct_to_cbor_value};
 use serde::{de::DeserializeOwned, Serialize};
+use serde_cbor::Value;
 use std::ops::{Deref, DerefMut};
 
 use self::entry::{PContent, Pointer, KV};
@@ -137,7 +138,7 @@ where
         let hash = hash(k);
         let mut hash_bits = HashBits::new(hash.as_ref());
         self.get_value(&mut hash_bits, k)
-            .and_then(|v| ipld_cbor::decode_into(&v).map_err(Error::IpldCbor))
+            .and_then(|v| cbor_value_to_struct(v).map_err(Error::IpldCbor))
     }
 
     pub fn delete(&mut self, k: &str) -> Result<()> {
@@ -149,7 +150,7 @@ where
     pub fn set<V: Serialize>(&mut self, k: &str, v: V) -> Result<()> {
         let hash = hash(k);
         let mut hash_bits = HashBits::new(hash.as_ref());
-        let b = ipld_cbor::dump_object(&v).map_err(Error::IpldCbor)?;
+        let b = struct_to_cbor_value(&v).map_err(Error::IpldCbor)?;
 
         self.modify_value(&mut hash_bits, k, Some(b))
     }
@@ -188,7 +189,7 @@ where
         Ok(total_size)
     }
 
-    fn get_value<'hash>(&self, hash_bits: &mut HashBits<'hash>, k: &str) -> Result<Bytes> {
+    fn get_value<'hash>(&self, hash_bits: &mut HashBits<'hash>, k: &str) -> Result<Value> {
         let idx = hash_bits.next(self.bit_width).ok_or(Error::MaxDepth)?;
         if self.bitfield.bit(idx as usize) == false {
             return Err(Error::NotFound(k.to_string()));
@@ -223,7 +224,7 @@ where
         &mut self,
         hv: &mut HashBits<'hash>,
         k: &str,
-        v: Option<Vec<u8>>,
+        v: Option<Value>,
     ) -> Result<()> {
         let idx = hv.next(self.bit_width).ok_or(Error::MaxDepth)?;
         // bitmap do not have this bit, it's a new key for this bit position.
@@ -299,7 +300,7 @@ where
                         let new_hash = hash(p.key.as_bytes());
                         let mut ch_hv =
                             HashBits::new_with_consumed(new_hash.as_ref(), hv.consumed());
-                        sub.modify_value(&mut ch_hv, p.key.as_str(), Some(p.value.to_vec()))?;
+                        sub.modify_value(&mut ch_hv, p.key.as_str(), Some(p.value.clone()))?;
                     }
 
                     let c = self.store.put(sub)?;
@@ -319,7 +320,7 @@ where
     }
 
     /// insert k,v to this bit position.
-    fn insert_child(&mut self, idx: u32, k: &str, v: Option<Vec<u8>>) -> Result<()> {
+    fn insert_child(&mut self, idx: u32, k: &str, v: Option<Value>) -> Result<()> {
         // in insert, the value must exist, `None` represent delete this key.
         let v = v.ok_or(Error::NotFound(k.to_string()))?;
 

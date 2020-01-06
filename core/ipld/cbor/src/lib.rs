@@ -11,6 +11,7 @@ mod obj;
 #[cfg(test)]
 mod tests;
 
+use std::ops::Deref;
 use std::result::Result as StdResult;
 use std::str::FromStr;
 
@@ -23,14 +24,15 @@ use cid::{Cid, CidT, Codec};
 pub use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 use multihash::Hash as MHashEnum;
 
+pub use serde_cbor::Value;
+
 #[cfg(feature = "bigint")]
 pub use self::bigint::CborBigUint;
 pub use self::error::{IpldCborError, Result};
 pub use self::obj::{
-    convert_to_cborish_obj, convert_to_jsonish_obj, hack_convert_float_to_int,
-    hack_convert_int_to_float, struct_to_cbor_value, Obj,
+    cbor_value_to_struct, convert_to_cborish_obj, convert_to_jsonish_obj,
+    hack_convert_float_to_int, hack_convert_int_to_float, struct_to_cbor_value, Obj,
 };
-use std::ops::Deref;
 
 /// `IpldNode` represents an IPLD node.
 #[derive(Debug, Clone, PartialEq)]

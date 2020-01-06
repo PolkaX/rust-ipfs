@@ -220,7 +220,7 @@ fn test_set_get() {
     map.iter_mut().for_each(|(k, v)| {
         let new_v = rand_value();
         *v = new_v.clone();
-        node.set(k, new_v);
+        node.set(k, new_v).unwrap();
     });
 
     map.iter().for_each(|(k, v)| {
@@ -334,14 +334,15 @@ fn test_copy_without_flush() {
     let count = 200_u8;
     for i in 0..count {
         let key = format!("key{}", i);
-        n.set(&key, vec![i]);
+        n.set(&key, vec![i]).unwrap();
     }
-    n.flush();
+    n.flush().unwrap();
 
     for i in 0..count {
         let key = format!("key{}", i);
         // override
-        n.set(&key, (count as u32 + i as u32).to_be_bytes().to_vec());
+        n.set(&key, (count as u32 + i as u32).to_be_bytes().to_vec())
+            .unwrap();
     }
 
     let nc = n.clone();
@@ -381,7 +382,7 @@ fn test_value_linking() {
     let thingy2 = Obj::Map(hash);
 
     let mut n = NodeRc::new(cs.clone());
-    n.set("cat", thingy2);
+    n.set("cat", thingy2).unwrap();
     let tcid = cs.put(n).unwrap();
 
     let blk = cs.get_block(&tcid).unwrap();
