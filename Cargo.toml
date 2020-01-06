@@ -1,11 +1,13 @@
 [workspace]
 members = [
     "core/multibase",
+    "core/multihash",
     "core/cid",
     "core/primitives",
     "core/ipld/cbor",
     "core/ipld/format",
     "core/block-format",
+    "core/hamt-ipld",
     "core/util",
     "core/merkledag",
 ]

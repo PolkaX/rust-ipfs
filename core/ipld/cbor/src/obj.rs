@@ -16,6 +16,7 @@ use serde_cbor::tags::current_cbor_tag;
 use serde_cbor::Value;
 
 use crate::error::{IpldCborError, Result};
+use serde::de::DeserializeOwned;
 
 #[derive(Clone, Debug, PartialEq)]
 //#[serde(untagged)]
@@ -262,6 +263,12 @@ pub fn struct_to_cbor_value<S: Serialize>(v: &S) -> Result<serde_cbor::Value> {
     let s = serde_cbor::to_vec(&v)?;
     let value: serde_cbor::Value = serde_cbor::from_slice(&s)?;
     Ok(value)
+}
+
+#[inline]
+pub fn cbor_value_to_struct<O: DeserializeOwned>(v: serde_cbor::Value) -> Result<O> {
+    let o = serde_cbor::value::from_value(v)?;
+    Ok(o)
 }
 
 impl TryFrom<serde_cbor::Value> for Obj {

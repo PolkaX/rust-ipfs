@@ -10,4 +10,4 @@ description = "Some utils of rust-ipfs"
 keywords = ["ipfs", "util"]
 
 [dependencies]
-multihash = { package = "parity-multihash", version = "0.2" }
+multihash = { package = "rust-multihash", path = "../multihash" }

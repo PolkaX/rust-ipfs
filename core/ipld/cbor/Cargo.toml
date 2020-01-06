@@ -11,13 +11,13 @@ keywords = ["ipfs", "ipld", "cbor"]
 
 [dependencies]
 thiserror = "1.0"
-either = "1.5"
+either = { version = "1.5", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 serde_bytes = "0.11"
 bytes = { version = "0.5", features = ["serde"] }
-num-bigint = { version = "0.2.3", optional = true }
-multihash = { package = "parity-multihash", version = "0.2" }
+num-bigint = { version = "0.2", optional = true }
+multihash = { package = "rust-multihash", path = "../../multihash" }
 
 serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
 ipld-format = { package = "rust-ipld-format", path = "../format" }
