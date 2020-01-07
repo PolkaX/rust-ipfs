@@ -39,7 +39,7 @@ impl<'de> serde::Deserialize<'de> for Cid {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::Error;
+        use serde::de::Error as _;
         let tagged = Tagged::<serde_bytes::ByteBuf>::deserialize(deserializer)?;
         match tagged.tag {
             Some(CID_CBOR_TAG) | None => {

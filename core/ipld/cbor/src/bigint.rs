@@ -60,12 +60,12 @@ impl<'de> serde::Deserialize<'de> for CborBigUint {
 mod tests {
     use std::collections::BTreeMap;
 
-    use block_format::Block;
-    use multihash::Hash;
     use serde::{Deserialize, Serialize};
 
+    use cid::{AsCidRef, Cid};
+    use multihash::Hash;
+
     use super::CborBigUint;
-    use crate::localcid::CborCid;
     use crate::node::IpldNode;
     use crate::obj::{Obj, SortedStr};
 
@@ -74,14 +74,14 @@ mod tests {
         #[derive(PartialEq, Eq, Debug, Serialize, Deserialize)]
         struct Foo {
             big_int: CborBigUint,
-            cid: CborCid,
+            cid: Cid,
         }
 
-        let node = IpldNode::from_obj(Obj::Null, Hash::SHA2256).unwrap();
+        let node = IpldNode::from_object(Obj::Null, Hash::SHA2256).unwrap();
         let cid = node.cid().clone();
         let foo1 = Foo {
             big_int: CborBigUint(1_u64.into()),
-            cid: CborCid(cid),
+            cid,
         };
 
         let bytes = serde_cbor::to_vec(&foo1).unwrap();
