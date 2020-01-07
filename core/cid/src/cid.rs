@@ -1,13 +1,14 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use integer_encoding::VarIntWriter;
+
 use multibase::Base;
 use multihash::{Hash, Multihash};
 
 use crate::codec::Codec;
 use crate::error::{CidError, Result};
 use crate::prefix::Prefix;
-use crate::to_cid::ToCid;
+use crate::traits::ToCid;
 use crate::version::Version;
 
 /// Representation of a CID.

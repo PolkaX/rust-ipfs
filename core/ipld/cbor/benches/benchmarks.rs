@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use multihash::Hash;
 use rust_ipld_cbor::{IpldNode, Obj};
 use serde::{Deserialize, Serialize};
@@ -48,23 +48,23 @@ fn test_struct_obj() -> Obj {
     serde_json::from_str::<Obj>(&json).unwrap()
 }
 
-fn bench_from_obj(c: &mut Criterion) {
+fn bench_from_object(c: &mut Criterion) {
     let obj = test_struct_obj();
 
     c.bench_function("from_obj", |b| {
         b.iter(|| {
-            let _ = IpldNode::from_obj(obj.clone(), Hash::SHA2256).unwrap();
+            let _ = black_box(IpldNode::from_object(obj.clone(), Hash::SHA2256).unwrap());
         })
     });
 }
 
 fn bench_from_block(c: &mut Criterion) {
     let obj = test_struct_obj();
-    let node = IpldNode::from_obj(obj, Hash::SHA2256).unwrap();
+    let node = IpldNode::from_object(obj, Hash::SHA2256).unwrap();
 
     c.bench_function("from_block", |b| {
         b.iter(|| {
-            let n = IpldNode::from_block(&node).unwrap();
+            let n = black_box(IpldNode::from_block(&node).unwrap());
             assert_eq!(node, n);
         })
     });
@@ -72,14 +72,14 @@ fn bench_from_block(c: &mut Criterion) {
 
 fn bench_to_cbor(c: &mut Criterion) {
     let obj = test_struct_obj();
-    let node = IpldNode::from_obj(obj, Hash::SHA2256).unwrap();
+    let node = IpldNode::from_object(obj, Hash::SHA2256).unwrap();
 
     c.bench_function("to_cbor", |b| {
         b.iter(|| {
-            let _ = node.to_cbor().unwrap();
+            let _ = black_box(node.to_cbor().unwrap());
         })
     });
 }
 
-criterion_group!(benches, bench_from_obj, bench_from_block, bench_to_cbor);
+criterion_group!(benches, bench_from_object, bench_from_block, bench_to_cbor);
 criterion_main!(benches);

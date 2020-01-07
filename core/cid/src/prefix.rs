@@ -3,6 +3,7 @@
 use std::io::Cursor;
 
 use integer_encoding::{VarIntReader, VarIntWriter};
+
 use multihash::Hash;
 
 use crate::cid::Cid;

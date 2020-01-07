@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 use cid::ToCid;
 
 use crate::error::{IpldCborError, Result};
-use crate::localcid::CborCid;
 use crate::obj::Obj;
 
 /// Convert structure to CBOR Value.
@@ -13,6 +12,11 @@ pub fn struct_to_cbor_value<S: serde::Serialize>(v: &S) -> Result<serde_cbor::Va
     let s = serde_cbor::to_vec(&v)?;
     let value: serde_cbor::Value = serde_cbor::from_slice(&s)?;
     Ok(value)
+}
+
+/// Convert CBOR Value to structure.
+pub fn cbor_value_to_struct<O: serde::de::DeserializeOwned>(v: serde_cbor::Value) -> Result<O> {
+    Ok(serde_cbor::value::from_value(v)?)
 }
 
 /// Convert Obj Integer to Obj Float for matching golang version.
@@ -55,7 +59,7 @@ pub fn convert_to_cborish_obj(mut value: Obj) -> Result<Obj> {
                     match link {
                         Obj::Text(s) => {
                             let cid = s.to_cid()?;
-                            *obj = Obj::Cid(CborCid(cid));
+                            *obj = Obj::Cid(cid);
                         }
                         Obj::Cid(cid) => {
                             *obj = Obj::Cid(cid.clone());
@@ -77,8 +81,8 @@ pub fn convert_to_jsonish_obj(mut value: Obj) -> Result<Obj> {
     let mut func = |obj: &mut Obj| {
         match obj {
             // change cid to map { "/", "string" }
-            Obj::Cid(local_cid) => {
-                let link = Obj::Text(local_cid.0.to_string());
+            Obj::Cid(cid) => {
+                let link = Obj::Text(cid.to_string());
                 let mut map = BTreeMap::new();
                 map.insert("/".to_string().into(), link);
                 *obj = Obj::Map(map);
@@ -87,9 +91,9 @@ pub fn convert_to_jsonish_obj(mut value: Obj) -> Result<Obj> {
             Obj::Map(ref mut map) => {
                 // if current map is like: { "/", cid }, change it to { "/": "string" }
                 if map.len() == 1 {
-                    if let Some(ref mut cid) = map.get("/") {
-                        match cid {
-                            Obj::Cid(local_cid) => *cid = &Obj::Text(local_cid.0.to_string()),
+                    if let Some(ref mut obj) = map.get("/") {
+                        match obj {
+                            Obj::Cid(cid) => *obj = &Obj::Text(cid.to_string()),
                             Obj::Text(_) => {} // do nothing,
                             _ => return Err(IpldCborError::NonStringLink), // should not happen
                         }

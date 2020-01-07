@@ -1,18 +1,16 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use bytes::Bytes;
-use cid::{Cid, Multihash};
+
+use cid::{AsCidRef, Cid, Multihash};
 use util::sha2_256_hash;
 
 use crate::error::Result;
 
 /// The trait for getting raw data and cid of block.
-pub trait Block {
+pub trait Block: AsCidRef {
     /// Get the raw data of block.
     fn raw_data(&self) -> &Bytes;
-
-    /// Get the cid of block.
-    fn cid(&self) -> &Cid;
 }
 
 /// The basic block.
@@ -59,7 +57,9 @@ impl Block for BasicBlock {
     fn raw_data(&self) -> &Bytes {
         &self.data
     }
+}
 
+impl AsCidRef for BasicBlock {
     fn cid(&self) -> &Cid {
         &self.cid
     }

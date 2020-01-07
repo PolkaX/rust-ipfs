@@ -17,4 +17,4 @@ cid = { package = "rust-cid", path = "../cid" }
 util = { package = "rust-ipfs-util", path = "../util" }
 
 [dev-dependencies]
-multihash = { package = "parity-multihash", version = "0.2" }
+multihash = { package = "rust-multihash", path = "../multihash" }

@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
 
+use cid::{deserialize_cid_from_bytes, Cid, CID_CBOR_TAG};
 use serde::{
     de::{self, Error as _},
     Deserialize, Serialize,
@@ -12,7 +13,6 @@ use serde::{
 use serde_cbor::{tags::current_cbor_tag, Value};
 
 use crate::error::IpldCborError;
-use crate::localcid::{deserialize_cid_from_bytes, CborCid, CID_CBOR_TAG};
 
 /// A String Wrapper that implements `Ord` and `PartialOrd`,
 /// according to the length of string, in bytes.
@@ -118,7 +118,7 @@ pub enum Obj {
     /// CBOR map value.
     Map(BTreeMap<SortedStr, Obj>),
     /// CBOR tag value (tag is 42).
-    Cid(CborCid),
+    Cid(Cid),
 }
 
 impl serde::Serialize for Obj {
@@ -276,7 +276,7 @@ impl<'de> serde::Deserialize<'de> for Obj {
             {
                 match current_cbor_tag() {
                     Some(CID_CBOR_TAG) | None => {
-                        let cid = CborCid::deserialize(deserializer)?;
+                        let cid = Cid::deserialize(deserializer)?;
                         Ok(Obj::Cid(cid))
                     }
                     Some(tag) => Err(D::Error::custom(format!("unexpected tag ({})", tag))),
@@ -338,7 +338,7 @@ fn try_from_tag(tag: u64, value: Value) -> Result<Obj, IpldCborError> {
 
     if let Value::Bytes(ref bytes) = value {
         let cid = deserialize_cid_from_bytes(bytes)?;
-        Ok(Obj::Cid(cid.into()))
+        Ok(Obj::Cid(cid))
     } else {
         Err(IpldCborError::ObjErr(format!(
             "tag [{}] value must be bytes",

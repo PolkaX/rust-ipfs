@@ -1,6 +1,6 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
 use rust_multibase::{decode, encode, Base};
 
@@ -11,17 +11,17 @@ fn bench_encode(c: &mut Criterion) {
     let mut group = c.benchmark_group("encode");
     group.bench_function("base32", |b| {
         b.iter(|| {
-            let _ = encode(Base::Base32Upper, &data);
+            let _ = black_box(encode(Base::Base32Upper, &data));
         })
     });
     group.bench_function("base58btc", |b| {
         b.iter(|| {
-            let _ = encode(Base::Base58Btc, &data);
+            let _ = black_box(encode(Base::Base58Btc, &data));
         })
     });
     group.bench_function("base64", |b| {
         b.iter(|| {
-            let _ = encode(Base::Base64, &data);
+            let _ = black_box(encode(Base::Base64, &data));
         })
     });
     group.finish();
@@ -45,17 +45,17 @@ fn bench_decode(c: &mut Criterion) {
     let mut group = c.benchmark_group("decode");
     group.bench_function("base32", |b| {
         b.iter(|| {
-            let _ = decode(&base32_data).unwrap();
+            let _ = black_box(decode(&base32_data).unwrap());
         })
     });
     group.bench_function("base58btc", |b| {
         b.iter(|| {
-            let _ = decode(&base58_data).unwrap();
+            let _ = black_box(decode(&base58_data).unwrap());
         })
     });
     group.bench_function("base64", |b| {
         b.iter(|| {
-            let _ = decode(&base64_data).unwrap();
+            let _ = black_box(decode(&base64_data).unwrap());
         })
     });
     group.finish();

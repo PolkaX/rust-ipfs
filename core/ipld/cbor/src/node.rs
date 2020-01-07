@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use block_format::{BasicBlock, Block};
 use bytes::Bytes;
-use cid::{Cid, Codec};
+use cid::{AsCidRef, Cid, Codec};
 use either::Either;
 use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 use multihash::Hash;
@@ -27,7 +27,7 @@ pub struct IpldNode {
 }
 
 impl IpldNode {
-    fn new_with_obj(block: &impl Block, obj: Obj) -> Result<Self> {
+    fn new_with_obj(block: &dyn Block, obj: Obj) -> Result<Self> {
         let (tree, links) = compute(&obj)?;
         Ok(Self {
             obj,
@@ -49,7 +49,7 @@ impl IpldNode {
     pub fn from_json(json: &str, hash_type: Hash) -> Result<Self> {
         let obj = json_to_obj(json)?;
         // need to generate other info
-        Self::from_obj(obj, hash_type)
+        Self::from_object(obj, hash_type)
     }
 
     /// Serialize the object of IPLD Node into its CBOR serialized byte representation.
@@ -60,25 +60,32 @@ impl IpldNode {
     /// Deserialize a CBOR object into an IPLD Node.
     pub fn from_cbor(bytes: &[u8], hash_type: Hash) -> Result<Self> {
         let obj = serde_cbor::from_slice::<Obj>(bytes)?;
-        Self::from_obj(obj, hash_type)
+        Self::from_object(obj, hash_type)
     }
 
     /// Just to match the golang version, it will be `deprecated` in the future.
+    /// Please use `from_cbor` method of `IpldNode`.
     pub fn decode(bytes: &[u8], hash_type: Hash) -> Result<Self> {
         Self::from_cbor(bytes, hash_type)
     }
 
-    /// Creates an IPLD Node with the given obj and hash type.
-    pub fn from_obj(obj: Obj, hash_type: Hash) -> Result<Self> {
-        let data = serde_cbor::to_vec(&obj).map_err(IpldCborError::CborErr)?;
+    /// Creates an IPLD Node with the given value and hash type.
+    pub fn from_object<T: serde::Serialize>(value: T, hash_type: Hash) -> Result<Self> {
+        Self::from_object_with_codec(value, hash_type, Codec::DagCBOR)
+    }
+
+    /// Creates an IPLD Node with the given value, hash type and codec.
+    pub fn from_object_with_codec<T: serde::Serialize>(value: T, hash_type: Hash, codec: Codec) -> Result<Self> {
+        let data = serde_cbor::to_vec(&value)?;
+        let obj = serde_cbor::from_slice::<Obj>(&data)?;
         let hash = multihash::encode(hash_type, &data)?;
-        let cid = Cid::new_cid_v1(Codec::DagCBOR, hash)?;
+        let cid = Cid::new_cid_v1(codec, hash)?;
         let block = BasicBlock::new_with_cid(data.into(), cid)?;
         Self::new_with_obj(&block, obj)
     }
 
     /// Creates an IPLD Node with the given block.
-    pub fn from_block(block: &impl Block) -> Result<Self> {
+    pub fn from_block(block: &dyn Block) -> Result<Self> {
         let obj = serde_cbor::from_slice::<Obj>(block.raw_data())?;
         Self::new_with_obj(block, obj)
     }
@@ -93,7 +100,9 @@ impl Block for IpldNode {
     fn raw_data(&self) -> &Bytes {
         &self.raw
     }
+}
 
+impl AsCidRef for IpldNode {
     fn cid(&self) -> &Cid {
         &self.cid
     }
@@ -124,7 +133,7 @@ impl Resolver for IpldNode {
                     })?;
                 }
                 Obj::Cid(cid) => {
-                    let link = Link::new_with_cid(cid.0.clone());
+                    let link = Link::new_with_cid(cid.clone());
                     return Ok((
                         Either::Left(link),
                         path.iter().skip(index).map(|s| (*s).to_string()).collect(),
@@ -134,7 +143,7 @@ impl Resolver for IpldNode {
             }
         }
         if let Obj::Cid(cid) = cur {
-            let link = Link::new_with_cid(cid.0.clone());
+            let link = Link::new_with_cid(cid.clone());
             return Ok((Either::Left(link), vec![]));
         }
         let jsonish =
@@ -226,7 +235,7 @@ fn compute(obj: &Obj) -> Result<(Vec<String>, Vec<Link>)> {
             tree.push(name);
         }
         if let Obj::Cid(cid) = obj {
-            links.push(Link::new_with_cid(cid.0.clone()))
+            links.push(Link::new_with_cid(cid.clone()))
         }
         Ok(())
     };
@@ -258,8 +267,8 @@ where
     }
 }
 
-// just for testing.
 /// Convert obj into json string.
+/// Just for testing. Please use the `to_json` method of `IpldNode`.
 #[inline]
 pub fn obj_to_json(obj: Obj) -> Result<String> {
     let json_obj = convert_to_jsonish_obj(obj)?;
@@ -268,8 +277,8 @@ pub fn obj_to_json(obj: Obj) -> Result<String> {
     Ok(serde_json::to_string(&json_obj)?)
 }
 
-// just for testing.
 /// Convert json string into Obj.
+/// Just for testing. Please use the `from_json` method of `IpldNode`.
 #[inline]
 pub fn json_to_obj(json: &str) -> Result<Obj> {
     let obj = serde_json::from_str::<Obj>(json)?;

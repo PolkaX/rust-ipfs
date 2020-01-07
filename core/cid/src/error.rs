@@ -29,6 +29,11 @@ pub enum CidError {
     /// Multihash parse failure.
     #[error("Failed to parse multihash: {0}")]
     ParsingError(#[source] Box<dyn std::error::Error + Send + Sync>),
+
+    /// Invalid binary multibase prefix in CBOR serialized CIDs.
+    #[cfg(feature = "serde_support")]
+    #[error("CBOR serialized CIDs must have binary multibase prefix")]
+    InvalidBinaryMultibasePrefix,
 }
 
 impl From<std::io::Error> for CidError {
