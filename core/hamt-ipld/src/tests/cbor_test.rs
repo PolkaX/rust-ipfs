@@ -121,12 +121,12 @@ fn test_pointer_and_node() {
     let node = Node::test_init(
         store.clone(),
         "11579208923731619542357098500868790785326998466564056403945758400791312",
-        vec![pointer.clone(), pointer2.clone()],
+        vec![pointer, pointer2],
         0,
     );
     let r = serde_cbor::to_vec(&node).unwrap();
     let node: PartNode<_, RcK> = serde_cbor::from_slice(&r).unwrap();
-    let node = node.into_node(store.clone(), bit_width);
+    let node = node.into_node(store, bit_width);
     println!("{:?}", node);
     println!("{:?}", node);
 }

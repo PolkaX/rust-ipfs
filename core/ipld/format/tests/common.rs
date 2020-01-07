@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use block_format::Block;
 use bytes::Bytes;
-use cid::{Cid, CidT, Codec, Hash, Prefix, Version};
+use cid::{AsCidRef, Cid, Codec, Hash, Prefix, Version};
 
 use rust_ipld_format::{FormatError, Link, NavigableNode, Node, NodeStat, Resolver, Result};
 
@@ -11,8 +11,8 @@ pub struct EmptyNode {
     data: Bytes,
 }
 
-impl EmptyNode {
-    pub fn new() -> Self {
+impl Default for EmptyNode {
+    fn default() -> Self {
         let p = Prefix {
             version: Version::V1,
             codec: Codec::Raw,
@@ -23,6 +23,12 @@ impl EmptyNode {
             cid: p.sum(b"").unwrap(),
             data: Bytes::from_static(b""),
         }
+    }
+}
+
+impl EmptyNode {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -50,7 +56,7 @@ impl Block for EmptyNode {
     }
 }
 
-impl CidT for EmptyNode {
+impl AsCidRef for EmptyNode {
     fn cid(&self) -> &Cid {
         &self.cid
     }
@@ -80,7 +86,7 @@ impl NavigableNode for N {
     fn fetch_child(&self, child_index: usize) -> Result<Arc<dyn NavigableNode>> {
         self.child
             .get(child_index)
-            .map(|d| d.clone())
+            .cloned()
             .ok_or(FormatError::NoChild(child_index))
     }
 }

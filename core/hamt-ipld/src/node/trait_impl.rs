@@ -83,7 +83,7 @@ where
         let index = bitmap_bytes
             .iter()
             .position(|i| *i != 0)
-            .unwrap_or(std::mem::size_of_val(&self.bitfield));
+            .unwrap_or_else(|| std::mem::size_of_val(&self.bitfield));
         let b = serde_bytes::Bytes::new(&bitmap_bytes[index..]);
         let tuple = (b, &self.pointers);
         tuple.serialize(serializer)

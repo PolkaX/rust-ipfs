@@ -87,13 +87,12 @@ where
     }
 
     pub fn new_with_bitwidth(store: CborIpldStor<B>, bit_width: u32) -> Node<B, P> {
-        let nd = Node {
+        Node {
             bitfield: 0.into(),
             pointers: vec![],
             store,
             bit_width,
-        };
-        nd
+        }
     }
 
     pub fn new_pointer_node(store: CborIpldStor<B>) -> NodeP<B, P> {
@@ -267,7 +266,7 @@ where
                     // remove pair when key equal to k
                     kvs.retain(|entry| entry.key != k);
 
-                    let result = if kvs.len() == 0 {
+                    let result = if kvs.is_empty() {
                         // no pair left, remove this child node
                         self.remove_child(cindex, idx)
                     } else if old_len == kvs.len() {
@@ -322,7 +321,7 @@ where
     /// insert k,v to this bit position.
     fn insert_child(&mut self, idx: u32, k: &str, v: Option<Value>) -> Result<()> {
         // in insert, the value must exist, `None` represent delete this key.
-        let v = v.ok_or(Error::NotFound(k.to_string()))?;
+        let v = v.ok_or_else(|| Error::NotFound(k.to_string()))?;
 
         let i = index_for_bitpos(&self.bitfield, idx);
         // set bit for index i

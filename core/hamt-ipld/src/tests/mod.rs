@@ -32,7 +32,7 @@ impl Blocks for MockBlocks {
             .data
             .get(cid)
             .map(|data| BasicBlock::new(Bytes::copy_from_slice(data)))
-            .ok_or(Error::NotFoundForCid(cid.clone()))?;
+            .ok_or_else(|| Error::NotFoundForCid(cid.clone()))?;
         Ok(Box::new(blk))
     }
 

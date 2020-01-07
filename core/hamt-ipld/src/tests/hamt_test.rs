@@ -48,7 +48,7 @@ fn add_and_remove_keys(bit_width: u32, keys: &[&str], extra_keys: &[&str]) {
     begin_node.flush().unwrap();
     let cid2 = cs.put(begin_node).unwrap();
     let part_node: PartNodeRc<_> = cs.get(&cid2).unwrap();
-    let node2 = part_node.into_node(cs.clone(), bit_width);
+    let node2 = part_node.into_node(cs, bit_width);
     assert_eq!(node, node2);
 }
 
@@ -173,7 +173,7 @@ where
 #[test]
 fn test_set_get() {
     let mut map: HashMap<String, Vec<u8>> = HashMap::new();
-    for _ in 0..100000 {
+    for _ in 0..100_000 {
         map.insert(rand_string(), rand_value());
     }
 
@@ -202,7 +202,7 @@ fn test_set_get() {
 
     let cid = cs.put(&begin_node).unwrap();
     let part_node: PartNodeRc<_> = cs.get(&cid).unwrap();
-    let mut node = part_node.into_node(cs.clone(), begin_node.get_bitwidth());
+    let mut node = part_node.into_node(cs, begin_node.get_bitwidth());
 
     let now = Instant::now();
     for (k, v) in map.iter() {
@@ -277,7 +277,7 @@ fn test_copy() {
     assert_eq!(nodes_equal(cs.clone(), &mut n, &mut nc), false);
 
     let mut n = nc.clone();
-    assert_eq!(nodes_equal(cs.clone(), &mut n, &mut nc), true);
+    assert_eq!(nodes_equal(cs, &mut n, &mut nc), true);
 }
 
 #[test]
@@ -295,13 +295,13 @@ fn test_deep_copy() {
     assert_eq!(nodes_equal(cs.clone(), &mut n, &mut nc), false);
 
     let mut n = nc.deep_copy();
-    assert_eq!(nodes_equal(cs.clone(), &mut n, &mut nc), true);
+    assert_eq!(nodes_equal(cs, &mut n, &mut nc), true);
 }
 
 #[test]
 fn test_copy_copies_nil_slices() {
     let cs = new_cbor_store();
-    let mut n = NodeRc::new(cs.clone());
+    let mut n = NodeRc::new(cs);
     let p = Pointer::from_kvs(vec![]);
     n.get_mut_pointers().push(p);
 
@@ -329,7 +329,7 @@ fn test_copy_copies_nil_slices() {
 #[test]
 fn test_copy_without_flush() {
     let cs = new_cbor_store();
-    let mut n = NodeRc::new(cs.clone());
+    let mut n = NodeRc::new(cs);
 
     let count = 200_u8;
     for i in 0..count {
@@ -368,7 +368,7 @@ fn test_copy_without_flush() {
 
 #[test]
 fn test_value_linking() {
-    use ipld_cbor::{Node as NodeT, Obj};
+    use ipld_cbor::{Node as _, Obj};
 
     let cs = new_cbor_store();
     let mut thingy1 = HashMap::new();
@@ -387,7 +387,7 @@ fn test_value_linking() {
 
     let blk = cs.get_block(&tcid).unwrap();
     println!("{:?}", blk.raw_data().to_vec());
-    let ipld_node = ipld_cbor::decode_block_from_box(&blk).unwrap();
+    let ipld_node = ipld_cbor::IpldNode::from_block(&*blk).unwrap();
 
     println!("thingy1:{:}", c1.to_string());
     println!("{:?}", ipld_node.links()[0]);

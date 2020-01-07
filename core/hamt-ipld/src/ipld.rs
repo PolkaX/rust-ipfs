@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
 use block_format::Block as BlockT;
-use cid::{Cid, CidT, Codec, HasCid};
+use cid::{AsCidRef, Cid, Codec, HasCid};
 use multihash::Hash as MHashEnum;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -73,7 +73,7 @@ impl<B: Blocks> CborIpldStor<B> {
             None
         };
 
-        let node = ipld_cbor::wrap_object_with_codec(v, hash_type, codec)?;
+        let node = ipld_cbor::IpldNode::from_object_with_codec(v, hash_type, codec)?;
         let cid = node.cid().clone(); // this cid is calc from node
         {
             let mut b = self.blocks.write().map_err(|_| Error::Lock)?;

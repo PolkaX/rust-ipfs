@@ -1,6 +1,6 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use crate::error::{Error, Result};
+use crate::error::{MultibaseError, Result};
 
 macro_rules! build_base_enum {
     ( $(#[$attr:meta] $code:expr => $base:ident,)* ) => {
@@ -24,7 +24,7 @@ macro_rules! build_base_enum {
             pub fn from(raw: u8) -> Result<Self> {
         	    match raw {
                     $( $code => Ok(Self::$base), )*
-            	    _ => Err(Error::UnknownBase(raw)),
+            	    _ => Err(MultibaseError::UnknownBase(raw)),
         	    }
             }
 

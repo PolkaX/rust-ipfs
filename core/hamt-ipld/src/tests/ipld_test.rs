@@ -42,7 +42,7 @@ fn test_kv() {
     thingy1.insert("cat".to_string(), "dog".to_string());
     let c1 = cs.put(thingy1).unwrap();
 
-    let c = Obj::Cid(c1.clone());
+    let c = Obj::Cid(c1);
     let mut hash = BTreeMap::new();
     hash.insert("one".into(), c);
     hash.insert("foo".into(), Obj::Text("bar".to_string()));
@@ -51,7 +51,7 @@ fn test_kv() {
     let b = ipld_cbor::dump_object(&thingy2).unwrap();
     println!("{:?}", b);
 
-    let mut node = NodeRc::new(cs.clone());
+    let mut node = NodeRc::new(cs);
     node.set("cat", thingy2).unwrap();
 
     let b = ipld_cbor::dump_object(&node).unwrap();

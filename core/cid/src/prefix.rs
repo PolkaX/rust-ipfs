@@ -3,11 +3,12 @@
 use std::io::Cursor;
 
 use integer_encoding::{VarIntReader, VarIntWriter};
+
 use multihash::Hash;
 
 use crate::cid::Cid;
 use crate::codec::Codec;
-use crate::error::{Error, Result};
+use crate::error::{CidError, Result};
 use crate::version::Version;
 
 /// Prefix represents all metadata of a CID, without the actual content.
@@ -35,7 +36,7 @@ impl Prefix {
 
         let version = Version::from(raw_version)?;
         let codec = Codec::from(raw_codec)?;
-        let mh_type = Hash::from_code(raw_mh_type).ok_or(Error::UnknownHash(raw_mh_type))?;
+        let mh_type = Hash::from_code(raw_mh_type).ok_or(CidError::UnknownHash(raw_mh_type))?;
 
         Ok(Prefix {
             version,
@@ -60,7 +61,7 @@ impl Prefix {
     /// and return a newly constructed CID with the resulting multihash.
     pub fn sum(&self, data: &[u8]) -> Result<Cid> {
         if self.version == Version::V0 && (self.mh_type != Hash::SHA2256 || self.mh_len != 32) {
-            return Err(Error::InvalidV0Prefix);
+            return Err(CidError::InvalidV0Prefix);
         }
 
         let mh = multihash::encode(self.mh_type, data)?;

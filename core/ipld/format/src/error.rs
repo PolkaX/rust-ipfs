@@ -1,9 +1,9 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-/// The special result type for `ipld format`.
+/// Type alias to use this library's [`FormatError`] type in a `Result`.
 pub type Result<T> = std::result::Result<T, FormatError>;
 
-/// The special error type for `ipld format`.
+/// Errors generated from this library.
 #[derive(Debug, thiserror::Error)]
 pub enum FormatError {
     /// The object is not support statistics for a node.

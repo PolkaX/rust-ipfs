@@ -25,9 +25,15 @@ block-format = { package = "rust-block-format", path = "../../block-format" }
 cid = { package = "rust-cid", path = "../../cid", features = ["serde_support"] }
 
 [dev-dependencies]
+criterion = "0.3"
 util = { package = "rust-ipfs-util", path = "../../util" }
 hex-literal = "0.2.1"
+maplit = "1.0"
 
 [features]
-bench = []
 bigint = [ "num-bigint" ]
+
+[[bench]]
+name = "benchmarks"
+path = "benches/benchmarks.rs"
+harness = false

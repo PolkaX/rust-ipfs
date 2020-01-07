@@ -1,10 +1,13 @@
 [package]
 name = "rust-hamt-ipld"
 version = "0.1.0"
-authors = ["Aten <jincxmain@gmail.com>"]
+authors = ["PolkaX <https://github.com/PolkaX>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT/Apache-2.0"
+repository = "https://github.com/PolkaX/rust-ipfs"
+description = "Implementation of the ipld hamt"
+keywords = ["ipfs", "ipld", "hamt"]
 
 [dependencies]
 fasthash = "0.4"

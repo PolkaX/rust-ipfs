@@ -3,8 +3,8 @@ use fasthash::murmur3::hash128;
 
 /// ```go
 /// func (d *digest64) Sum64() uint64 {
-/// 	h1, _ = (*digest128)(d).Sum128()
-/// 	return h1
+///     h1, _ = (*digest128)(d).Sum128()
+///     return h1
 /// }
 /// ```
 /// murmur3 hash for a bytes value. using hash128 but just pick half for result
