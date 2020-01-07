@@ -11,8 +11,8 @@ mod error;
 mod node;
 mod obj;
 
-pub use serde_cbor::Value;
 pub use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
+pub use serde_cbor::Value;
 
 #[cfg(feature = "bigint")]
 pub use self::bigint::CborBigUint;

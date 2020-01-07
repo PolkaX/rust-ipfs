@@ -75,7 +75,11 @@ impl IpldNode {
     }
 
     /// Creates an IPLD Node with the given value, hash type and codec.
-    pub fn from_object_with_codec<T: serde::Serialize>(value: T, hash_type: Hash, codec: Codec) -> Result<Self> {
+    pub fn from_object_with_codec<T: serde::Serialize>(
+        value: T,
+        hash_type: Hash,
+        codec: Codec,
+    ) -> Result<Self> {
         let data = serde_cbor::to_vec(&value)?;
         let obj = serde_cbor::from_slice::<Obj>(&data)?;
         let hash = multihash::encode(hash_type, &data)?;
