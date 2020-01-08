@@ -7,6 +7,7 @@ members = [
     "core/ipld/cbor",
     "core/ipld/format",
     "core/block-format",
+    "core/datastore",
     "core/hamt-ipld",
     "core/util",
     "core/merkledag",
