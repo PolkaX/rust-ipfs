@@ -14,8 +14,8 @@ impl fmt::Display for Key {
     }
 }
 
-const LEFT_SLASH: u8 = '/' as u8;
-const LEFT_SLASH_STR: &'static str = "/";
+pub const LEFT_SLASH: u8 = '/' as u8;
+pub const LEFT_SLASH_STR: &'static str = "/";
 
 pub fn clean<S: AsRef<str>>(s: S) -> String {
     let b = s.as_ref().as_bytes();

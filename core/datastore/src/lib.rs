@@ -1,4 +1,7 @@
+mod datastore;
+mod error;
 mod key;
+mod keytransform;
 #[cfg(test)]
 mod tests;
 
