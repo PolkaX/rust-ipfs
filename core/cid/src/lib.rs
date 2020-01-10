@@ -23,7 +23,7 @@ pub use multihash::{Hash, Multihash};
 pub use self::cid::Cid;
 pub use self::codec::Codec;
 pub use self::error::{CidError, Result};
-pub use self::prefix::{new_prefix_v0, new_prefix_v1, Prefix};
+pub use self::prefix::Prefix;
 #[cfg(feature = "serde_support")]
 pub use self::serde::{deserialize_cid_from_bytes, CID_CBOR_TAG};
 #[cfg(feature = "hascid")]

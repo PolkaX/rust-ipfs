@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use rust_cid::{new_prefix_v0, new_prefix_v1, Cid, Codec, Hash, Prefix, Version};
+use rust_cid::{Cid, Codec, Hash, Prefix, Version};
 
 #[test]
 fn basic_marshalling() {
@@ -127,7 +127,7 @@ fn test_hash() {
 #[test]
 fn test_new_prefix_v0() {
     let data = b"this is some test content";
-    let prefix = new_prefix_v0(Hash::SHA2256);
+    let prefix = Prefix::new_prefix_v0(Hash::SHA2256);
 
     // Construct c1
     let c1 = prefix.sum(data.as_ref()).unwrap();
@@ -173,7 +173,7 @@ fn test_invalid_v0_prefix() {
 #[test]
 fn test_new_prefix_v1() {
     let data = b"this is some test content";
-    let prefix = new_prefix_v1(Codec::DagCBOR, Hash::SHA2256);
+    let prefix = Prefix::new_prefix_v1(Codec::DagCBOR, Hash::SHA2256);
 
     // Construct c1
     let c1 = prefix.sum(data.as_ref()).unwrap();

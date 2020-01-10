@@ -46,6 +46,26 @@ impl Prefix {
         })
     }
 
+    /// A helper function to create the prefix of CIDv0.
+    pub fn new_prefix_v0(hash: Hash) -> Prefix {
+        Prefix {
+            version: Version::V0,
+            codec: Codec::DagProtobuf,
+            mh_type: hash,
+            mh_len: hash.size() as usize,
+        }
+    }
+
+    /// A helper function to create the prefix of CIDv1.
+    pub fn new_prefix_v1(codec: Codec, hash: Hash) -> Prefix {
+        Prefix {
+            version: Version::V1,
+            codec,
+            mh_type: hash,
+            mh_len: hash.size() as usize,
+        }
+    }
+
     /// Convert the prefix to bytes.
     pub fn as_bytes(&self) -> Vec<u8> {
         let mut res = Vec::with_capacity(4);
@@ -69,25 +89,5 @@ impl Prefix {
             Version::V0 => Cid::new_cid_v0(mh),
             Version::V1 => Cid::new_cid_v1(self.codec, mh),
         }
-    }
-}
-
-/// A helper function to create the prefix of CIDv0.
-pub fn new_prefix_v0(hash: Hash) -> Prefix {
-    Prefix {
-        version: Version::V0,
-        codec: Codec::DagProtobuf,
-        mh_type: hash,
-        mh_len: hash.size() as usize,
-    }
-}
-
-/// A helper function to create the prefix of CIDv1.
-pub fn new_prefix_v1(codec: Codec, hash: Hash) -> Prefix {
-    Prefix {
-        version: Version::V1,
-        codec,
-        mh_type: hash,
-        mh_len: hash.size() as usize,
     }
 }
