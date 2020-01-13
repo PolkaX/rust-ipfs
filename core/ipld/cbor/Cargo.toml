@@ -19,7 +19,7 @@ bytes = { version = "0.5", features = ["serde"] }
 num-bigint = { version = "0.2", optional = true }
 multihash = { package = "rust-multihash", path = "../../multihash" }
 
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
 ipld-format = { package = "rust-ipld-format", path = "../format" }
 block-format = { package = "rust-block-format", path = "../../block-format" }
 cid = { package = "rust-cid", path = "../../cid", features = ["serde_support"] }

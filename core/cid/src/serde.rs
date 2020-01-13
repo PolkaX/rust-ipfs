@@ -45,7 +45,7 @@ impl<'de> serde::Deserialize<'de> for Cid {
             Some(CID_CBOR_TAG) | None => {
                 let res = tagged.value.to_vec();
                 let cid = deserialize_cid_from_bytes(&res)
-                    .map_err(|e| D::Error::custom(format!("Cid deserialize failed: {:}", e)))?;
+                    .map_err(|e| D::Error::custom(format!("Cid deserialize failed: {}", e)))?;
                 Ok(cid)
             }
             Some(_) => Err(D::Error::custom("unexpected tag")),

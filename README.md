@@ -1,5 +1,18 @@
 # rust-ipfs
 
+[![Actions Status][ga-svg]][ga-url]
+<!-- [![GitHub License][license-svg]][license-url] -->
+[![dep-svg]][dep-rs]
+
+[ga-svg]: https://github.com/PolkaX/rust-ipfs/workflows/build/badge.svg
+[ga-url]: https://github.com/PolkaX/rust-ipfs/actions
+<!--
+[license-svg]: https://img.shields.io/github/license/PolkaX/rust-ipfs?style=flat-square
+[license-url]: https://github.com/PolkaX/rust-ipfs/blob/master/LICENSE-MIT
+-->
+[dep-svg]: https://deps.rs/repo/github/PolkaX/rust-ipfs/status.svg
+[dep-rs]: https://deps.rs/repo/github/PolkaX/rust-ipfs
+
 ## License
 
 Licensed under either of
