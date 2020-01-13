@@ -1,3 +1,5 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use std::ops::{Deref, DerefMut};
 use std::result;
 use std::sync::RwLock;
@@ -7,14 +9,13 @@ use archery::{RcK, SharedPointer, SharedPointerKind};
 use cid::Cid;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+pub use self::kv::KV;
 use crate::error::*;
 use crate::ipld::{Blocks, CborIpldStor};
-
-use super::{load_node, Node};
+use crate::node::{load_node, Node};
 
 mod kv {
     use serde_cbor::Value;
-    use serde_derive;
     use serde_tuple::*;
     #[derive(Debug, Clone, Eq, PartialEq, Serialize_tuple, Deserialize_tuple)]
     pub struct KV {
@@ -32,8 +33,6 @@ mod kv {
         }
     }
 }
-
-pub use kv::KV;
 
 #[derive(Debug, Clone, Eq, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
 pub enum PContent {

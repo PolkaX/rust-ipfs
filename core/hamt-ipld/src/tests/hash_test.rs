@@ -1,8 +1,12 @@
-use crate::hash::{hash, HashBits};
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
+use crate::hash::HashBits;
 
 #[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_hash() {
+    use crate::hash::hash;
+
     let h1 = hash("abcd");
     let h2 = hash("abce");
 

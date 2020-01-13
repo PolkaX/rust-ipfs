@@ -1,9 +1,10 @@
-use super::*;
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use crate::node::set_bit;
 use archery::RcK;
 use ipld_cbor::struct_to_cbor_value;
-use std::collections::BTreeMap;
+
+use super::*;
+use crate::node::set_bit;
 
 #[test]
 fn test_roundtrip() {
@@ -35,8 +36,11 @@ fn test_basic_bytes_loading() {
 }
 
 #[test]
+#[cfg(not(feature = "test-hash"))]
 fn test_kv() {
     use ipld_cbor::Obj;
+    use std::collections::BTreeMap;
+
     let cs = new_cbor_store();
     let mut thingy1 = HashMap::new();
     thingy1.insert("cat".to_string(), "dog".to_string());

@@ -1,3 +1,7 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
+use std::cmp::Ordering;
+
 #[cfg(not(feature = "test-hash"))]
 use fasthash::murmur3::hash128;
 
@@ -25,11 +29,8 @@ pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 8] {
 #[cfg(feature = "test-hash")]
 pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 32] {
     let mut bytes = [0_u8; 32];
-
-    let mut index = 0;
-    for i in v.as_ref().iter().take(32) {
-        bytes[index] = *i;
-        index += 1;
+    for (index, byte) in v.as_ref().iter().take(32).enumerate() {
+        bytes[index] = *byte;
     }
     bytes
 }
@@ -77,29 +78,33 @@ impl<'a> HashBits<'a> {
         let left_bit = 8 - (self.consumed % 8); // consumed % 8, left_bit is less and equal than 8
 
         let cur_byte = self.b[cur_byte_index];
-        if i == left_bit {
-            // i and left_bit must less or equal than 8
-            let out = mkmask(i) & cur_byte;
-            self.consumed += i;
-            out as u32
-        } else if i < left_bit {
-            // i must less than 8, left_bit must less or equal than 8
-            // e.g. cur_byte: 0b11111111, self.consumed % 8=1, left_bit=7, i=2, then:
-            // a=0b_1111111
-            let a = cur_byte & mkmask(left_bit); // mask out the high bits we don't want, do not need consumed bits
-                                                 // b=0b_11_____
-            let b = a & (!mkmask(left_bit - i)); // mask out the low bits we don't want, do not need unused bits
-                                                 // c=0b______11
-            let c = b as u32 >> left_bit - i; // shift whats left down
-            self.consumed += i;
-            c
-        } else {
-            // must beyond current byte, pick all left_bit
-            let mut out = (mkmask(left_bit) & cur_byte) as u32;
-            out <<= i - left_bit;
-            self.consumed += left_bit;
-            out += self.next_bit(i - left_bit);
-            out
+        match i.cmp(&left_bit) {
+            Ordering::Equal => {
+                // i and left_bit must less or equal than 8
+                let out = mkmask(i) & cur_byte;
+                self.consumed += i;
+                out as u32
+            }
+            Ordering::Less => {
+                // i must less than 8, left_bit must less or equal than 8
+                // e.g. cur_byte: 0b11111111, self.consumed % 8=1, left_bit=7, i=2, then:
+                // a=0b_1111111
+                let a = cur_byte & mkmask(left_bit); // mask out the high bits we don't want, do not need consumed bits
+                                                     // b=0b_11_____
+                let b = a & (!mkmask(left_bit - i)); // mask out the low bits we don't want, do not need unused bits
+                                                     // c=0b______11
+                let c = b as u32 >> (left_bit - i); // shift whats left down
+                self.consumed += i;
+                c
+            }
+            Ordering::Greater => {
+                // must beyond current byte, pick all left_bit
+                let mut out = (mkmask(left_bit) & cur_byte) as u32;
+                out <<= i - left_bit;
+                self.consumed += left_bit;
+                out += self.next_bit(i - left_bit);
+                out
+            }
         }
     }
 }
