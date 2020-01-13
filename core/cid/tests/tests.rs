@@ -97,9 +97,9 @@ fn from() {
     let the_hash = "QmdfTbBqBPQ7VNxZEYEj14VmRuZBkqFbiwReogJgS1zR1n";
 
     let cases = vec![
-        format!("/ipfs/{:}", &the_hash),
-        format!("https://ipfs.io/ipfs/{:}", &the_hash),
-        format!("http://localhost:8080/ipfs/{:}", &the_hash),
+        format!("/ipfs/{}", &the_hash),
+        format!("https://ipfs.io/ipfs/{}", &the_hash),
+        format!("http://localhost:8080/ipfs/{}", &the_hash),
     ];
 
     for case in cases {

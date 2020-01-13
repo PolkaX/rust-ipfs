@@ -394,6 +394,6 @@ fn test_value_linking() {
     println!("{:?}", blk.raw_data().to_vec());
     let ipld_node = ipld_cbor::IpldNode::from_block(&*blk).unwrap();
 
-    println!("thingy1:{:}", c1.to_string());
+    println!("thingy1:{}", c1.to_string());
     println!("{:?}", ipld_node.links()[0]);
 }
