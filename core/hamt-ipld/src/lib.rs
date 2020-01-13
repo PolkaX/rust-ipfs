@@ -3,6 +3,7 @@
 //! A implementation of `ipld hamt` in Rust.
 
 #![feature(matches_macro)]
+#![allow(clippy::bool_comparison, clippy::type_complexity)]
 
 mod error;
 mod hash;
