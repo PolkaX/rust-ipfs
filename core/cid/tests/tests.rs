@@ -110,7 +110,7 @@ fn from() {
 }
 
 #[test]
-#[allow(clippy::mutable_key_type)]
+//#[allow(clippy::mutable_key_type)]
 fn test_hash() {
     let data: Vec<u8> = vec![1, 2, 3];
     let prefix = Prefix {
