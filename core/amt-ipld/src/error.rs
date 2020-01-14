@@ -1,7 +1,7 @@
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, AmtIpldError>;
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum AmtIpldError {
     #[error("blockstore error, err:{0}")]
     Blockstore(#[from] blockstore::BlockstoreError),
 
