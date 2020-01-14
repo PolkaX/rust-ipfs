@@ -40,12 +40,7 @@ where
     bs: Rc<RefCell<B>>,
 }
 
-pub enum Content {
-    Link(Cid),
-    Val(Value),
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Node {
     bitmap: usize,
     links: Vec<Cid>,
@@ -53,6 +48,26 @@ pub struct Node {
 
     // cache
     cache: [RefCell<Option<Box<Node>>>; WIDTH],
+}
+
+#[cfg(test)]
+pub fn create_node(bitmap: usize, links: Vec<Cid>, values: Vec<Value>) -> Node {
+    Node {
+        bitmap,
+        links,
+        values,
+        cache: Default::default(),
+    }
+}
+
+#[cfg(test)]
+pub fn create_root<B: Blocks>(height: u64, count: u64, node: Node, bs: Rc<RefCell<B>>) -> Root<B> {
+    Root {
+        height,
+        count,
+        node,
+        bs,
+    }
 }
 
 impl<B> Root<B>
