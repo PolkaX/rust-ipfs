@@ -5,7 +5,7 @@ mod tests;
 mod trait_impl;
 
 use std::cell::RefCell;
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use serde::Serialize;
@@ -40,7 +40,7 @@ where
     bs: Rc<RefCell<B>>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Node {
     bitmap: usize,
     links: Vec<Cid>,
@@ -158,7 +158,7 @@ impl Node {
     where
         B: Blocks,
     {
-        // it's root node
+        // it's leaf node
         if height == 0 {
             let pos = index(key, shift);
             let exist = self.get_bit(pos);
@@ -173,21 +173,17 @@ impl Node {
         }
 
         let i = index(height, shift);
-        let sub_node = self.load_node_with_creating(bs.clone(), i, true)?;
-        if let Some(node) = sub_node.borrow_mut().deref_mut() {
+        self.load_node_with_creating(bs.clone(), i, true, |node| {
             node.set(bs.clone(), height - 1, key, v, shift + BITS_PER_SUBKEY)
-        } else {
-            unreachable!("")
-        }
+        })
     }
 
-    fn load_node<B: Blocks>(
-        &self,
-        bs: Rc<RefCell<B>>,
-        index: usize,
-    ) -> Result<&RefCell<Option<Box<Node>>>> {
-        if self.cache[index].borrow().is_some() {
-            return Ok(&self.cache[index]);
+    fn load_node<B: Blocks, F, R>(&self, bs: Rc<RefCell<B>>, index: usize, f: F) -> Result<R>
+    where
+        F: Fn(&Self) -> Result<R>,
+    {
+        if let Some(node) = self.cache[index].borrow().deref() {
+            return f(node);
         }
         if !self.get_bit(index) {
             return Err(AmtIpldError::Tmp);
@@ -195,21 +191,25 @@ impl Node {
 
         let pos = self.index_for_bitpos(index);
         let n: Node = bs.borrow().get(&self.links[pos])?;
-
+        let r = f(&n);
         *self.cache[index].borrow_mut().deref_mut() = Some(Box::new(n));
-        Ok(&self.cache[index])
+        r
     }
 
-    fn load_node_with_creating<B: Blocks>(
+    fn load_node_with_creating<B: Blocks, F, R>(
         &mut self,
         bs: Rc<RefCell<B>>,
         index: usize,
         create: bool,
-    ) -> Result<&RefCell<Option<Box<Node>>>> {
-        if self.cache[index].borrow().is_some() {
-            return Ok(&self.cache[index]);
+        f: F,
+    ) -> Result<R>
+    where
+        F: FnOnce(&mut Self) -> Result<R>,
+    {
+        if let Some(n) = self.cache[index].borrow_mut().deref_mut() {
+            return f(n);
         }
-        let n = if self.get_bit(index) {
+        let mut n = if self.get_bit(index) {
             let pos = self.index_for_bitpos(index);
             let n: Node = bs.borrow().get(&self.links[pos])?;
             n
@@ -222,7 +222,8 @@ impl Node {
                 return Err(AmtIpldError::Tmp);
             }
         };
+        let r = f(&mut n);
         *self.cache[index].borrow_mut().deref_mut() = Some(Box::new(n));
-        Ok(&self.cache[index])
+        r
     }
 }
