@@ -78,13 +78,7 @@ where
         Root::<B> {
             height: 0,
             count: 0,
-            node: Node {
-                bitmap: 0,
-                links: vec![],
-                values: vec![],
-
-                cache: Default::default(),
-            },
+            node: Node::new(),
             bs: Rc::new(RefCell::new(bs)),
         }
     }
@@ -107,12 +101,7 @@ where
         let mut tmp_k = k >> (BITS_PER_SUBKEY * (self.height + 1));
         while tmp_k != 0 {
             let cid = self.bs.borrow_mut().put(&self.node)?;
-            self.node = Node {
-                bitmap: 1,
-                links: vec![cid],
-                values: vec![],
-                cache: Default::default(),
-            };
+            self.node = Node::new_with_cid(cid);
             tmp_k >>= BITS_PER_SUBKEY;
             self.height += 1;
         }
@@ -126,6 +115,24 @@ where
 }
 
 impl Node {
+    pub fn new() -> Self {
+        Node {
+            bitmap: 0,
+            links: vec![],
+            values: vec![],
+            cache: Default::default(),
+        }
+    }
+
+    pub fn new_with_cid(cid: Cid) -> Self {
+        Node {
+            bitmap: 1,
+            links: vec![cid],
+            values: vec![],
+            cache: Default::default(),
+        }
+    }
+
     fn set_bit(&mut self, index: usize) {
         let b = 1 << index;
         self.bitmap |= b;
@@ -208,12 +215,7 @@ impl Node {
             n
         } else {
             if create {
-                let sub_node = Node {
-                    bitmap: 0,
-                    links: vec![],
-                    values: vec![],
-                    cache: Default::default(),
-                };
+                let sub_node = Node::new();
                 self.set_bit(index);
                 sub_node
             } else {
