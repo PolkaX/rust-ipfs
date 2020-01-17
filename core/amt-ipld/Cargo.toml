@@ -20,3 +20,4 @@ block-format = { package = "rust-block-format", path = "../block-format" }
 
 [dev-dependencies]
 util = { package = "rust-ipfs-util", path = "../util" }
+rand = "0.7"

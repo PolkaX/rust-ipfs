@@ -29,7 +29,7 @@ fn node_test() {
 fn root_test() {
     let cid = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
     let node = create_node(1, vec![cid], vec![]);
-    let db = db();
+    let db = db_refcell();
     let root = create_root(4, 100, node, db.clone());
     let v = serde_cbor::to_vec(&root).unwrap();
     println!("{:?}", v);

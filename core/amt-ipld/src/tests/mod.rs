@@ -1,3 +1,4 @@
+mod amt_test;
 mod cbor_test;
 
 use cid::{Cid, Codec, Hash as MHashEnum, Prefix};
@@ -28,6 +29,10 @@ impl Blocks for DB {
     }
 }
 
-fn db() -> Rc<RefCell<DB>> {
+pub fn db_refcell() -> Rc<RefCell<DB>> {
     Rc::new(RefCell::new(Default::default()))
+}
+
+pub fn db() -> DB {
+    Default::default()
 }

@@ -30,3 +30,13 @@ pub use self::serde::{deserialize_cid_from_bytes, CID_CBOR_TAG};
 pub use self::traits::HasCid;
 pub use self::traits::{AsCidRef, ToCid};
 pub use self::version::Version;
+
+/// a place holder for cid
+pub fn zero_cid() -> Cid {
+    use multihash::encode;
+    Cid::new_cid_v1(
+        Codec::Raw,
+        encode(Hash::Identity, b"").expect("should not happen"),
+    )
+    .expect("should not happen")
+}
