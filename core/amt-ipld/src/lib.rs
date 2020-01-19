@@ -14,7 +14,10 @@ use cid::{zero_cid, Cid};
 
 use crate::blocks::Blocks;
 use crate::error::*;
+use crate::internal::RefCellTrick;
 use crate::trait_impl::PartRoot;
+use std::borrow::{Borrow, BorrowMut};
+use std::fmt::Debug;
 
 const WIDTH: usize = 8; // 2^3
 const BITS_PER_SUBKEY: u64 = 3;
@@ -28,29 +31,132 @@ fn mask(h: u64, s: u64) -> usize {
     1 << index(h, s)
 }
 
-pub struct Root<B>
+pub struct Root<B, NodeRef>
 where
     B: Blocks,
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
 {
     height: u64,
     count: u64,
-    node: Node,
+    node: Node<NodeRef>,
 
     bs: B,
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct Node {
+#[derive(Clone, Debug)]
+pub struct Node<NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug> {
     bitmap: usize,
     links: Vec<Cid>,
     values: Vec<Value>,
 
     // cache
-    cache: [RefCell<Option<Box<Node>>>; WIDTH],
+    cache: [NodeRef; WIDTH],
 }
 
+pub trait NodeRefLike: Debug + Default {
+    type Target;
+    fn load_node<B, F, R>(
+        &self,
+        parent: &Self::Target,
+        index: usize,
+        bs: Rc<RefCell<B>>,
+        f: F,
+    ) -> Result<R>
+    where
+        B: Blocks,
+        F: Fn(&Self::Target) -> Result<R>,
+        Self: Sized;
+
+    fn load_node_with_creating<B, F, R>(
+        &mut self,
+        parent: &mut Self::Target,
+        index: usize,
+        bs: Rc<RefCell<B>>,
+        create: bool,
+        f: F,
+    ) -> Result<R>
+    where
+        B: Blocks,
+        F: FnMut(&mut Self::Target) -> Result<R>,
+        Self: Sized;
+}
+
+pub mod internal {
+    use super::Node;
+    use std::cell::RefCell;
+
+    #[derive(Debug, Default)]
+    pub struct RefCellTrick(pub RefCell<Option<Box<Node<RefCellTrick>>>>);
+    // TODO RwLockTrick
+}
+
+impl NodeRefLike for internal::RefCellTrick {
+    type Target = Node<internal::RefCellTrick>;
+
+    fn load_node<B, F, R>(
+        &self,
+        parent: &Self::Target,
+        index: usize,
+        bs: Rc<RefCell<B>>,
+        mut f: F,
+    ) -> Result<R>
+    where
+        B: Blocks,
+        F: Fn(&Self::Target) -> Result<R>,
+    {
+        if let Some(node) = self.0.borrow().deref() {
+            return f(node);
+        }
+        if !parent.get_bit(index) {
+            return Err(AmtIpldError::Tmp);
+        }
+        let pos = parent.index_for_bitpos(index);
+        let n: Node<Self> = bs.deref().borrow().get(&parent.links[pos])?;
+        let r = f(&n);
+        *self.0.borrow_mut().deref_mut() = Some(Box::new(n));
+        r
+    }
+    
+    fn load_node_with_creating<B, F, R>(
+        &mut self,
+        parent: &mut Self::Target,
+        index: usize,
+        bs: Rc<RefCell<B>>,
+        create: bool,
+        mut f: F,
+    ) -> Result<R>
+    where
+        B: Blocks,
+        F: FnMut(&mut Self::Target) -> Result<R>,
+    {
+        if let Some(node) = self.0.borrow_mut().deref_mut() {
+            return f(node);
+        }
+        let mut n = if parent.get_bit(index) {
+            let pos = parent.index_for_bitpos(index);
+            let n: Node<Self> = bs.deref().borrow().get(&parent.links[pos])?;
+            n
+        } else {
+            if create {
+                let sub_node = Node::new();
+                parent.set_bit(index);
+                sub_node
+            } else {
+                return Err(AmtIpldError::Tmp);
+            }
+        };
+        let r = f(&mut n);
+        *self.0.borrow_mut().deref_mut() = Some(Box::new(n));
+        r
+    }
+}
+
+/// for thread unsafe
+pub type RefCellNode = Node<internal::RefCellTrick>;
+pub type RefCellRoot<B> = Root<B, internal::RefCellTrick>;
+
 #[cfg(test)]
-pub fn create_node(bitmap: usize, links: Vec<Cid>, values: Vec<Value>) -> Node {
+pub fn create_node(bitmap: usize, links: Vec<Cid>, values: Vec<Value>) -> RefCellNode {
     Node {
         bitmap,
         links,
@@ -60,7 +166,12 @@ pub fn create_node(bitmap: usize, links: Vec<Cid>, values: Vec<Value>) -> Node {
 }
 
 #[cfg(test)]
-pub fn create_root<B: Blocks>(height: u64, count: u64, node: Node, bs: B) -> Root<B> {
+pub fn create_root<B: Blocks>(
+    height: u64,
+    count: u64,
+    node: RefCellNode,
+    bs: Rc<RefCell<B>>,
+) -> RefCellRoot<B> {
     Root {
         height,
         count,
@@ -69,26 +180,22 @@ pub fn create_root<B: Blocks>(height: u64, count: u64, node: Node, bs: B) -> Roo
     }
 }
 
-impl<B> Root<B>
+impl<B, NodeRef> Root<B, NodeRef>
 where
     B: Blocks,
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
 {
     pub fn new(bs: B) -> Self {
-        Root::<B> {
+        Root::<B, NodeRef> {
             height: 0,
             count: 0,
-            node: Node::new(),
-            bs,
+            node: Node::<NodeRef>::new(),
+            bs: Rc::new(RefCell::new(bs)),
         }
     }
 
-    pub fn load(cid: &Cid, bs: B) -> Result<Self> {
-        let part_root: PartRoot = bs.get(cid)?;
-        Ok(Self::from_partroot(part_root, bs))
-    }
-
-    pub fn from_partroot(part_root: PartRoot, bs: B) -> Self {
-        Root::<B> {
+    pub fn from_partroot(part_root: PartRoot<NodeRef>, bs: Rc<RefCell<B>>) -> Self {
+        Root::<B, NodeRef> {
             height: part_root.0,
             count: part_root.1,
             node: part_root.2,
@@ -106,14 +213,11 @@ where
         // extend amt tree first
         // if current key large then tree capacity, create a new root, and move current root be
         // sub node of new root, so that the tree is been extended.
-        let mut tmp = k >> (BITS_PER_SUBKEY * (self.height + 1));
-        while tmp != 0 {
-            if !self.node.empty() {
-                self.node.flush(self.bs.clone(), self.height)?;
-                let cid = self.bs.put(&self.node)?;
-                self.node = Node::new_with_cid(cid);
-            }
-            tmp >>= BITS_PER_SUBKEY;
+        let mut tmp_k = k >> (BITS_PER_SUBKEY * (self.height + 1));
+        while tmp_k != 0 {
+            let cid = self.bs.deref().borrow_mut().put(&self.node)?;
+            self.node = Node::new_with_cid(cid);
+            tmp_k >>= BITS_PER_SUBKEY;
             self.height += 1;
         }
         let current_shift = BITS_PER_SUBKEY * self.height;
@@ -147,9 +251,12 @@ where
     }
 }
 
-impl Node {
+impl<NodeRef> Node<NodeRef>
+where
+    NodeRef: NodeRefLike<Target=Self> + Debug,
+{
     pub fn new() -> Self {
-        Node {
+        Node::<NodeRef> {
             bitmap: 0,
             links: vec![],
             values: vec![],
@@ -158,7 +265,7 @@ impl Node {
     }
 
     pub fn new_with_cid(cid: Cid) -> Self {
-        Node {
+        Node::<NodeRef> {
             bitmap: 1,
             links: vec![cid],
             values: vec![],
@@ -202,124 +309,66 @@ impl Node {
             return Ok(!exist);
         }
 
-        let i = index(key, shift);
-        self.load_node_with_creating(bs.clone(), i, true, |node| {
-            node.set(bs.clone(), height - 1, key, v, shift - BITS_PER_SUBKEY)
+        let i = index(height, shift);
+        self.cache[i].load_node_with_creating(self, i, bs.clone(), true, |node| {
+            node.set(bs.clone(), height - 1, key, v, shift + BITS_PER_SUBKEY)
         })
+        //        let sub_node = self.load_node_with_creating(bs.clone(), i, true)?;
+        //        if let Some(node) = sub_node.borrow_mut().deref_mut() {
+        //            node.set(bs.clone(), height - 1, key, v, shift + BITS_PER_SUBKEY)
+        //        } else {
+        //            unreachable!("")
+        //        }
+        //        Ok(true)
     }
 
-    pub fn get<B>(&self, bs: B, height: u64, key: u64, shift: u64) -> Result<Value>
-    where
-        B: Blocks,
-    {
-        let pos = index(key, shift);
-        if !self.get_bit(pos) {
+    fn load_node<B: Blocks>(
+        &self,
+        bs: Rc<RefCell<B>>,
+        index: usize,
+    ) -> Result<&RefCell<Option<Box<Node>>>> {
+        if self.cache[index].borrow().is_some() {
+            return Ok(&self.cache[index]);
+        }
+        if !self.get_bit(index) {
             return Err(AmtIpldError::Tmp);
         }
 
-        // touch leaf node, fetch value
-        if height == 0 {
-            let index = self.index_for_bitpos(pos);
-            let v_ref = self
-                .values
-                .get(index)
-                .expect("value list must match bitmap");
-            return Ok(v_ref.clone());
-        }
+        let pos = self.index_for_bitpos(index);
+        let n: Node = bs.borrow().get(&self.links[pos])?;
 
-        self.load_node(bs.clone(), pos, |sub_node| {
-            sub_node.get(bs.clone(), height - 1, key, shift - BITS_PER_SUBKEY)
-        })
+        *self.cache[index].borrow_mut().deref_mut() = Some(Box::new(n));
+        Ok(&self.cache[index])
     }
 
-    pub fn flush<B>(&mut self, bs: B, depth: u64) -> Result<()>
-    where
-        B: Blocks,
-    {
-        if depth == 0 {
-            // do nothing for leaf
-            return Ok(());
-        }
-
-        for i in 0..WIDTH {
-            let cid_option = self.try_get_cache(i, |sub_node| -> Result<Cid> {
-                sub_node.flush(bs.clone(), depth - 1)?;
-                let db = bs.clone();
-                let cid = db.put(sub_node)?;
-                Ok(cid)
-            })?;
-
-            if let Some(cid) = cid_option {
-                // refresh link cid from cache
-                let link_index = self.index_for_bitpos(i);
-                let old = self
-                    .links
-                    .get_mut(link_index)
-                    .expect("link must exist in flush");
-                *old = cid;
-            }
-        }
-        Ok(())
-    }
-
-    fn try_get_cache<F, R>(&self, index: usize, mut f: F) -> Result<Option<R>>
-    where
-        F: FnMut(&mut Self) -> Result<R>,
-    {
-        if let Some(node) = self.cache[index].borrow_mut().deref_mut() {
-            return f(node).map(Some);
-        }
-        Ok(None)
-    }
-
-    fn load_node<B: Blocks, F, R>(&self, bs: B, pos: usize, f: F) -> Result<R>
-    where
-        F: Fn(&Self) -> Result<R>,
-    {
-        if let Some(node) = self.cache[pos].borrow().deref() {
-            return f(node);
-        }
-        if !self.get_bit(pos) {
-            return Err(AmtIpldError::Tmp);
-        }
-
-        let pos = self.index_for_bitpos(pos);
-        let n: Node = bs.get(&self.links[pos])?;
-        let r = f(&n);
-        *self.cache[pos].borrow_mut().deref_mut() = Some(Box::new(n));
-        r
-    }
-
-    fn load_node_with_creating<B: Blocks, F, R>(
+    fn load_node_with_creating<B: Blocks>(
         &mut self,
-        bs: B,
-        pos: usize,
+        bs: Rc<RefCell<B>>,
+        index: usize,
         create: bool,
-        f: F,
-    ) -> Result<R>
-    where
-        F: FnOnce(&mut Self) -> Result<R>,
-    {
-        if let Some(n) = self.cache[pos].borrow_mut().deref_mut() {
-            return f(n);
+    ) -> Result<&RefCell<Option<Box<Node>>>> {
+        if self.cache[index].borrow().is_some() {
+            return Ok(&self.cache[index]);
         }
-        let index = self.index_for_bitpos(pos);
-        let mut n = if self.get_bit(pos) {
-            let n: Node = bs.get(&self.links[index])?;
+        let n = if self.get_bit(index) {
+            let pos = self.index_for_bitpos(index);
+            let n: Node = bs.borrow().get(&self.links[pos])?;
             n
         } else {
             if create {
-                let sub_node = Node::new();
-                self.set_bit(pos);
-                let mock = zero_cid();
-                self.links.insert(index, mock);
+                let sub_node = Node {
+                    bitmap: 0,
+                    links: vec![],
+                    values: vec![],
+                    cache: Default::default(),
+                };
+                self.set_bit(index);
                 sub_node
             } else {
                 return Err(AmtIpldError::Tmp);
             }
         };
-        let r = f(&mut n);
-        *self.cache[pos].borrow_mut().deref_mut() = Some(Box::new(n));
-        r
+        *self.cache[index].borrow_mut().deref_mut() = Some(Box::new(n));
+        Ok(&self.cache[index])
     }
 }

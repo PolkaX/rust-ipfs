@@ -7,11 +7,13 @@ use serde_cbor::Value;
 use cid::Cid;
 
 use crate::blocks::Blocks;
-use crate::{Node, Root};
+use crate::{Node, NodeRefLike, Root};
+use std::fmt::Debug;
 
-impl<B> Serialize for Root<B>
+impl<B, NodeRef> Serialize for Root<B, NodeRef>
 where
     B: Blocks,
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
 {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
     where
@@ -21,20 +23,27 @@ where
     }
 }
 
-impl<B> Eq for Root<B> where B: Blocks {}
-
-impl<B> PartialEq for Root<B>
+impl<B, NodeRef> Eq for Root<B, NodeRef>
 where
     B: Blocks,
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
+{
+}
+
+impl<B, NodeRef> PartialEq for Root<B, NodeRef>
+where
+    B: Blocks,
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
 {
     fn eq(&self, other: &Self) -> bool {
         self.height.eq(&other.height) && self.count.eq(&other.count) && self.node.eq(&other.node)
     }
 }
 
-impl<B> fmt::Debug for Root<B>
+impl<B, NodeRef> fmt::Debug for Root<B, NodeRef>
 where
     B: Blocks,
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -46,18 +55,26 @@ where
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PartRoot(pub u64, pub u64, pub Node);
+pub struct PartRoot<NodeRef>(pub u64, pub u64, pub Node<NodeRef>)
+where
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug;
 
-impl PartRoot {
-    pub fn into_root<B>(self, bs: B) -> Root<B>
+impl<NodeRef> PartRoot<NodeRef>
+where
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
+{
+    pub fn into_root<B>(self, bs: Rc<RefCell<B>>) -> Root<B, NodeRef>
     where
         B: Blocks,
     {
-        Root::<B>::from_partroot(self, bs)
+        Root::<B, NodeRef>::from_partroot(self, bs)
     }
 }
 
-impl Serialize for Node {
+impl<NodeRef> Serialize for Node<NodeRef>
+where
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
+{
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -75,7 +92,10 @@ impl Serialize for Node {
 
 #[derive(Deserialize)]
 struct NodeVisitor(serde_bytes::ByteBuf, Vec<Cid>, Vec<Value>);
-impl<'de> Deserialize<'de> for Node {
+impl<'de, NodeRef> Deserialize<'de> for Node<NodeRef>
+where
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
+{
     fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -97,13 +117,15 @@ impl<'de> Deserialize<'de> for Node {
     }
 }
 
-impl Clone for Node {
-    fn clone(&self) -> Self {
-        Node {
-            bitmap: self.bitmap,
-            links: self.links.clone(),
-            values: self.values.clone(),
-            cache: Default::default(),
-        }
+impl<NodeRef> Eq for Node<NodeRef> where NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug {}
+
+impl<NodeRef> PartialEq for Node<NodeRef>
+where
+    NodeRef: NodeRefLike<Target=Node<NodeRef>> + Debug,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.bitmap.eq(&other.bitmap)
+            && self.links.eq(&other.links)
+            && self.values.eq(&other.values)
     }
 }
