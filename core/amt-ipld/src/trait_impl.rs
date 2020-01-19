@@ -96,14 +96,3 @@ impl<'de> Deserialize<'de> for Node {
         })
     }
 }
-
-impl Clone for Node {
-    fn clone(&self) -> Self {
-        Node {
-            bitmap: self.bitmap,
-            links: self.links.clone(),
-            values: self.values.clone(),
-            cache: Default::default(),
-        }
-    }
-}

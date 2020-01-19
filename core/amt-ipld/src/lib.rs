@@ -140,11 +140,45 @@ where
         Ok(output)
     }
 
+    pub fn delete(&mut self, k: u64) -> Result<()> {
+        let current_shift = BITS_PER_SUBKEY * self.height;
+        self.node
+            .delete(self.bs.clone(), self.height, k, current_shift)?;
+        self.count -= 1;
+
+        while self.node.bitmap == 1 && self.height > 0 {
+            // the `self.node.cache[;]` would be released with `self.node` releasing,
+            // and self.node would be replaced by `sub` later.
+            // thus, we use an `empty` node replace the `self.node.cache[i]`, passing to outside,
+            // and use the `empty` node replace with self.node.
+            // if failed in `load_node_with_creating`, the replacing would not happen,
+            // thus do not wrong about the tree would be corrupted
+            // notice only allow in single thread
+            let sub = self
+                .node
+                .load_node_with_creating(self.bs.clone(), 0, false, |node| {
+                    let mut empty = Node::new();
+                    std::mem::swap(node, &mut empty);
+                    Ok(empty)
+                })?;
+            self.node = sub;
+            self.height -= 1;
+        }
+
+        Ok(())
+    }
+
     pub fn flush(&mut self) -> Result<Cid> {
         self.node.flush(self.bs.clone(), self.height)?;
         let cid = self.bs.put(&self)?;
         Ok(cid)
     }
+}
+
+enum CacheStatus {
+    Clear,
+    NotExist,
+    Exist,
 }
 
 impl Node {
@@ -169,6 +203,11 @@ impl Node {
     fn set_bit(&mut self, index: usize) {
         let b = 1 << index;
         self.bitmap |= b;
+    }
+
+    fn unset_bit(&mut self, index: usize) {
+        let b = 1 << index;
+        self.bitmap &= !b
     }
 
     fn get_bit(&self, index: usize) -> bool {
@@ -232,6 +271,30 @@ impl Node {
         })
     }
 
+    pub fn delete<B>(&mut self, bs: B, height: u64, key: u64, shift: u64) -> Result<()>
+    where
+        B: Blocks,
+    {
+        let pos = index(key, shift);
+        if !self.get_bit(pos) {
+            return Err(AmtIpldError::Tmp);
+        }
+        if height == 0 {
+            self.unset_bit(pos);
+            self.values.remove(pos);
+            return Ok(());
+        }
+
+        let i = index(key, shift);
+        self.load_node_with_creating(bs.clone(), i, false, |node| {
+            node.delete(bs.clone(), height - 1, key, shift - BITS_PER_SUBKEY)
+        })?;
+        if let CacheStatus::Clear = self.try_clear_cache(i) {
+            self.unset_bit(i)
+        }
+        Ok(())
+    }
+
     pub fn flush<B>(&mut self, bs: B, depth: u64) -> Result<()>
     where
         B: Blocks,
@@ -260,6 +323,21 @@ impl Node {
             }
         }
         Ok(())
+    }
+
+    fn try_clear_cache(&mut self, index: usize) -> CacheStatus {
+        let mut borrow = self.cache[index].borrow_mut();
+        if let Some(ref n) = borrow.deref() {
+            if n.empty() {
+                // clear cache for index
+                *borrow = None;
+                CacheStatus::Clear
+            } else {
+                CacheStatus::Exist
+            }
+        } else {
+            CacheStatus::NotExist
+        }
     }
 
     fn try_get_cache<F, R>(&self, index: usize, mut f: F) -> Result<Option<R>>
