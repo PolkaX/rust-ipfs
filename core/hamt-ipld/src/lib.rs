@@ -2,8 +2,6 @@
 
 //! A implementation of `ipld hamt` in Rust.
 
-#![feature(matches_macro)]
-
 mod error;
 mod hash;
 mod ipld;

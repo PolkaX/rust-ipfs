@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
 use std::result;
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
@@ -51,7 +49,7 @@ where
 pub struct PartRoot(pub u64, pub u64, pub Node);
 
 impl PartRoot {
-    pub fn into_root<B>(self, bs: Rc<RefCell<B>>) -> Root<B>
+    pub fn into_root<B>(self, bs: B) -> Root<B>
     where
         B: Blocks,
     {

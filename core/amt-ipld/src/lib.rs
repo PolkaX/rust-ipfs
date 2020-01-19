@@ -6,7 +6,6 @@ mod trait_impl;
 
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_cbor::Value;
@@ -37,7 +36,7 @@ where
     count: u64,
     node: Node,
 
-    bs: Rc<RefCell<B>>,
+    bs: B,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -61,7 +60,7 @@ pub fn create_node(bitmap: usize, links: Vec<Cid>, values: Vec<Value>) -> Node {
 }
 
 #[cfg(test)]
-pub fn create_root<B: Blocks>(height: u64, count: u64, node: Node, bs: Rc<RefCell<B>>) -> Root<B> {
+pub fn create_root<B: Blocks>(height: u64, count: u64, node: Node, bs: B) -> Root<B> {
     Root {
         height,
         count,
@@ -79,17 +78,26 @@ where
             height: 0,
             count: 0,
             node: Node::new(),
-            bs: Rc::new(RefCell::new(bs)),
+            bs,
         }
     }
 
-    pub fn from_partroot(part_root: PartRoot, bs: Rc<RefCell<B>>) -> Self {
+    pub fn load(cid: &Cid, bs: B) -> Result<Self> {
+        let part_root: PartRoot = bs.get(cid)?;
+        Ok(Self::from_partroot(part_root, bs))
+    }
+
+    pub fn from_partroot(part_root: PartRoot, bs: B) -> Self {
         Root::<B> {
             height: part_root.0,
             count: part_root.1,
             node: part_root.2,
             bs,
         }
+    }
+
+    pub fn count(&self) -> u64 {
+        self.count
     }
 
     pub fn set<Input: Serialize>(&mut self, k: u64, input: Input) -> Result<()> {
@@ -102,7 +110,7 @@ where
         while tmp != 0 {
             if !self.node.empty() {
                 self.node.flush(self.bs.clone(), self.height)?;
-                let cid = self.bs.borrow_mut().put(&self.node)?;
+                let cid = self.bs.put(&self.node)?;
                 self.node = Node::new_with_cid(cid);
             }
             tmp >>= BITS_PER_SUBKEY;
@@ -134,7 +142,7 @@ where
 
     pub fn flush(&mut self) -> Result<Cid> {
         self.node.flush(self.bs.clone(), self.height)?;
-        let cid = self.bs.borrow_mut().put(&self)?;
+        let cid = self.bs.put(&self)?;
         Ok(cid)
     }
 }
@@ -176,14 +184,7 @@ impl Node {
         self.bitmap == 0
     }
 
-    pub fn set<B>(
-        &mut self,
-        bs: Rc<RefCell<B>>,
-        height: u64,
-        key: u64,
-        v: Value,
-        shift: u64,
-    ) -> Result<bool>
+    pub fn set<B>(&mut self, bs: B, height: u64, key: u64, v: Value, shift: u64) -> Result<bool>
     where
         B: Blocks,
     {
@@ -207,28 +208,31 @@ impl Node {
         })
     }
 
-    pub fn get<B>(&self, bs: Rc<RefCell<B>>, height: u64, key: u64, shift: u64) -> Result<Value>
+    pub fn get<B>(&self, bs: B, height: u64, key: u64, shift: u64) -> Result<Value>
     where
         B: Blocks,
     {
-        let i = index(height, shift);
-        if !self.get_bit(i) {
+        let pos = index(key, shift);
+        if !self.get_bit(pos) {
             return Err(AmtIpldError::Tmp);
         }
 
         // touch leaf node, fetch value
         if height == 0 {
-            let pos = self.index_for_bitpos(i);
-            let v_ref = self.values.get(pos).expect("value list must match bitmap");
+            let index = self.index_for_bitpos(pos);
+            let v_ref = self
+                .values
+                .get(index)
+                .expect("value list must match bitmap");
             return Ok(v_ref.clone());
         }
 
-        self.load_node(bs.clone(), i, |sub_node| {
+        self.load_node(bs.clone(), pos, |sub_node| {
             sub_node.get(bs.clone(), height - 1, key, shift - BITS_PER_SUBKEY)
         })
     }
 
-    pub fn flush<B>(&mut self, bs: Rc<RefCell<B>>, depth: u64) -> Result<()>
+    pub fn flush<B>(&mut self, bs: B, depth: u64) -> Result<()>
     where
         B: Blocks,
     {
@@ -241,7 +245,7 @@ impl Node {
             let cid_option = self.try_get_cache(i, |sub_node| -> Result<Cid> {
                 sub_node.flush(bs.clone(), depth - 1)?;
                 let db = bs.clone();
-                let cid = db.borrow_mut().put(sub_node)?;
+                let cid = db.put(sub_node)?;
                 Ok(cid)
             })?;
 
@@ -268,7 +272,7 @@ impl Node {
         Ok(None)
     }
 
-    fn load_node<B: Blocks, F, R>(&self, bs: Rc<RefCell<B>>, pos: usize, f: F) -> Result<R>
+    fn load_node<B: Blocks, F, R>(&self, bs: B, pos: usize, f: F) -> Result<R>
     where
         F: Fn(&Self) -> Result<R>,
     {
@@ -280,7 +284,7 @@ impl Node {
         }
 
         let pos = self.index_for_bitpos(pos);
-        let n: Node = bs.borrow().get(&self.links[pos])?;
+        let n: Node = bs.get(&self.links[pos])?;
         let r = f(&n);
         *self.cache[pos].borrow_mut().deref_mut() = Some(Box::new(n));
         r
@@ -288,7 +292,7 @@ impl Node {
 
     fn load_node_with_creating<B: Blocks, F, R>(
         &mut self,
-        bs: Rc<RefCell<B>>,
+        bs: B,
         pos: usize,
         create: bool,
         f: F,
@@ -301,7 +305,7 @@ impl Node {
         }
         let index = self.index_for_bitpos(pos);
         let mut n = if self.get_bit(pos) {
-            let n: Node = bs.borrow().get(&self.links[index])?;
+            let n: Node = bs.get(&self.links[index])?;
             n
         } else {
             if create {
