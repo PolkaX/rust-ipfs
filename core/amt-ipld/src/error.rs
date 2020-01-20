@@ -17,6 +17,12 @@ pub enum AmtIpldError {
     #[error("ipld cbor error: {0}")]
     IpldCbor(#[from] ipld_cbor::IpldCborError),
 
+    #[error("not found for key: {0}")]
+    NotFound(u64),
+
+    #[error("no node found at (sub)index: {0}")]
+    NoNodeForIndex(usize),
+
     #[error("tmp")]
     Tmp,
 }

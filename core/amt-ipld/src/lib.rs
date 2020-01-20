@@ -130,7 +130,7 @@ where
         let test = k >> (BITS_PER_SUBKEY * (self.height + 1));
         if test != 0 {
             // not found
-            return Err(AmtIpldError::Tmp);
+            return Err(AmtIpldError::NotFound(k));
         }
         let current_shift = BITS_PER_SUBKEY * self.height;
         let v = self
@@ -253,7 +253,7 @@ impl Node {
     {
         let pos = index(key, shift);
         if !self.get_bit(pos) {
-            return Err(AmtIpldError::Tmp);
+            return Err(AmtIpldError::NotFound(key));
         }
 
         // touch leaf node, fetch value
@@ -277,11 +277,12 @@ impl Node {
     {
         let pos = index(key, shift);
         if !self.get_bit(pos) {
-            return Err(AmtIpldError::Tmp);
+            return Err(AmtIpldError::NotFound(key));
         }
         if height == 0 {
             self.unset_bit(pos);
-            self.values.remove(pos);
+            let index = self.index_for_bitpos(pos);
+            self.values.remove(index);
             return Ok(());
         }
 
@@ -350,6 +351,7 @@ impl Node {
         Ok(None)
     }
 
+    /// for immutable call
     fn load_node<B: Blocks, F, R>(&self, bs: B, pos: usize, f: F) -> Result<R>
     where
         F: Fn(&Self) -> Result<R>,
@@ -358,16 +360,17 @@ impl Node {
             return f(node);
         }
         if !self.get_bit(pos) {
-            return Err(AmtIpldError::Tmp);
+            return Err(AmtIpldError::NoNodeForIndex(pos));
         }
 
-        let pos = self.index_for_bitpos(pos);
-        let n: Node = bs.get(&self.links[pos])?;
+        let index = self.index_for_bitpos(pos);
+        let n: Node = bs.get(&self.links[index])?;
         let r = f(&n);
         *self.cache[pos].borrow_mut().deref_mut() = Some(Box::new(n));
         r
     }
 
+    /// for mutable call
     fn load_node_with_creating<B: Blocks, F, R>(
         &mut self,
         bs: B,
@@ -393,7 +396,7 @@ impl Node {
                 self.links.insert(index, mock);
                 sub_node
             } else {
-                return Err(AmtIpldError::Tmp);
+                return Err(AmtIpldError::NoNodeForIndex(pos));
             }
         };
         let r = f(&mut n);
