@@ -33,6 +33,14 @@ fn one_root_node_reorder_insert() {
         &s,
         "bafy2bzacecfpqjvhbe4sbanu4bjy6aws3qupk2y2h5hsr7fbxky7wbu6rtedi"
     );
+
+    let mut collection = vec![];
+    root.for_each(&mut |key, value| collection.push(((key, value.clone()))));
+    let m = vec![0, 2, 5, 7];
+    for (src, (key, value)) in m.iter().zip(collection.into_iter()) {
+        assert_eq!(*src, key);
+        assert_eq!(Value::Text(src.to_string()), value);
+    }
 }
 
 #[test]
@@ -80,6 +88,14 @@ fn tow_level_node_reorder_insert() {
         "bafy2bzaceazvpi5k466hzkiuypsbzrr65smq72fhwumnehb2mg6ixanbbttag"
     );
 
+    let mut collection = vec![];
+    root.for_each(&mut |key, value| collection.push(((key, value.clone()))));
+    let m = vec![1, 7, 8];
+    for (src, (key, value)) in m.iter().zip(collection.into_iter()) {
+        assert_eq!(*src, key);
+        assert_eq!(Value::Text(src.to_string()), value);
+    }
+
     let bs = db();
     let mut root = Root::new(bs);
     root.set(8, "8").unwrap();
@@ -93,6 +109,14 @@ fn tow_level_node_reorder_insert() {
         &s,
         "bafy2bzaceazvpi5k466hzkiuypsbzrr65smq72fhwumnehb2mg6ixanbbttag"
     );
+
+    let mut collection = vec![];
+    root.for_each(&mut |key, value| collection.push(((key, value.clone()))));
+    let m = vec![1, 7, 8];
+    for (src, (key, value)) in m.iter().zip(collection.into_iter()) {
+        assert_eq!(*src, key);
+        assert_eq!(Value::Text(src.to_string()), value);
+    }
 }
 
 #[test]
@@ -105,8 +129,8 @@ fn there_level() {
     let bs = db();
     let mut root = Root::new(bs);
 
-    for i in m {
-        root.set(i, i).unwrap();
+    for i in m.iter() {
+        root.set(*i, *i).unwrap();
     }
 
     let cid = root.flush().unwrap();
@@ -115,7 +139,15 @@ fn there_level() {
     assert_eq!(
         &s,
         "bafy2bzacedtys7tutnbv7677lkpkrkzduhcgwybj4m4vl5pmdwujnsmnq5e6s"
-    )
+    );
+
+    let mut collection = vec![];
+    root.for_each(&mut |key, value| collection.push(((key, value.clone()))));
+    m.sort();
+    for (src, (key, value)) in m.iter().zip(collection.into_iter()) {
+        assert_eq!(*src, key);
+        assert_eq!(Value::Integer(*src as i128), value);
+    }
 }
 
 fn assert_get<B: Blocks>(root: &Root<B>, key: u64, value: &str) {

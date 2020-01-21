@@ -1,5 +1,7 @@
+#![cfg_attr(test, feature(matches_macro))]
 mod blocks;
 mod error;
+mod iter;
 #[cfg(test)]
 mod tests;
 mod trait_impl;
@@ -352,9 +354,9 @@ impl Node {
     }
 
     /// for immutable call
-    fn load_node<B: Blocks, F, R>(&self, bs: B, pos: usize, f: F) -> Result<R>
+    fn load_node<B: Blocks, F, R>(&self, bs: B, pos: usize, mut f: F) -> Result<R>
     where
-        F: Fn(&Self) -> Result<R>,
+        F: FnMut(&Self) -> Result<R>,
     {
         if let Some(node) = self.cache[pos].borrow().deref() {
             return f(node);
