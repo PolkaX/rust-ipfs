@@ -6,12 +6,11 @@ use crate::blocks::Blocks;
 use crate::error::AmtIpldError;
 use crate::{Node, Root, BITS_PER_SUBKEY, WIDTH};
 
-/// this function would use in anywhere to traverse the trie
-
 impl<B> Root<B>
 where
     B: Blocks,
 {
+    /// this function would use in anywhere to traverse the trie, do not need flush first.
     pub fn for_each<F>(&self, f: &mut F)
     where
         F: FnMut(u64, &Value),
