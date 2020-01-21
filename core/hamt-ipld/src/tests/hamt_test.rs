@@ -1,10 +1,14 @@
-use super::*;
-use archery::SharedPointerKind;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::time::Instant;
+
+use archery::SharedPointerKind;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
+
+use super::*;
 
 fn rand_string() -> String {
     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(18).collect();
@@ -16,6 +20,7 @@ fn rand_value() -> Vec<u8> {
     rand_string.into_bytes()
 }
 
+#[cfg(feature = "test-hash")]
 fn add_and_remove_keys(bit_width: u32, keys: &[&str], extra_keys: &[&str]) {
     let all: Vec<(&str, Vec<u8>)> = keys.iter().map(|k| (*k, rand_value())).collect();
 
@@ -101,8 +106,8 @@ fn test_overflow() {
         node.set(k, b"foobar".to_vec()).unwrap();
     }
 
-    let r = node.set(keys[3], b"foobar".to_vec());
-    matches!(r, Err(Error::MaxDepth));
+    let res = node.set(keys[3], b"foobar".to_vec());
+    assert!(matches!(res, Err(Error::MaxDepth)));
     // Try forcing the depth beyond 32
     node.set(&keys[3][1..], b"foobar".to_vec()).unwrap();
 }
@@ -214,7 +219,7 @@ fn test_set_get() {
     for _ in 0..100 {
         let r = rand_string();
         let result = node.find::<Vec<u8>>(&r);
-        matches!(result, Err(Error::NotFound(r)));
+        assert!(matches!(result, Err(Error::NotFound(_))));
     }
 
     map.iter_mut().for_each(|(k, v)| {
@@ -231,13 +236,13 @@ fn test_set_get() {
     for _ in 0..100 {
         let r = rand_string();
         let result = node.delete(&r);
-        matches!(result, Err(Error::NotFound(r)));
+        assert!(matches!(result, Err(Error::NotFound(_))));
     }
 
     for (k, _) in map {
         node.delete(&k).unwrap();
         let result = node.find::<Vec<u8>>(&k);
-        matches!(result, Err(Error::NotFound(k)));
+        assert!(matches!(result, Err(Error::NotFound(_))));
     }
 }
 
@@ -389,6 +394,6 @@ fn test_value_linking() {
     println!("{:?}", blk.raw_data().to_vec());
     let ipld_node = ipld_cbor::IpldNode::from_block(&*blk).unwrap();
 
-    println!("thingy1:{:}", c1.to_string());
+    println!("thingy1:{}", c1.to_string());
     println!("{:?}", ipld_node.links()[0]);
 }

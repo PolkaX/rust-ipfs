@@ -11,6 +11,6 @@ keywords = ["ipfs", "multiformat", "multihash"]
 
 [dependencies]
 parity-multihash = "0.2"
-bytes = "0.4.12"
+bytes = "0.5"
 blake2 = { version = "0.8", default-features = false }
-unsigned-varint = "0.2"
+unsigned-varint = "0.3"
