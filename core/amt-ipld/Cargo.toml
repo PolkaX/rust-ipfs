@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 thiserror = "1.0"
 serde = "1.0"
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
 serde_bytes = "0.11"
 archery = "0.3"
 
