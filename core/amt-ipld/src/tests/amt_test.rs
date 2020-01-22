@@ -361,6 +361,14 @@ fn test_for_each() {
     });
 
     assert_eq!(x, INDEXS.len());
+
+    x = 0;
+    let (_, flushed) = root2.flush().unwrap();
+    for (i, item) in flushed.iter().enumerate() {
+        assert_eq!(item.0, INDEXS[x]);
+        x += 1;
+    }
+    assert_eq!(x, INDEXS.len());
 }
 
 const INDEXS: [u64; 4933] = [

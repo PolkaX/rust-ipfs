@@ -1,5 +1,6 @@
 use cid::Cid;
 use serde_cbor::Value;
+use std::iter::Zip;
 use std::vec;
 
 use crate::blocks::Blocks;
@@ -66,10 +67,26 @@ where
 {
     /// for `FlushedRoot`, the root must be a flushed tree, thus could load node from cid directly
     pub fn iter(&self) -> Iter<B> {
+        let node_ref = &self.root.node;
+
+        let prefix_key_list = (0..WIDTH)
+            .map(|prefix_key| (prefix_key, node_ref.get_bit(prefix_key)))
+            .filter(|(_, need)| *need)
+            .map(|(pref, _)| pref as u64)
+            .collect::<Vec<_>>();
+
         let init = if self.root.height == 0 {
-            Traversing::Leaf(self.root.node.values.clone().into_iter())
+            assert_eq!(prefix_key_list.len(), node_ref.values.len());
+            let zip = prefix_key_list
+                .into_iter()
+                .zip(node_ref.values.clone().into_iter());
+            Traversing::Leaf(zip)
         } else {
-            Traversing::Link(self.root.node.links.clone().into_iter())
+            assert_eq!(prefix_key_list.len(), node_ref.links.len());
+            let zip = prefix_key_list
+                .into_iter()
+                .zip(node_ref.links.clone().into_iter());
+            Traversing::Link(zip)
         };
         Iter {
             size: self.root.count,
@@ -96,43 +113,57 @@ where
 
 #[derive(Clone)]
 enum Traversing {
-    Leaf(vec::IntoIter<Value>),
-    Link(vec::IntoIter<Cid>),
+    Leaf(Zip<vec::IntoIter<u64>, vec::IntoIter<Value>>),
+    Link(Zip<vec::IntoIter<u64>, vec::IntoIter<Cid>>),
 }
 
 impl<B> Iterator for Iter<B>
 where
     B: Blocks,
 {
-    type Item = Value;
+    type Item = (u64, Value);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let last = match self.stack.pop() {
+        let mut last = match self.stack.last_mut() {
             Some(last) => last,
             None => {
                 return None;
             }
         };
         match last {
-            Traversing::Leaf(mut iter) => match iter.next() {
+            Traversing::Leaf(ref mut iter) => match iter.next() {
                 Some(v) => {
                     self.count += 1;
-                    self.stack.push(Traversing::Leaf(iter));
                     Some(v)
                 }
-                None => self.next(),
+                None => {
+                    self.stack.pop();
+                    self.next()
+                }
             },
-            Traversing::Link(mut iter) => match iter.next() {
-                Some(cid) => {
+            Traversing::Link(ref mut iter) => match iter.next() {
+                Some((key, cid)) => {
                     let n: Node = self.bs.get(&cid).ok()?;
+
+                    let prefix_key_list = (0..WIDTH)
+                        .map(|prefix_key| (prefix_key, n.get_bit(prefix_key)))
+                        .filter(|(_, need)| *need)
+                        .map(|(pref, _)| (key << BITS_PER_SUBKEY) + pref as u64)
+                        .collect::<Vec<_>>();
+
                     if n.bitmap != 0 && n.values.len() != 0 {
-                        self.stack.push(Traversing::Leaf(n.values.into_iter()));
+                        let zip = prefix_key_list.into_iter().zip(n.values.into_iter());
+                        self.stack.push(Traversing::Leaf(zip));
                     } else {
-                        self.stack.push(Traversing::Link(n.links.into_iter()));
+                        let zip = prefix_key_list.into_iter().zip(n.links.into_iter());
+                        self.stack.push(Traversing::Link(zip));
                     }
                     self.next()
                 }
-                None => self.next(),
+                None => {
+                    self.stack.pop();
+                    self.next()
+                }
             },
         }
     }
