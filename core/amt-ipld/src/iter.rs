@@ -124,7 +124,7 @@ where
     type Item = (u64, Value);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut last = match self.stack.last_mut() {
+        let last = match self.stack.last_mut() {
             Some(last) => last,
             None => {
                 return None;

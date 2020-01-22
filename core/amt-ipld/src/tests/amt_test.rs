@@ -45,6 +45,11 @@ fn one_root_node_reorder_insert() {
         assert_eq!(*src, key);
         assert_eq!(Value::Text(src.to_string()), value);
     }
+
+    let (_, flushed) = root.flush().unwrap();
+    for (src, (key, _)) in m.iter().zip(flushed.iter()) {
+        assert_eq!(*src, key)
+    }
 }
 
 #[test]
@@ -131,6 +136,11 @@ fn tow_level_node_reorder_insert() {
         assert_eq!(*src, key);
         assert_eq!(Value::Text(src.to_string()), value);
     }
+
+    let (_, flushed) = root.flush().unwrap();
+    for (src, (key, _)) in m.iter().zip(flushed.iter()) {
+        assert_eq!(*src, key)
+    }
 }
 
 #[test]
@@ -165,6 +175,11 @@ fn there_level() {
     for (src, (key, value)) in m.iter().zip(collection.into_iter()) {
         assert_eq!(*src, key);
         assert_eq!(Value::Integer(*src as i128), value);
+    }
+
+    let (_, flushed) = root.flush().unwrap();
+    for (src, (key, _)) in m.iter().zip(flushed.iter()) {
+        assert_eq!(*src, key)
     }
 }
 
@@ -364,7 +379,7 @@ fn test_for_each() {
 
     x = 0;
     let (_, flushed) = root2.flush().unwrap();
-    for (i, item) in flushed.iter().enumerate() {
+    for (_, item) in flushed.iter().enumerate() {
         assert_eq!(item.0, INDEXS[x]);
         x += 1;
     }
