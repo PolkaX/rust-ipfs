@@ -48,9 +48,13 @@ where
                 }
             }
         } else {
-            node.load_node(bs.clone(), i, |node| {
+            let r = node.load_node(bs.clone(), i, |node| {
                 traversing(bs.clone(), node, height - 1, current_key, f)
-            })?;
+            });
+            match r {
+                Ok(_) | Err(AmtIpldError::NoNodeForIndex(_)) => {}
+                Err(e) => return Err(e),
+            }
         }
     }
     Ok(())

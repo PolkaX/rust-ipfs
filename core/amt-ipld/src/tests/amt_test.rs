@@ -240,6 +240,22 @@ fn assert_delete<B: Blocks>(root: &mut Root<B>, k: u64) {
 }
 
 #[test]
+fn test_delete_first_entry() {
+    let bs = db();
+    let mut root = Root::new(bs.clone());
+
+    root.set(0, "cat").unwrap();
+    root.set(27, "cat").unwrap();
+
+    assert_delete(&mut root, 0);
+
+    let (c, _) = root.flush().unwrap();
+
+    let root = Root::load(&c, bs.clone()).unwrap();
+    assert_eq!(root.count(), 1);
+}
+
+#[test]
 fn test_delete() {
     let bs = db();
     let mut root = Root::new(bs.clone());
@@ -336,6 +352,15 @@ fn test_for_each() {
 
     let root2 = Root::load(&c2, bs.clone()).unwrap();
     assert_eq!(root2.count(), INDEXS.len() as u64);
+
+    let mut x = 0;
+    let _ = root2.for_each(&mut |key, _| {
+        assert_eq!(key, INDEXS[x]);
+        x += 1;
+        Ok(())
+    });
+
+    assert_eq!(x, INDEXS.len());
 }
 
 const INDEXS: [u64; 4933] = [
