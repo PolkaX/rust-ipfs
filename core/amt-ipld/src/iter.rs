@@ -1,28 +1,39 @@
 use cid::Cid;
 use serde_cbor::Value;
-use std::slice;
+use std::vec;
 
 use crate::blocks::Blocks;
-use crate::error::AmtIpldError;
-use crate::{Node, Root, BITS_PER_SUBKEY, WIDTH};
+use crate::error::*;
+use crate::{FlushedRoot, Node, Root, BITS_PER_SUBKEY, WIDTH};
 
 impl<B> Root<B>
 where
     B: Blocks,
 {
     /// this function would use in anywhere to traverse the trie, do not need flush first.
-    pub fn for_each<F>(&self, f: &mut F)
+    pub fn for_each<F>(&self, f: &mut F) -> Result<()>
     where
-        F: FnMut(u64, &Value),
+        F: FnMut(u64, &Value) -> Result<()>,
     {
-        traversing(self.bs.clone(), &self.node, self.height, 0, f);
+        traversing(self.bs.clone(), &self.node, self.height, 0, f)
+    }
+
+    /// Subtract removes all elements of 'or' from 'self'
+    pub fn subtract(&mut self, or: Self) -> Result<()> {
+        or.for_each(&mut |key, _| {
+            // if not find, do not handle error
+            match self.delete(key) {
+                Ok(_) | Err(AmtIpldError::NotFound(_)) => Ok(()),
+                Err(e) => Err(e),
+            }
+        })
     }
 }
 
-fn traversing<B, F>(bs: B, node: &Node, height: u64, prefix_key: u64, f: &mut F)
+fn traversing<B, F>(bs: B, node: &Node, height: u64, prefix_key: u64, f: &mut F) -> Result<()>
 where
     B: Blocks,
-    F: FnMut(u64, &Value),
+    F: FnMut(u64, &Value) -> Result<()>,
 {
     let prefix = prefix_key << BITS_PER_SUBKEY;
     for i in 0..WIDTH {
@@ -31,90 +42,101 @@ where
             if node.get_bit(i) {
                 let index = node.index_for_bitpos(i);
                 if let Some(v) = node.values.get(index) {
-                    f(current_key, v)
+                    f(current_key, v)?;
                 } else {
                     unreachable!("bitmap not match value list, the tree is corrupted")
                 }
             }
         } else {
-            let _ = node.load_node(bs.clone(), i, |node| {
-                traversing(bs.clone(), node, height - 1, current_key, f);
-                Ok(())
-            });
+            node.load_node(bs.clone(), i, |node| {
+                traversing(bs.clone(), node, height - 1, current_key, f)
+            })?;
+        }
+    }
+    Ok(())
+}
+
+impl<B> FlushedRoot<B>
+where
+    B: Blocks,
+{
+    /// for `FlushedRoot`, the root must be a flushed tree, thus could load node from cid directly
+    pub fn iter(&self) -> Iter<B> {
+        let init = if self.root.height == 0 {
+            Traversing::Leaf(self.root.node.values.clone().into_iter())
+        } else {
+            Traversing::Link(self.root.node.links.clone().into_iter())
+        };
+        Iter {
+            size: self.root.count,
+            count: 0,
+            stack: vec![init],
+            bs: self.root.bs.clone(),
         }
     }
 }
 
-struct Iter<'a, B>
+/// this `Iter` only could be used for FlushedRoot, due to current module use child_cache to store child,
+/// and the child ref is under `RefCell`. So that we could only iterate the tree after flushing.
+/// if someone do not what iterating the free after flushing, could use `for_each`.
+pub struct Iter<B>
 where
     B: Blocks,
 {
-    size: usize,
-    count: usize,
-    stack: Vec<Traversing<'a>>,
-
+    size: u64,
+    count: u64,
+    stack: Vec<Traversing>,
+    // blocks ref, use for load node from cid
     bs: B,
 }
 
 #[derive(Clone)]
-enum Traversing<'a> {
-    Leaf(slice::Iter<'a, Value>),
-    Link(&'a Node, usize),
+enum Traversing {
+    Leaf(vec::IntoIter<Value>),
+    Link(vec::IntoIter<Cid>),
 }
 
-//impl<'a, B> Iterator for Iter<'a, B>
-//    where
-//        B: Blocks,
-//{
-//    type Item = &'a Value;
-//
-//    fn next(&mut self) -> Option<Self::Item> {
-//        let last = match self.stack.pop() {
-//            Some(last) => last,
-//            None => {
-//                return None;
-//            }
-//        };
-//        match last {
-//            Traversing::Leaf(mut iter) => {
-//                match iter.next() {
-//                    Some(ref v) => {
-//                        self.count += 1;
-//                        self.stack.push(Traversing::Leaf(iter));
-//                        Some(v)
-//                    }
-//                    None => {
-//                        self.next()
-//                    }
-//                }
-//            },
-//            Traversing::Link(mut node, mut pos) => {
-//                if pos == WIDTH {
-//                    // current node cache has searched finish, do next
-//                    return self.next()
-//                }
-//                if node.values.len() != 0 && node.bitmap != 0 {
-//                    self.stack.push(Traversing::Leaf(node.values.iter()));
-//                    self.next()
-//                } else {
-//                    // try get or load cache for pos, if cache not exist, push current node and plus pos
-//                    let r = node.load_node(self.bs.clone(), pos, |node| {
-//                        self.stack.push(Traversing::Link(node, 0));
-//                        self.next();
-//                        Ok(())
-//                    });
-//                    match r {
-//                        Ok(_) => {
-//                            self.next()
-//                        }
-//                        Err(AmtIpldError::NoNodeForIndex(_)) => {
-//                            self.stack.push(Traversing::Link(node, pos + 1));
-//                            self.next()
-//                        }
-//                        Err(_) => unreachable!("should not reach this branch, otherwise the tree is corrupted")
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
+impl<B> Iterator for Iter<B>
+where
+    B: Blocks,
+{
+    type Item = Value;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let last = match self.stack.pop() {
+            Some(last) => last,
+            None => {
+                return None;
+            }
+        };
+        match last {
+            Traversing::Leaf(mut iter) => match iter.next() {
+                Some(v) => {
+                    self.count += 1;
+                    self.stack.push(Traversing::Leaf(iter));
+                    Some(v)
+                }
+                None => self.next(),
+            },
+            Traversing::Link(mut iter) => match iter.next() {
+                Some(cid) => {
+                    let n: Node = self.bs.get(&cid).ok()?;
+                    if n.bitmap != 0 && n.values.len() != 0 {
+                        self.stack.push(Traversing::Leaf(n.values.into_iter()));
+                    } else {
+                        self.stack.push(Traversing::Link(n.links.into_iter()));
+                    }
+                    self.next()
+                }
+                None => self.next(),
+            },
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (
+            (self.size - self.count) as usize,
+            Some((self.size - self.count) as usize),
+        )
+    }
+}

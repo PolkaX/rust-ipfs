@@ -1,7 +1,7 @@
 use block_format::{BasicBlock, Block as BlockT};
 use blockstore::Blockstore;
 use cid::{Cid, Codec, Hash as MHashEnum, Prefix};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
 

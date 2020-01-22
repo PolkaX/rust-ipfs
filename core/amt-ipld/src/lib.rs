@@ -9,7 +9,7 @@ mod trait_impl;
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use serde_cbor::Value;
 
 use cid::{zero_cid, Cid};
@@ -26,9 +26,9 @@ fn index(h: u64, s: u64) -> usize {
     ((h >> s) & SUBKEY_MASK) as usize
 }
 
-fn mask(h: u64, s: u64) -> usize {
-    1 << index(h, s)
-}
+//fn mask(h: u64, s: u64) -> usize {
+//    1 << index(h, s)
+//}
 
 pub struct Root<B>
 where
@@ -39,6 +39,13 @@ where
     node: Node,
 
     bs: B,
+}
+
+pub struct FlushedRoot<B>
+where
+    B: Blocks,
+{
+    root: Root<B>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -170,10 +177,19 @@ where
         Ok(())
     }
 
-    pub fn flush(&mut self) -> Result<Cid> {
+    pub fn flush(mut self) -> Result<(Cid, FlushedRoot<B>)> {
         self.node.flush(self.bs.clone(), self.height)?;
         let cid = self.bs.put(&self)?;
-        Ok(cid)
+        Ok((cid, FlushedRoot { root: self }))
+    }
+}
+
+impl<B> FlushedRoot<B>
+where
+    B: Blocks,
+{
+    pub fn downgrade(self) -> Root<B> {
+        self.root
     }
 }
 
