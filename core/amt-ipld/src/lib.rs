@@ -420,16 +420,14 @@ impl Node {
         let mut n = if self.get_bit(pos) {
             let n: Node = bs.get(&self.links[index])?;
             n
+        } else if create {
+            let sub_node = Node::new();
+            self.set_bit(pos);
+            let mock = zero_cid();
+            self.links.insert(index, mock);
+            sub_node
         } else {
-            if create {
-                let sub_node = Node::new();
-                self.set_bit(pos);
-                let mock = zero_cid();
-                self.links.insert(index, mock);
-                sub_node
-            } else {
-                return Err(AmtIpldError::NoNodeForIndex(pos));
-            }
+            return Err(AmtIpldError::NoNodeForIndex(pos));
         };
         let r = f(&mut n);
         *self.cache[pos].borrow_mut().deref_mut() = Some(Box::new(n));
