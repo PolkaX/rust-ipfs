@@ -1,0 +1,13 @@
+[package]
+name = "rust-ipfs-blockstore"
+version = "0.1.0"
+authors = ["Aten <jincxmain@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0"
+
+cid = { package = "rust-cid", path = "../../cid" }
+block-format = { package = "rust-block-format", path = "../../block-format" }

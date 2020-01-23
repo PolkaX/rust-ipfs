@@ -6,8 +6,10 @@ members = [
     "core/primitives",
     "core/ipld/cbor",
     "core/ipld/format",
+    "core/ipfs/blockstore",
     "core/block-format",
     "core/hamt-ipld",
+    "core/amt-ipld",
     "core/util",
     "core/merkledag",
 ]

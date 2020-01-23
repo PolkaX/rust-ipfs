@@ -23,10 +23,20 @@ pub use multihash::{Hash, Multihash};
 pub use self::cid::Cid;
 pub use self::codec::Codec;
 pub use self::error::{CidError, Result};
-pub use self::prefix::{new_prefix_v0, new_prefix_v1, Prefix};
+pub use self::prefix::Prefix;
 #[cfg(feature = "serde_support")]
 pub use self::serde::{deserialize_cid_from_bytes, CID_CBOR_TAG};
 #[cfg(feature = "hascid")]
 pub use self::traits::HasCid;
 pub use self::traits::{AsCidRef, ToCid};
 pub use self::version::Version;
+
+/// a place holder for cid
+pub fn zero_cid() -> Cid {
+    use multihash::encode;
+    Cid::new_cid_v1(
+        Codec::Raw,
+        encode(Hash::Identity, b"").expect("should not happen"),
+    )
+    .expect("should not happen")
+}

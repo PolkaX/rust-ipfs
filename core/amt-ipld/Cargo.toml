@@ -1,0 +1,23 @@
+[package]
+name = "rust-amt-ipld"
+version = "0.1.0"
+authors = ["Aten <jincxmain@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+thiserror = "1.0"
+serde = "1.0"
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
+serde_bytes = "0.11"
+archery = "0.3"
+
+cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
+ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor" }
+blockstore = { package = "rust-ipfs-blockstore", path = "../ipfs/blockstore" }
+block-format = { package = "rust-block-format", path = "../block-format" }
+
+[dev-dependencies]
+util = { package = "rust-ipfs-util", path = "../util" }
+rand = "0.7"
