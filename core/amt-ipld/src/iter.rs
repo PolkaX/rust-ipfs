@@ -151,7 +151,7 @@ where
                         .map(|(pref, _)| (key << BITS_PER_SUBKEY) + pref as u64)
                         .collect::<Vec<_>>();
 
-                    if n.bitmap != 0 && n.values.len() != 0 {
+                    if n.bitmap != 0 && !n.values.is_empty() {
                         let zip = prefix_key_list.into_iter().zip(n.values.into_iter());
                         self.stack.push(Traversing::Leaf(zip));
                     } else {

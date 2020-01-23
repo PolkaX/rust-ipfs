@@ -48,7 +48,7 @@ where
     root: Root<B>,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Default)]
 pub struct Node {
     bitmap: usize,
     links: Vec<Cid>,
@@ -215,12 +215,7 @@ enum CacheStatus {
 
 impl Node {
     pub fn new() -> Self {
-        Node {
-            bitmap: 0,
-            links: vec![],
-            values: vec![],
-            cache: Default::default(),
-        }
+        Node::default()
     }
 
     pub fn new_with_cid(cid: Cid) -> Self {
