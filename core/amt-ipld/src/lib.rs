@@ -105,6 +105,13 @@ where
         }
     }
 
+    pub fn from_array<I: Serialize, L: AsRef<[I]>>(arr: L, bs: B) -> Result<Cid> {
+        let mut root = Self::new(bs);
+        root.batch_set(arr)?;
+        let (cid, _) = root.flush()?;
+        Ok(cid)
+    }
+
     pub fn count(&self) -> u64 {
         self.count
     }
@@ -131,6 +138,13 @@ where
             .set(self.bs.clone(), self.height, k, v, current_shift)?;
         if add {
             self.count += 1;
+        }
+        Ok(())
+    }
+
+    pub fn batch_set<I: Serialize, L: AsRef<[I]>>(&mut self, vals: L) -> Result<()> {
+        for (i, v) in vals.as_ref().iter().enumerate() {
+            self.set(i as u64, v)?;
         }
         Ok(())
     }
