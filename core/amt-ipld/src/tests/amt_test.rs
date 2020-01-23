@@ -242,7 +242,7 @@ fn test_insert_a_bunch() {
         &c.to_string(),
         "bafy2bzacedjhcq7542wu7ike4i4srgq7hwxxc5pmw5sub4secqk33mugl4zda"
     );
-    let root = Root::load(&c, bs.clone()).unwrap();
+    let root = Root::load(&c, bs).unwrap();
     for i in 0..num {
         assert_get(&root, i, "foo foo bar");
     }
@@ -266,7 +266,7 @@ fn test_delete_first_entry() {
 
     let (c, _) = root.flush().unwrap();
 
-    let root = Root::load(&c, bs.clone()).unwrap();
+    let root = Root::load(&c, bs).unwrap();
     assert_eq!(root.count(), 1);
 }
 
@@ -303,7 +303,7 @@ fn test_delete() {
     let new_root = Root::load(&c, bs.clone()).unwrap();
     assert_eq!(new_root.count(), 1);
 
-    let mut root2 = Root::new(bs.clone());
+    let mut root2 = Root::new(bs);
     root2.set(24, "dog").unwrap();
     let root = root.downgrade();
     let (c2, _) = root.flush().unwrap();
@@ -323,7 +323,7 @@ fn test_delete_reduce_height() {
 
     let (c2, _) = root.flush().unwrap();
 
-    let mut root2 = Root::load(&c2, bs.clone()).unwrap();
+    let mut root2 = Root::load(&c2, bs).unwrap();
 
     assert_delete(&mut root2, 37);
     assert_eq!(root2.count(), 1);
@@ -365,7 +365,7 @@ fn test_for_each() {
     );
     assert_eq!(c1.to_string(), c2.to_string());
 
-    let root2 = Root::load(&c2, bs.clone()).unwrap();
+    let root2 = Root::load(&c2, bs).unwrap();
     assert_eq!(root2.count(), INDEXS.len() as u64);
 
     let mut x = 0;
