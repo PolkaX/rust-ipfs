@@ -45,6 +45,6 @@ impl Blocks for MockBlocks {
     }
 }
 
-pub fn new_cbor_store() -> BasicCborIpldStore<MockBlocks> {
-    BasicCborIpldStore::new(MockBlocks::new())
+pub fn new_cbor_store() -> CborIpldStor<MockBlocks> {
+    CborIpldStor::new(MockBlocks::new())
 }

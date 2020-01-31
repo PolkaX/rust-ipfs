@@ -140,18 +140,20 @@ struct HamtStats {
     counts: HashMap<usize, usize>,
 }
 
-fn stats<B>(node: &Node<B>) -> HamtStats
+fn stats<B, P>(node: &Node<B, P>) -> HamtStats
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     let mut st = HamtStats::default();
     stats_rec(node, &mut st);
     st
 }
 
-fn stats_rec<B>(node: &Node<B>, st: &mut HamtStats)
+fn stats_rec<B, P>(node: &Node<B, P>, st: &mut HamtStats)
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     st.total_nodes += 1;
     for p in node.get_pointers().iter() {
@@ -253,9 +255,10 @@ fn test_reload_empty() {
     on.set("foo", b"bar".to_vec()).unwrap();
 }
 
-fn nodes_equal<B>(store: BasicCborIpldStore<B>, n1: &mut Node<B>, n2: &mut Node<B>) -> bool
+fn nodes_equal<B, P>(store: CborIpldStor<B>, n1: &mut Node<B, P>, n2: &mut Node<B, P>) -> bool
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     n1.flush().unwrap();
     let n1_cid = store.put(n1).unwrap();

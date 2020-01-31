@@ -15,24 +15,31 @@ use self::entry::{PContent, Pointer, KV};
 pub use self::trait_impl::PartNode;
 use crate::error::*;
 use crate::hash::{hash, HashBits};
-use crate::ipld::{BasicCborIpldStore, CborIpldStore};
+use crate::ipld::{Blocks, CborIpldStor};
 
 const ARRAY_WIDTH: usize = 3;
 pub const DEFAULT_BIT_WIDTH: u32 = 8;
 
+pub type NodeP<B, P> = SharedPointer<Node<B, P>, P>;
+pub type NodeRc<B> = Node<B, RcK>;
+pub type NodeArc<B> = Node<B, ArcK>;
+pub type PartNodeRc<B> = PartNode<B, RcK>;
+pub type PartNodeArc<B> = PartNode<B, ArcK>;
+
 #[derive(Debug)]
-pub struct Node<B>
+pub struct Node<B, P = RcK>
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     // we use u64 here, for normally a branch of node would not over 64, 64 branch's wide is so large, if larger then 64, panic
     /// bitmap
     bitfield: U256,
     /// branch node
-    pointers: Vec<Pointer<B>>,
+    pointers: Vec<Pointer<B, P>>,
 
     /// for fetching and storing children
-    store: B,
+    store: CborIpldStor<B>,
     bit_width: u32,
 }
 
@@ -57,12 +64,18 @@ pub fn index_for_bitpos(bitmap: &U256, bit_pos: u32) -> u32 {
     r.0.iter().fold(0, |a, b| a + b.count_ones())
 }
 
-impl<B> Node<B>
+impl<B, P> Node<B, P>
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     #[cfg(test)]
-    pub fn test_init(store: B, bitfield: &str, pointers: Vec<Pointer<B>>, bit_width: u32) -> Self {
+    pub fn test_init(
+        store: CborIpldStor<B>,
+        bitfield: &str,
+        pointers: Vec<Pointer<B, P>>,
+        bit_width: u32,
+    ) -> Self {
         Node {
             bitfield: U256::from_dec_str(bitfield).unwrap(),
             pointers,
@@ -71,11 +84,11 @@ where
         }
     }
 
-    pub fn new(store: B) -> Node<B> {
+    pub fn new(store: CborIpldStor<B>) -> Node<B, P> {
         Self::new_with_bitwidth(store, DEFAULT_BIT_WIDTH)
     }
 
-    pub fn new_with_bitwidth(store: B, bit_width: u32) -> Node<B> {
+    pub fn new_with_bitwidth(store: CborIpldStor<B>, bit_width: u32) -> Node<B, P> {
         Node {
             bitfield: 0.into(),
             pointers: vec![],
@@ -84,12 +97,20 @@ where
         }
     }
 
-    pub fn load_node(store: B, c: Cid) -> Result<Node<B>> {
+    pub fn new_pointer_node(store: CborIpldStor<B>) -> NodeP<B, P> {
+        SharedPointer::new(Self::new(store))
+    }
+
+    pub fn load_node(store: CborIpldStor<B>, c: Cid) -> Result<Node<B, P>> {
         Self::load_node_with_bitwidth(store, c, DEFAULT_BIT_WIDTH)
     }
 
-    pub fn load_node_with_bitwidth(store: B, c: Cid, bit_width: u32) -> Result<Node<B>> {
-        let pn: PartNode<B> = store.get(&c)?;
+    pub fn load_node_with_bitwidth(
+        store: CborIpldStor<B>,
+        c: Cid,
+        bit_width: u32,
+    ) -> Result<Node<B, P>> {
+        let pn: PartNode<B, P> = store.get(&c)?;
         let node = pn.into_node(store, bit_width);
         Ok(node)
     }
@@ -98,11 +119,11 @@ where
         &mut self.bitfield
     }
 
-    pub fn get_mut_pointers(&mut self) -> &mut Vec<Pointer<B>> {
+    pub fn get_mut_pointers(&mut self) -> &mut Vec<Pointer<B, P>> {
         &mut self.pointers
     }
 
-    pub fn get_pointers(&self) -> &Vec<Pointer<B>> {
+    pub fn get_pointers(&self) -> &Vec<Pointer<B, P>> {
         &self.pointers
     }
 
@@ -110,7 +131,7 @@ where
         self.bit_width
     }
 
-    pub fn get_store(&self) -> B {
+    pub fn get_store(&self) -> CborIpldStor<B> {
         self.store.clone()
     }
 
@@ -137,20 +158,14 @@ where
 
     pub fn flush(&mut self) -> Result<()> {
         for p in self.pointers.iter_mut() {
-            p.flush_cache(self.store.clone())?;
-            //            p.flush_cache(|pointer, node| {
-            //                node.flush()?;
-            //                let cid = self.store.clone().put(node)?;
-            //                *pointer.data = PContent::Link(cid);
-            //            })?;
-            //            let mut guard_cache = p.cache.write().map_err(|_| Error::Lock)?;
-            //            if let Some(ref mut cache) = guard_cache.deref_mut() {
-            //                cache.flush()?;
-            //                let cid = self.store.put(cache)?;
-            //                p.data = PContent::Link(cid);
-            //            }
-            //            // clear cache
-            //            *guard_cache = None;
+            let mut guard_cache = p.cache.write().map_err(|_| Error::Lock)?;
+            if let Some(ref mut cache) = guard_cache.deref_mut() {
+                cache.flush()?;
+                let cid = self.store.put(cache)?;
+                p.data = PContent::Link(cid);
+            }
+            // clear cache
+            *guard_cache = None;
         }
         Ok(())
     }
@@ -161,20 +176,15 @@ where
         let mut total_size = blk.raw_data().len() as u64;
         for child in self.pointers.iter() {
             if child.is_shared() {
-                child.load_child(self.store.clone(), self.bit_width, &mut |node| {
-                    let child_size = node.check_size()?;
-                    // TODO
+                let child_node = child.load_child(self.store.clone(), self.bit_width)?;
+
+                let node = child_node.read().map_err(|_| Error::Lock)?;
+                if let Some(n) = node.deref() {
+                    let child_size = n.check_size()?;
                     total_size += child_size;
-                    Ok(())
-                })?;
-                //
-                //                let node = child_node.read().map_err(|_| Error::Lock)?;
-                //                if let Some(n) = node.deref() {
-                //                    let child_size = n.check_size()?;
-                //                    total_size += child_size;
-                //                } else {
-                //                    unreachable!("node cache must be `Some()` here")
-                //                }
+                } else {
+                    unreachable!("node cache must be `Some()` here")
+                }
             }
         }
         Ok(total_size)
@@ -191,7 +201,15 @@ where
             .get(child_index)
             .expect("[get_value]should not happen, bit counts must match pointers");
         match child.data {
-            // for leaf
+            PContent::Link(_) => {
+                let child_node = child.load_child(self.store.clone(), self.bit_width)?;
+                let guard = child_node.read().map_err(|_| Error::Lock)?;
+                if let Some(node) = guard.deref() {
+                    node.get_value(hash_bits, k)
+                } else {
+                    unreachable!("node cache must be `Some()` here");
+                }
+            }
             PContent::KVs(ref kvs) => {
                 for kv in kvs.iter() {
                     if kv.key == k {
@@ -200,10 +218,6 @@ where
                 }
                 Err(Error::NotFound(k.to_string()))
             }
-            // for branch, recursion for `get_value`
-            PContent::Link(_) => child.load_child(self.store.clone(), self.bit_width, |node| {
-                node.get_value(hash_bits, k)
-            }),
         }
     }
 
@@ -215,7 +229,6 @@ where
     ) -> Result<()> {
         let idx = hv.next(self.bit_width).ok_or(Error::MaxDepth)?;
         // bitmap do not have this bit, it's a new key for this bit position.
-        // create a kv pointer to store this value
         if self.bitfield.bit(idx as usize) == false {
             return self.insert_child(idx, k, v);
         }
@@ -225,33 +238,39 @@ where
             .pointers
             .get_mut(cindex as usize)
             .expect("[modify_value]should not happen, bit counts must match pointers");
-        let need_delete = v.is_none();
+
         match child.data {
-            // id child is branch
             PContent::Link(_) => {
-                child.load_child(self.store.clone(), self.bit_width, |node| {
-                    node.modify_value(hv, k, v)?;
-                    if need_delete {
-                        return self.clean_child(node, cindex);
+                let child_node_p = child.load_child(self.store.clone(), self.bit_width)?;
+                let need_delete = v.is_none();
+                {
+                    let mut guard = child_node_p.write().map_err(|_| Error::Lock)?;
+                    if let Some(n) = guard.deref_mut() {
+                        n.modify_value(hv, k, v)?;
+                    } else {
+                        unreachable!("node cache must be `Some()` here");
                     }
-                    Ok(())
-                })?;
+                }
+                if need_delete {
+                    let guard = child_node_p.read().map_err(|_| Error::Lock)?;
+                    if let Some(ref node) = guard.deref() {
+                        return self.clean_child(node, cindex);
+                    } else {
+                        unreachable!("node cache must be `Some()` here");
+                    }
+                }
                 Ok(())
             }
-            // if child is leaf
             PContent::KVs(ref mut kvs) => {
                 // when need to remove this key/value pair
-                if need_delete {
+                if v.is_none() {
                     let old_len = kvs.len();
                     // remove pair when key equal to k
                     kvs.retain(|entry| entry.key != k);
 
                     let result = if kvs.is_empty() {
-                        // no pair left, remove this child node,
-                        // notice this is removing for current node pointer directly,
-                        // not handle for child
-                        self.remove_child(cindex, idx);
-                        Ok(())
+                        // no pair left, remove this child node
+                        self.remove_child(cindex, idx)
                     } else if old_len == kvs.len() {
                         // no pair could be removed
                         Err(Error::NotFound(k.to_string()))
@@ -273,7 +292,8 @@ where
 
                 // If the array is full, create a subshard and insert everything into it
                 if kvs.len() >= ARRAY_WIDTH {
-                    let mut sub = Node::<B>::new_with_bitwidth(self.store.clone(), self.bit_width);
+                    let mut sub =
+                        Node::<B, P>::new_with_bitwidth(self.store.clone(), self.bit_width);
                     let mut hash_copy = hv.clone();
                     sub.modify_value(&mut hash_copy, k, v)?;
 
@@ -285,7 +305,6 @@ where
                     }
 
                     let c = self.store.put(sub)?;
-                    // todo set cache as well
                     let pointer = Pointer::from_link(c);
                     return self.set_child(cindex, pointer);
                 }
@@ -310,26 +329,28 @@ where
         // set bit for index i
         set_bit(&mut self.bitfield, idx);
 
-        // new pointer
+        // net pointer
         let p = Pointer::from_kvs(vec![KV::new(k.to_string(), v)]);
         self.pointers.insert(i as usize, p);
         Ok(())
     }
 
-    fn clean_child(&mut self, child_node: &mut Node<B>, child_index: u32) -> Result<()> {
+    fn clean_child(&mut self, child_node: &Node<B, P>, idx: u32) -> Result<()> {
         let len = child_node.pointers.len();
         match len {
             0 => Err(Error::InvalidFormatHAMT),
             1 => {
                 // TODO: only do this if its a value, cant do this for shards unless pairs requirements are met.
-
-                if child_node.pointers[0].is_shared() {
+                let p = child_node
+                    .pointers
+                    .get(0)
+                    .expect("[clean_child]should not happen, bit counts must match pointers");
+                if let PContent::Link(ref _cid) = p.data {
+                    // don't know why... todo
                     return Ok(());
                 }
-                let mut empty_ptr = Pointer::from_kvs(vec![]);
-                // this is safe, for child_node would be replace in `set_child` later
-                std::mem::swap(&mut child_node.pointers[0], &mut empty_ptr);
-                self.set_child(child_index, empty_ptr)
+
+                self.set_child(idx, (*p).clone())
             }
             x if x <= ARRAY_WIDTH => {
                 let mut chvals = vec![];
@@ -337,29 +358,29 @@ where
                     match p.data {
                         PContent::Link(_) => return Ok(()),
                         PContent::KVs(ref kvs) => {
-                            for kv in kvs {
+                            for sp in kvs {
                                 if chvals.len() == ARRAY_WIDTH {
                                     return Ok(());
                                 }
-                                // TODO use mem::swap to avoid clone
-                                chvals.push(kv.clone());
+                                chvals.push(sp.clone());
                             }
                         }
                     }
                 }
-                self.set_child(child_index, Pointer::from_kvs(chvals))
+                self.set_child(idx, Pointer::from_kvs(chvals))
             }
             _ => Ok(()),
         }
     }
 
-    fn remove_child(&mut self, i: u32, idx: u32) {
+    fn remove_child(&mut self, i: u32, idx: u32) -> Result<()> {
         self.pointers.remove(i as usize);
         // set idx pos bit is zero
         unset_bit(&mut self.bitfield, idx);
+        Ok(())
     }
 
-    fn set_child(&mut self, idx: u32, p: Pointer<B>) -> Result<()> {
+    fn set_child(&mut self, idx: u32, p: Pointer<B, P>) -> Result<()> {
         let v = self
             .pointers
             .get_mut(idx as usize)
@@ -368,20 +389,21 @@ where
         Ok(())
     }
 
-    //    pub fn deep_copy(&self) -> Node<B> {
-    //        Node::<B> {
-    //            bitfield: self.bitfield,
-    //            pointers: self.pointers.iter().map(|p| p.deep_copy()).collect(),
-    //            store: self.store.clone(),
-    //            bit_width: self.bit_width,
-    //        }
-    //    }
+    pub fn deep_copy(&self) -> Node<B, P> {
+        Node::<B, P> {
+            bitfield: self.bitfield,
+            pointers: self.pointers.iter().map(|p| p.deep_copy()).collect(),
+            store: self.store.clone(),
+            bit_width: self.bit_width,
+        }
+    }
 }
 
-pub fn load_node<B>(cs: B, bit_width: u32, cid: &Cid) -> Result<Node<B>>
+pub fn load_node<B, P>(cs: CborIpldStor<B>, bit_width: u32, cid: &Cid) -> Result<Node<B, P>>
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
-    let pn: PartNode<B> = cs.get(cid)?;
+    let pn: PartNode<B, P> = cs.get(cid)?;
     Ok(pn.into_node(cs, bit_width))
 }

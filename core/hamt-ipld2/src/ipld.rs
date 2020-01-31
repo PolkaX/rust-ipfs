@@ -8,38 +8,31 @@ use multihash::Hash as MHashEnum;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::error::*;
-use std::cell::RefCell;
-use std::rc::Rc;
 
-trait Blocks {
+pub trait Blocks {
     fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>>;
     fn add_block(&mut self, blk: impl BlockT) -> Result<()>;
 }
 
-pub trait Blockstore {
+pub trait BlockStore {
     fn get(&self, cid: &Cid) -> Result<Box<dyn BlockT>>;
     fn put(&mut self, block: impl BlockT) -> Result<()>;
 }
 
-pub trait CborIpldStore: Clone {
-    fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T>;
-    fn put<T: Serialize + HasCid>(&self, v: T) -> Result<Cid>;
-}
-
 #[derive(Debug)]
-pub struct BasicCborIpldStore<B: Blocks> {
-    blocks: Rc<RefCell<B>>,
+pub struct CborIpldStor<B: Blocks> {
+    blocks: Arc<RwLock<B>>,
 }
 
-impl<B: Blocks> Clone for BasicCborIpldStore<B> {
+impl<B: Blocks> Clone for CborIpldStor<B> {
     fn clone(&self) -> Self {
-        BasicCborIpldStore {
+        CborIpldStor {
             blocks: self.blocks.clone(),
         }
     }
 }
 
-impl<B: Blocks> Blocks for BasicCborIpldStore<B> {
+impl<B: Blocks> Blocks for CborIpldStor<B> {
     fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>> {
         let b = self.blocks.read().map_err(|_| Error::Lock)?;
         b.get_block(cid)
@@ -51,15 +44,14 @@ impl<B: Blocks> Blocks for BasicCborIpldStore<B> {
     }
 }
 
-impl<B: Blocks> BasicCborIpldStore<B> {
+impl<B: Blocks> CborIpldStor<B> {
     pub fn new(b: B) -> Self {
-        BasicCborIpldStore {
-            blocks: Rc::new(RefCell::new(b)),
+        CborIpldStor {
+            blocks: Arc::new(RwLock::new(b)),
         }
     }
-}
-impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
-    fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T> {
+
+    pub fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T> {
         let blk = {
             let b = self.blocks.read().map_err(|_| Error::Lock)?;
             b.get_block(c)?
@@ -69,7 +61,7 @@ impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
         Ok(r)
     }
 
-    fn put<T: Serialize + HasCid>(&self, v: T) -> Result<Cid> {
+    pub fn put<T: Serialize + HasCid>(&self, v: T) -> Result<Cid> {
         let mut hash_type = MHashEnum::Blake2b256;
         let mut codec = Codec::DagCBOR;
 
@@ -99,22 +91,16 @@ impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
     }
 }
 
-struct BsWrapper<BS: Blockstore> {
+pub struct BsWrapper<BS: BlockStore> {
     bs: BS,
 }
 
-impl<BS: Blockstore> Blocks for BsWrapper<BS> {
+impl<BS: BlockStore> Blocks for BsWrapper<BS> {
     fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>> {
         self.bs.get(cid)
     }
 
     fn add_block(&mut self, blk: impl BlockT) -> Result<()> {
         self.bs.put(blk)
-    }
-}
-
-pub fn cst_from_bstore<BS: Blockstore>(bs: BS) -> BasicCborIpldStore<BsWrapper<BS>> {
-    BasicCborIpldStore {
-        blocks: Rc::new(RefCell::new(BsWrapper { bs })),
     }
 }

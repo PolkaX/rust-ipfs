@@ -11,10 +11,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub use self::kv::KV;
 use crate::error::*;
-use crate::ipld::{BasicCborIpldStore, CborIpldStore};
+use crate::ipld::{Blocks, CborIpldStor};
 use crate::node::{load_node, Node};
-use std::cell::RefCell;
-use std::io::Write;
 
 mod kv {
     use serde_cbor::Value;
@@ -45,40 +43,49 @@ pub enum PContent {
 }
 
 #[derive(Debug)]
-pub struct Pointer<B>
+pub struct Pointer<B, P = RcK>
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     pub data: PContent,
-    pub cache: RefCell<Option<Box<Node<B>>>>,
+    pub cache: SharedPointer<RwLock<Option<Node<B, P>>>, P>,
 }
 
-impl<B> PartialEq for Pointer<B>
+impl<B, P> PartialEq for Pointer<B, P>
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
     }
 }
 
-impl<B> Eq for Pointer<B> where B: CborIpldStore {}
-
-//impl<B> Clone for Pointer<B>
-//where
-//    B: CborIpldStore,
-//{
-//    fn clone(&self) -> Self {
-//        Pointer {
-//            data: self.data.clone(),
-//            cache: self.cache.clone(),
-//        }
-//    }
-//}
-
-impl<B> Serialize for Pointer<B>
+impl<B, P> Eq for Pointer<B, P>
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
+{
+}
+
+impl<B, P> Clone for Pointer<B, P>
+where
+    B: Blocks,
+    P: SharedPointerKind,
+{
+    fn clone(&self) -> Self {
+        Pointer {
+            data: self.data.clone(),
+            cache: self.cache.clone(),
+        }
+    }
+}
+
+impl<B, P> Serialize for Pointer<B, P>
+where
+    B: Blocks,
+    P: SharedPointerKind,
 {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
     where
@@ -88,9 +95,10 @@ where
     }
 }
 
-impl<'de, B> Deserialize<'de> for Pointer<B>
+impl<'de, B, P> Deserialize<'de> for Pointer<B, P>
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
     where
@@ -99,26 +107,27 @@ where
         let link = PContent::deserialize(deserializer)?;
         Ok(Pointer {
             data: link,
-            cache: RefCell::new(None),
+            cache: SharedPointer::new(RwLock::new(None)),
         })
     }
 }
 
-impl<B> Pointer<B>
+impl<B, P> Pointer<B, P>
 where
-    B: CborIpldStore,
+    B: Blocks,
+    P: SharedPointerKind,
 {
     pub fn from_kvs(kvs: Vec<KV>) -> Self {
         Pointer {
             data: PContent::KVs(kvs),
-            cache: RefCell::new(None),
+            cache: SharedPointer::new(RwLock::new(None)),
         }
     }
 
     pub fn from_link(cid: Cid) -> Self {
         Pointer {
             data: PContent::Link(cid),
-            cache: RefCell::new(None),
+            cache: SharedPointer::new(RwLock::new(None)),
         }
     }
 
@@ -130,37 +139,27 @@ where
         &mut self.data
     }
 
-    pub fn load_child<F, R>(&self, cs: B, bit_width: u32, f: F) -> Result<R>
-    where
-        F: FnOnce(&mut Node<B>) -> Result<R>,
-    {
+    pub fn load_child(
+        &self,
+        cs: CborIpldStor<B>,
+        bit_width: u32,
+    ) -> Result<SharedPointer<RwLock<Option<Node<B, P>>>, P>> {
         {
-            // TODO need to check mutable
-            if let Some(n) = self.cache.borrow_mut().deref_mut() {
-                return f(n);
+            if self.cache.read().map_err(|_| Error::Lock)?.is_some() {
+                return Ok(self.cache.clone());
             }
         }
 
         if let PContent::Link(ref cid) = self.data {
-            let mut node = load_node(cs, bit_width, cid)?;
-            let r = f(&mut node);
-            *self.cache.borrow_mut() = Some(Box::new(node));
-            r
+            let node = load_node(cs, bit_width, cid)?;
+            {
+                let mut guard = self.cache.write().map_err(|_| Error::Lock)?;
+                *(guard.deref_mut()) = Some(node);
+            }
+            Ok(self.cache.clone())
         } else {
             unreachable!("current data must be a link");
         }
-    }
-
-    pub fn flush_cache(&mut self, cs: B) -> Result<()> {
-        let mut cache_ref = self.cache.borrow_mut();
-        if let Some(node) = cache_ref.deref_mut() {
-            // TODO need to check if use r
-            node.flush()?;
-            let cid = cs.put(node)?;
-            self.data = PContent::Link(cid);
-        }
-        *cache_ref = None;
-        Ok(())
     }
 
     pub fn is_shared(&self) -> bool {
@@ -170,21 +169,21 @@ where
         }
     }
 
-    //    pub fn deep_copy(&self) -> Pointer<B> {
-    //        let cache = {
-    //            let guard = self.cache.read().expect("must could get read lock here");
-    //            if let Some(c) = guard.deref() {
-    //                Some(c.deep_copy())
-    //            } else {
-    //                None
-    //            }
-    //        };
-    //
-    //        Pointer {
-    //            data: self.data.clone(),
-    //            cache: SharedPointer::new(RwLock::new(cache)),
-    //        }
-    //    }
+    pub fn deep_copy(&self) -> Pointer<B, P> {
+        let cache = {
+            let guard = self.cache.read().expect("must could get read lock here");
+            if let Some(c) = guard.deref() {
+                Some(c.deep_copy())
+            } else {
+                None
+            }
+        };
+
+        Pointer {
+            data: self.data.clone(),
+            cache: SharedPointer::new(RwLock::new(cache)),
+        }
+    }
 }
 
 // hack for compile pass `Serialize_tuple` and `Deserialize_tuple`, use an empty struct to import `Serialize` and `Deserialize`
