@@ -50,7 +50,7 @@ where
     B: CborIpldStore,
 {
     pub data: PContent,
-    pub cache: RefCell<Option<Box<Node<B>>>>,
+    pub cache: RefCell<Option<Box<Node>>>,
 }
 
 impl<B> PartialEq for Pointer<B>
@@ -132,7 +132,7 @@ where
 
     pub fn load_child<F, R>(&self, cs: B, bit_width: u32, f: F) -> Result<R>
     where
-        F: FnOnce(&mut Node<B>) -> Result<R>,
+        F: FnOnce(&mut Node) -> Result<R>,
     {
         {
             // TODO need to check mutable

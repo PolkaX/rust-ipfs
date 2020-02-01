@@ -8,63 +8,11 @@ use bigint::U256;
 use serde::de::{SeqAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Node, Pointer};
+use super::{Item, Node};
 use crate::ipld::CborIpldStore;
+use std::cell::RefCell;
 
-#[derive(Debug)]
-pub struct PartNode<B>
-where
-    B: CborIpldStore,
-{
-    bitfield: U256,
-    pointers: Vec<Pointer<B>>,
-}
-
-impl<B> PartNode<B>
-where
-    B: CborIpldStore,
-{
-    pub fn into_node(self, store: B, bit_width: u32) -> Node<B> {
-        Node {
-            bitfield: self.bitfield,
-            pointers: self.pointers,
-            store,
-            bit_width,
-        }
-    }
-}
-
-impl<B> PartialEq for Node<B>
-where
-    B: CborIpldStore,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.bitfield == other.bitfield
-            && self.pointers == other.pointers
-            && self.bit_width == other.bit_width
-    }
-}
-
-impl<B> Eq for Node<B> where B: CborIpldStore {}
-
-//impl<B> Clone for Node<B>
-//where
-//    B: CborIpldStore,
-//{
-//    fn clone(&self) -> Self {
-//        Node {
-//            bitfield: self.bitfield,
-//            pointers: self.pointers.clone(),
-//            store: self.store.clone(),
-//            bit_width: self.bit_width,
-//        }
-//    }
-//}
-
-impl<B> Serialize for Node<B>
-where
-    B: CborIpldStore,
-{
+impl Serialize for Node {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -77,25 +25,19 @@ where
             .position(|i| *i != 0)
             .unwrap_or_else(|| std::mem::size_of_val(&self.bitfield));
         let b = serde_bytes::Bytes::new(&bitmap_bytes[index..]);
-        let tuple = (b, &self.pointers);
+        let tuple = (b, &self.items);
         tuple.serialize(serializer)
     }
 }
 
-impl<'de, B> Deserialize<'de> for PartNode<B>
-where
-    B: CborIpldStore,
-{
+impl<'de> Deserialize<'de> for Node {
     fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct TupleVisitor<B: CborIpldStore>(std::marker::PhantomData<B>);
-        impl<'de, B> Visitor<'de> for TupleVisitor<B>
-        where
-            B: CborIpldStore,
-        {
-            type Value = (serde_bytes::ByteBuf, Vec<Pointer<B>>);
+        struct TupleVisitor;
+        impl<'de> Visitor<'de> for TupleVisitor {
+            type Value = (serde_bytes::ByteBuf, Vec<Item>);
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "tuple must be 2 item, bytes and Vec<Pointer>")
@@ -113,8 +55,7 @@ where
                 Ok((first, second))
             }
         }
-        let (byte_buf, pointers) =
-            deserializer.deserialize_tuple(2, TupleVisitor::<B>(std::marker::PhantomData))?;
+        let (byte_buf, items) = deserializer.deserialize_tuple(2, TupleVisitor)?;
 
         // it's big ending bytes, we copy value from end.
         // the buf is size of `u64` u8 array, notice could not out of bounds.
@@ -129,7 +70,28 @@ where
         }
         // U256 receipt a big ending array
         let bitfield = buf.into();
+        let items = items
+            .into_iter()
+            .map(|i| RefCell::new(i))
+            .collect::<Vec<_>>();
+        Ok(Node { bitfield, items })
+    }
+}
 
-        Ok(PartNode { bitfield, pointers })
+impl Serialize for Item {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        unimplemented!()
+    }
+}
+
+impl<'de> Deserialize<'de> for Item {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        unimplemented!()
     }
 }

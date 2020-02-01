@@ -14,6 +14,7 @@ mod tests;
 
 pub use self::ipld::{BasicCborIpldStore, Blockstore, CborIpldStore};
 pub use self::node::{
-    entry::{PContent, Pointer, KV},
-    Node, PartNode, DEFAULT_BIT_WIDTH,
+    //    entry::{PContent, Pointer, KV},
+    Hamt,
+    DEFAULT_BIT_WIDTH,
 };

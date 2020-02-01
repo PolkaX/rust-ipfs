@@ -8,7 +8,9 @@ use multihash::Hash as MHashEnum;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::error::*;
+use std::borrow::Borrow;
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::Rc;
 
 trait Blocks {
@@ -21,55 +23,53 @@ pub trait Blockstore {
     fn put(&mut self, block: impl BlockT) -> Result<()>;
 }
 
-pub trait CborIpldStore: Clone {
+pub trait CborIpldStore {
     fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T>;
-    fn put<T: Serialize + HasCid>(&self, v: T) -> Result<Cid>;
+    fn put<T: Serialize + HasCid>(&mut self, v: T) -> Result<Cid>;
 }
 
 #[derive(Debug)]
 pub struct BasicCborIpldStore<B: Blocks> {
-    blocks: Rc<RefCell<B>>,
+    blocks: B,
 }
 
-impl<B: Blocks> Clone for BasicCborIpldStore<B> {
-    fn clone(&self) -> Self {
-        BasicCborIpldStore {
-            blocks: self.blocks.clone(),
-        }
-    }
-}
+//impl<B: Blocks> Clone for BasicCborIpldStore<B> {
+//    fn clone(&self) -> Self {
+//        BasicCborIpldStore {
+//            blocks: self.blocks.clone(),
+//        }
+//    }
+//}
 
 impl<B: Blocks> Blocks for BasicCborIpldStore<B> {
     fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>> {
-        let b = self.blocks.read().map_err(|_| Error::Lock)?;
-        b.get_block(cid)
+        //        let b: &B = self.blocks.borrow().deref();
+        //        let s = b; //.get_block(cid)
+        self.blocks.get_block(cid)
     }
 
     fn add_block(&mut self, blk: impl BlockT) -> Result<()> {
-        let mut b = self.blocks.write().map_err(|_| Error::Lock)?;
-        b.add_block(blk)
+        self.blocks.add_block(blk)
     }
 }
 
 impl<B: Blocks> BasicCborIpldStore<B> {
     pub fn new(b: B) -> Self {
         BasicCborIpldStore {
-            blocks: Rc::new(RefCell::new(b)),
+            //            blocks: Rc::new(RefCell::new(b)),
+            blocks: b,
         }
     }
 }
 impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
     fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T> {
-        let blk = {
-            let b = self.blocks.read().map_err(|_| Error::Lock)?;
-            b.get_block(c)?
-        };
+        let blk = self.blocks.borrow().get_block(c)?;
         let data = (*blk).raw_data();
         let r = ipld_cbor::decode_into(data)?;
         Ok(r)
     }
 
-    fn put<T: Serialize + HasCid>(&self, v: T) -> Result<Cid> {
+    fn put<T: Serialize + HasCid>(&mut self, v: T) -> Result<Cid> {
         let mut hash_type = MHashEnum::Blake2b256;
         let mut codec = Codec::DagCBOR;
 
@@ -85,10 +85,7 @@ impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
 
         let node = ipld_cbor::IpldNode::from_object_with_codec(v, hash_type, codec)?;
         let cid = node.cid().clone(); // this cid is calc from node
-        {
-            let mut b = self.blocks.write().map_err(|_| Error::Lock)?;
-            b.add_block(node)?;
-        }
+        self.blocks.add_block(node)?;
 
         if let Some(hash) = exp_cid_hash {
             // if has expected cid, then this expected hash
@@ -115,6 +112,7 @@ impl<BS: Blockstore> Blocks for BsWrapper<BS> {
 
 pub fn cst_from_bstore<BS: Blockstore>(bs: BS) -> BasicCborIpldStore<BsWrapper<BS>> {
     BasicCborIpldStore {
-        blocks: Rc::new(RefCell::new(BsWrapper { bs })),
+        //        blocks: Rc::new(RefCell::new(BsWrapper { bs })),
+        blocks: BsWrapper { bs },
     }
 }

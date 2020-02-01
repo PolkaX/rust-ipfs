@@ -140,7 +140,7 @@ struct HamtStats {
     counts: HashMap<usize, usize>,
 }
 
-fn stats<B>(node: &Node<B>) -> HamtStats
+fn stats<B>(node: &Node) -> HamtStats
 where
     B: CborIpldStore,
 {
@@ -149,7 +149,7 @@ where
     st
 }
 
-fn stats_rec<B>(node: &Node<B>, st: &mut HamtStats)
+fn stats_rec<B>(node: &Node, st: &mut HamtStats)
 where
     B: CborIpldStore,
 {
@@ -253,7 +253,7 @@ fn test_reload_empty() {
     on.set("foo", b"bar".to_vec()).unwrap();
 }
 
-fn nodes_equal<B>(store: BasicCborIpldStore<B>, n1: &mut Node<B>, n2: &mut Node<B>) -> bool
+fn nodes_equal<B>(store: BasicCborIpldStore<B>, n1: &mut Node, n2: &mut Node) -> bool
 where
     B: CborIpldStore,
 {

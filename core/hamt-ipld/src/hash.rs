@@ -42,15 +42,20 @@ pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 32] {
 pub struct HashBits<'a> {
     b: &'a [u8],
     consumed: u32,
+    pub bit_width: u32,
 }
 
 impl<'a> HashBits<'a> {
-    pub fn new(buf: &'a [u8]) -> HashBits<'a> {
-        Self::new_with_consumed(buf, 0)
+    pub fn new(buf: &'a [u8], bit_width: u32) -> HashBits<'a> {
+        Self::new_with_consumed(buf, 0, bit_width)
     }
 
-    pub fn new_with_consumed(buf: &'a [u8], consumed: u32) -> HashBits<'a> {
-        HashBits { b: buf, consumed }
+    pub fn new_with_consumed(buf: &'a [u8], consumed: u32, bit_width: u32) -> HashBits<'a> {
+        HashBits {
+            b: buf,
+            consumed,
+            bit_width,
+        }
     }
 
     pub fn consumed(&self) -> u32 {
@@ -59,7 +64,8 @@ impl<'a> HashBits<'a> {
 
     /// Next returns the next 'i' bits of the hashBits value as an u32,
     /// or `None `if there aren't enough bits.
-    pub fn next(&mut self, i: u32) -> Option<u32> {
+    pub fn next(&mut self) -> Option<u32> {
+        let i = self.bit_width;
         let new_consumed = self.consumed.checked_add(i)?;
         if new_consumed > self.b.len() as u32 * 8 {
             return None;
