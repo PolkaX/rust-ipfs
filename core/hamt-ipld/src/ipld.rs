@@ -7,11 +7,6 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use crate::error::*;
 
-pub trait Blocks {
-    fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>>;
-    fn add_block(&mut self, blk: impl BlockT) -> Result<()>;
-}
-
 pub trait Blockstore {
     fn get(&self, cid: &Cid) -> Result<Box<dyn BlockT>>;
     fn put(&mut self, block: impl BlockT) -> Result<()>;
@@ -23,28 +18,18 @@ pub trait CborIpldStore {
 }
 
 #[derive(Debug)]
-pub struct BasicCborIpldStore<B: Blocks> {
+pub struct BasicCborIpldStore<B: Blockstore> {
     blocks: B,
 }
 
-impl<B: Blocks> Blocks for BasicCborIpldStore<B> {
-    fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>> {
-        self.blocks.get_block(cid)
-    }
-
-    fn add_block(&mut self, blk: impl BlockT) -> Result<()> {
-        self.blocks.add_block(blk)
-    }
-}
-
-impl<B: Blocks> BasicCborIpldStore<B> {
+impl<B: Blockstore> BasicCborIpldStore<B> {
     pub fn new(b: B) -> Self {
         BasicCborIpldStore { blocks: b }
     }
 }
-impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
+impl<B: Blockstore> CborIpldStore for BasicCborIpldStore<B> {
     fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T> {
-        let blk = self.blocks.get_block(c)?;
+        let blk = self.blocks.get(c)?;
         let data = (*blk).raw_data();
         let r = ipld_cbor::decode_into(data)?;
         Ok(r)
@@ -66,7 +51,7 @@ impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
 
         let node = ipld_cbor::IpldNode::from_object_with_codec(v, hash_type, codec)?;
         let cid = node.cid().clone(); // this cid is calc from node
-        self.blocks.add_block(node)?;
+        self.blocks.put(node)?;
 
         if let Some(hash) = exp_cid_hash {
             // if has expected cid, then this expected hash
@@ -77,22 +62,6 @@ impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
     }
 }
 
-pub struct BsWrapper<BS: Blockstore> {
-    bs: BS,
-}
-
-impl<BS: Blockstore> Blocks for BsWrapper<BS> {
-    fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>> {
-        self.bs.get(cid)
-    }
-
-    fn add_block(&mut self, blk: impl BlockT) -> Result<()> {
-        self.bs.put(blk)
-    }
-}
-
-pub fn cst_from_bstore<BS: Blockstore>(bs: BS) -> BasicCborIpldStore<BsWrapper<BS>> {
-    BasicCborIpldStore {
-        blocks: BsWrapper { bs },
-    }
+pub fn cst_from_bstore<BS: Blockstore>(bs: BS) -> BasicCborIpldStore<BS> {
+    BasicCborIpldStore::new(bs)
 }
