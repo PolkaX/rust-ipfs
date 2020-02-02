@@ -4,13 +4,13 @@ pub mod trait_impl;
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::ops::{Deref, DerefMut};
 
 use bigint::U256;
 use cid::Cid;
 use ipld_cbor::{cbor_value_to_struct, struct_to_cbor_value};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_cbor::Value;
-use std::ops::{Deref, DerefMut};
 
 use crate::error::*;
 use crate::hash::{hash, HashBits};
@@ -115,6 +115,16 @@ where
         let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
         self.root.remove(&self.bs, &mut hash_bits, k)
     }
+
+    pub fn flush(&mut self) -> Result<Cid> {
+        self.root.flush(&mut self.bs)?;
+        self.bs.put(&self.root)
+    }
+
+    pub fn check_size(&mut self) -> Result<u64> {
+        self.flush()?;
+        self.root.check_size(&mut self.bs)
+    }
 }
 
 impl Item {
@@ -199,14 +209,14 @@ impl Item {
 }
 
 impl Node {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Node {
             bitfield: U256::zero(),
             items: vec![],
         }
     }
 
-    pub fn get<'hash, B, F, Output>(
+    fn get<'hash, B, F, Output>(
         &self,
         bs: &B,
         hv: &mut HashBits<'hash>,
@@ -239,13 +249,7 @@ impl Node {
         }
     }
 
-    pub fn set<'hash, B>(
-        &mut self,
-        bs: &B,
-        hv: &mut HashBits<'hash>,
-        k: &str,
-        v: Value,
-    ) -> Result<()>
+    fn set<'hash, B>(&mut self, bs: &B, hv: &mut HashBits<'hash>, k: &str, v: Value) -> Result<()>
     where
         B: CborIpldStore,
     {
@@ -346,30 +350,41 @@ impl Node {
         }
         Ok(())
     }
-    //    pub fn check_size(&self) -> Result<u64> {
-    //        let cid = self.store.put(&self)?;
-    //        let blk = self.store.get_block(&cid)?;
-    //        let mut total_size = blk.raw_data().len() as u64;
-    //        for child in self.pointers.iter() {
-    //            if child.is_shared() {
-    //                child.load_child(self.store.clone(), self.bit_width, &mut |node| {
-    //                    let child_size = node.check_size()?;
-    //                    // TODO
-    //                    total_size += child_size;
-    //                    Ok(())
-    //                })?;
-    //                //
-    //                //                let node = child_node.read().map_err(|_| Error::Lock)?;
-    //                //                if let Some(n) = node.deref() {
-    //                //                    let child_size = n.check_size()?;
-    //                //                    total_size += child_size;
-    //                //                } else {
-    //                //                    unreachable!("node cache must be `Some()` here")
-    //                //                }
-    //            }
-    //        }
-    //        Ok(total_size)
-    //    }
+
+    fn flush<'hash, B>(&mut self, bs: &mut B) -> Result<()>
+    where
+        B: CborIpldStore,
+    {
+        for item in self.items.iter() {
+            let mut borrow = item.borrow_mut();
+            let i = borrow.deref_mut();
+            if let Item::Ptr(node) = i {
+                node.flush(bs)?;
+                let cid = bs.put(&node)?;
+                // flush current item
+                *i = Item::Link(cid);
+            }
+        }
+        Ok(())
+    }
+
+    fn check_size<B>(&self, bs: &mut B) -> Result<u64>
+    where
+        B: CborIpldStore,
+    {
+        let cid = bs.put(&self)?;
+        let node = bs.get(&cid)?;
+        let mut total_size = ipld_cbor::dump_object(&node)?.len() as u64;
+
+        for item in self.items.iter() {
+            item.borrow_mut().deref_mut().load_item(bs)?;
+            if let Item::Ptr(node) = item.borrow().deref() {
+                let child_size = node.check_size(bs)?;
+                total_size += child_size;
+            }
+        }
+        Ok(total_size)
+    }
 
     /// insert k,v to this bit position.
     fn insert_child(&mut self, idx: u32, k: &str, v: Value) -> Result<()> {

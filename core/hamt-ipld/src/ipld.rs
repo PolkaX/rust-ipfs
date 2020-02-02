@@ -1,5 +1,4 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
-use std::borrow::Borrow;
 
 use block_format::Block as BlockT;
 use cid::{AsCidRef, Cid, Codec, HasCid};
@@ -28,18 +27,8 @@ pub struct BasicCborIpldStore<B: Blocks> {
     blocks: B,
 }
 
-//impl<B: Blocks> Clone for BasicCborIpldStore<B> {
-//    fn clone(&self) -> Self {
-//        BasicCborIpldStore {
-//            blocks: self.blocks.clone(),
-//        }
-//    }
-//}
-
 impl<B: Blocks> Blocks for BasicCborIpldStore<B> {
     fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>> {
-        //        let b: &B = self.blocks.borrow().deref();
-        //        let s = b; //.get_block(cid)
         self.blocks.get_block(cid)
     }
 
@@ -50,15 +39,12 @@ impl<B: Blocks> Blocks for BasicCborIpldStore<B> {
 
 impl<B: Blocks> BasicCborIpldStore<B> {
     pub fn new(b: B) -> Self {
-        BasicCborIpldStore {
-            //            blocks: Rc::new(RefCell::new(b)),
-            blocks: b,
-        }
+        BasicCborIpldStore { blocks: b }
     }
 }
 impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
     fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T> {
-        let blk = self.blocks.borrow().get_block(c)?;
+        let blk = self.blocks.get_block(c)?;
         let data = (*blk).raw_data();
         let r = ipld_cbor::decode_into(data)?;
         Ok(r)
@@ -107,7 +93,6 @@ impl<BS: Blockstore> Blocks for BsWrapper<BS> {
 
 pub fn cst_from_bstore<BS: Blockstore>(bs: BS) -> BasicCborIpldStore<BsWrapper<BS>> {
     BasicCborIpldStore {
-        //        blocks: Rc::new(RefCell::new(BsWrapper { bs })),
         blocks: BsWrapper { bs },
     }
 }
