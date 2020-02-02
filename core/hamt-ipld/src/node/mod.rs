@@ -95,7 +95,12 @@ where
     }
 
     pub fn find<Output: DeserializeOwned>(&self, k: &str) -> Result<Output> {
-        Err(Error::InvalidFormatHAMT)
+        let hash = hash(k);
+        let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
+        let v = self.root.get(&self.bs, &mut hash_bits, k, |v| {
+            cbor_value_to_struct(v.clone()).map_err(Error::IpldCbor)
+        })?;
+        Ok(v)
     }
 
     pub fn set<V: Serialize>(&mut self, k: &str, v: V) -> Result<()> {
@@ -106,7 +111,9 @@ where
     }
 
     pub fn delete(&mut self, k: &str) -> Result<()> {
-        Ok(())
+        let hash = hash(k);
+        let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
+        self.root.remove(&self.bs, &mut hash_bits, k)
     }
 }
 
@@ -196,6 +203,39 @@ impl Node {
         Node {
             bitfield: U256::zero(),
             items: vec![],
+        }
+    }
+
+    pub fn get<'hash, B, F, Output>(
+        &self,
+        bs: &B,
+        hv: &mut HashBits<'hash>,
+        k: &str,
+        f: F,
+    ) -> Result<Output>
+    where
+        B: CborIpldStore,
+        F: Fn(&Value) -> Result<Output>,
+    {
+        let idx = hv.next().ok_or(Error::MaxDepth)?;
+        if self.bitfield.bit(idx as usize) == false {
+            return Err(Error::NotFound(k.to_string()));
+        }
+        let child_index = bit_to_index(&self.bitfield, idx);
+        // load_item first
+        self.items[child_index]
+            .borrow_mut()
+            .deref_mut()
+            .load_item(bs)?;
+        let child = self.items[child_index].borrow();
+        let child = child.deref();
+        match child {
+            Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
+            Item::Ptr(node) => node.get(bs, hv, k, f),
+            Item::Leaf(kvs) => kvs
+                .get(k)
+                .ok_or(Error::NotFound(k.to_string()))
+                .and_then(|v| f(v)),
         }
     }
 
