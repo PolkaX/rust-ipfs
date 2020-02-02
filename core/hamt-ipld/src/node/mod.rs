@@ -32,13 +32,15 @@ pub type KV = BTreeMap<String, Value>;
 pub type KVT = (String, Value);
 
 #[derive(Debug, PartialEq, Eq)]
-enum Item {
+#[cfg_attr(test, derive(Clone))]
+pub enum Item {
     Link(Cid),
     Ptr(Box<Node>),
     Leaf(KV),
 }
 
 #[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(Clone))]
 pub struct Node {
     /// bitmap
     bitfield: U256,
@@ -205,6 +207,14 @@ impl Item {
             }
             _ => unreachable!("`clean_child` param must be `Item::Ptr`"),
         }
+    }
+}
+
+#[cfg(test)]
+pub fn test_node(bitfield: &str, items: Vec<Item>) -> Node {
+    Node {
+        bitfield: U256::from_dec_str(bitfield).unwrap(),
+        items: items.into_iter().map(|i| RefCell::new(i)).collect(),
     }
 }
 
