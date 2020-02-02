@@ -1,14 +1,16 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::result;
 
 use bigint::U256;
+use cid::Cid;
 use serde::de::{SeqAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Item, Node};
+use super::{Item, Node, KVT};
 
 impl Serialize for Node {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
@@ -81,8 +83,28 @@ impl Serialize for Item {
     where
         S: Serializer,
     {
-        unimplemented!()
+        match self {
+            Item::Link(cid) => {
+                let mut m = BTreeMap::new();
+                m.insert("0", cid);
+                m.serialize(serializer)
+            }
+            Item::Leaf(kvs) => {
+                let mut m = BTreeMap::new();
+                m.insert("1", kvs.iter().collect::<Vec<_>>());
+                m.serialize(serializer)
+            }
+            Item::Ptr(_) => unreachable!("should not happen, could not serialize a node ptr"),
+        }
     }
+}
+
+#[derive(Deserialize)]
+enum ItemRef {
+    #[serde(rename = "0")]
+    Link(Cid),
+    #[serde(rename = "1")]
+    KVs(Vec<KVT>),
 }
 
 impl<'de> Deserialize<'de> for Item {
@@ -90,6 +112,11 @@ impl<'de> Deserialize<'de> for Item {
     where
         D: Deserializer<'de>,
     {
-        unimplemented!()
+        let item_ref = ItemRef::deserialize(deserializer)?;
+        let i = match item_ref {
+            ItemRef::Link(cid) => Item::from_link(cid),
+            ItemRef::KVs(kvs) => Item::from_kvs(kvs),
+        };
+        Ok(i)
     }
 }

@@ -12,9 +12,5 @@ pub mod node;
 #[cfg(test)]
 mod tests;
 
-pub use self::ipld::{BasicCborIpldStore, Blockstore, CborIpldStore};
-pub use self::node::{
-    //    entry::{PContent, Pointer, KV},
-    Hamt,
-    DEFAULT_BIT_WIDTH,
-};
+pub use self::ipld::{cst_from_bstore, BasicCborIpldStore, Blockstore, CborIpldStore};
+pub use self::node::{Hamt, DEFAULT_BIT_WIDTH};
