@@ -1,6 +1,5 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
-
-use std::sync::{Arc, RwLock};
+use std::borrow::Borrow;
 
 use block_format::Block as BlockT;
 use cid::{AsCidRef, Cid, Codec, HasCid};
@@ -8,12 +7,8 @@ use multihash::Hash as MHashEnum;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::error::*;
-use std::borrow::Borrow;
-use std::cell::RefCell;
-use std::ops::Deref;
-use std::rc::Rc;
 
-trait Blocks {
+pub trait Blocks {
     fn get_block(&self, cid: &Cid) -> Result<Box<dyn BlockT>>;
     fn add_block(&mut self, blk: impl BlockT) -> Result<()>;
 }
@@ -96,7 +91,7 @@ impl<B: Blocks> CborIpldStore for BasicCborIpldStore<B> {
     }
 }
 
-struct BsWrapper<BS: Blockstore> {
+pub struct BsWrapper<BS: Blockstore> {
     bs: BS,
 }
 

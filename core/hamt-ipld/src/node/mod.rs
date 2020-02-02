@@ -1,9 +1,8 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-//pub mod entry;
 pub mod trait_impl;
 
-use std::cell::{RefCell, RefMut};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use bigint::U256;
@@ -13,12 +12,9 @@ use serde::{de::DeserializeOwned, Serialize};
 use serde_cbor::Value;
 use std::ops::{Deref, DerefMut};
 
-//use self::entry::{PContent, Pointer};
-//pub use self::trait_impl::PartNode;
 use crate::error::*;
 use crate::hash::{hash, HashBits};
-use crate::ipld::{BasicCborIpldStore, CborIpldStore};
-use std::borrow::Borrow;
+use crate::ipld::CborIpldStore;
 
 const ARRAY_WIDTH: usize = 3;
 pub const DEFAULT_BIT_WIDTH: u32 = 8;
@@ -133,6 +129,66 @@ impl Item {
         }
         Ok(())
     }
+
+    pub fn clean_child(&mut self) -> Result<()> {
+        match self {
+            Item::Ptr(ref node) => {
+                let len = node.items.len();
+                match len {
+                    0 => Err(Error::InvalidFormatHAMT),
+                    1 => {
+                        // this branch means that if current node's child only have one child,
+                        // and this child first sub-child is a leaf, then use sub-child replace
+                        // current child directly.
+                        // due to rust mutable check, when we hold `node.items` ref, we can't
+                        // call mem::swap(self, node.items[0]), so that we just use a `tmp` item to
+                        // swap first, and then swap the `tmp` item into `self`
+                        let should_move_leaf = {
+                            let mut borrow = node.items[0].borrow_mut();
+                            let leaf = borrow.deref_mut();
+                            if let Item::Leaf(_) = leaf {
+                                // it's safe, for current child would be release after `*self = leaf`
+                                // so that we use a `tmp` Item to replace current sub-child,
+                                // and now `tmp` is `sub-child`
+                                let mut tmp = Item::Leaf(Default::default());
+                                std::mem::swap(&mut tmp, leaf);
+                                Some(tmp)
+                            } else {
+                                // if sub-child is not a leaf, do nothing.
+                                None
+                            }
+                        };
+                        // if sub-child is not leaf, this if branch would not hit
+                        if let Some(leaf) = should_move_leaf {
+                            *self = leaf
+                        }
+                        Ok(())
+                    }
+                    x if x <= ARRAY_WIDTH => {
+                        // should use clone instead of mem::swap, for this part may be return directly
+                        let mut child_vals = KV::default();
+                        for child_item in node.items.iter() {
+                            match child_item.borrow().deref() {
+                                Item::Leaf(kvs) => {
+                                    for (k, v) in kvs.iter() {
+                                        if child_vals.len() == ARRAY_WIDTH {
+                                            return Ok(());
+                                        }
+                                        child_vals.insert(k.clone(), v.clone());
+                                    }
+                                }
+                                _ => return Ok(()),
+                            }
+                        }
+                        *self = Item::Leaf(child_vals);
+                        Ok(())
+                    }
+                    _ => Ok(()),
+                }
+            }
+            _ => unreachable!("`clean_child` param must be `Item::Ptr`"),
+        }
+    }
 }
 
 impl Node {
@@ -158,11 +214,9 @@ impl Node {
             return self.insert_child(idx, k, v);
         }
         let item_index = bit_to_index(&self.bitfield, idx);
-        // TODO
-        let item = self.items.get(item_index).expect("");
-        // try load node from cid
-        let mut item = item.borrow_mut();
+        let mut item = self.items[item_index].borrow_mut();
         let item = item.deref_mut();
+        // try load node from cid
         item.load_item(bs)?;
 
         match item {
@@ -216,73 +270,42 @@ impl Node {
             return Err(Error::NotFound(k.to_string()));
         }
         let item_index = bit_to_index(&self.bitfield, idx);
-        // TODO
-        let item = self.items.get(item_index).expect("");
-        // try load node from cid
-        let mut item = item.borrow_mut();
-        let item = item.deref_mut();
-        match item {
-            Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
-            Item::Ptr(node) => {
-                // it's branch, recurse to fetch child
-                node.remove(bs, hv, k)?;
-                node.clean_child(item)
-            }
-            Item::Leaf(kvs) => {
-                let _ = kvs.remove(k).ok_or(Error::NotFound(k.to_string()))?;
-                if kvs.is_empty() {
-                    // the leaf is empty, should remove this leaf from this node
-                    self.items.remove(item_index);
-                    // set idx pos bit is zero
-                    unset_bit(&mut self.bitfield, idx);
-                }
-                Ok(())
-            }
-        }
-    }
+        let mut delete = false;
+        {
+            // use block to ensure `item` would be release, then final delete from parent could be called
+            let mut item = self.items[item_index].borrow_mut();
+            let item = item.deref_mut();
+            // try load node from cid
+            item.load_item(bs)?;
 
-    fn clean_child(&mut self, item: &mut Item) -> Result<()> {
-        match item {
-            Item::Ptr(node) => {
-                let len = node.items.len();
-                match len {
-                    0 => Err(Error::InvalidFormatHAMT),
-                    1 => {
-                        let mut tmp_item = node.items[0].borrow_mut();
-                        let mut child_item = tmp_item.deref_mut();
-                        if let Item::Leaf(_) = child_item {
-                            // it's safe, for child is sub item[0] for item
-                            // use sub item[0] replace of current item, then old item would release directly
-                            std::mem::swap(item, child_item);
-                        }
-                        Ok(())
+            match item {
+                Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
+                Item::Ptr(node) => {
+                    // it's branch, recurse to fetch child
+                    node.remove(bs, hv, k)?;
+                    // return directly
+                    return item.clean_child();
+                }
+                Item::Leaf(kvs) => {
+                    let _ = kvs.remove(k).ok_or(Error::NotFound(k.to_string()))?;
+                    if kvs.is_empty() {
+                        // after remove, when the leaf is empty, should remove from parent.
+                        // but due to rust immutable check, `items.remove` could not call here,
+                        // need be called after this block
+                        delete = true;
                     }
-                    x if x <= ARRAY_WIDTH => {
-                        // should use clone instead of mem::swap, for this part may be return directly
-                        let mut child_vals = KV::default();
-                        for child_item in node.items.iter() {
-                            match child_item.borrow().deref() {
-                                Item::Leaf(kvs) => {
-                                    for (k, v) in kvs.iter() {
-                                        if child_vals.len() == ARRAY_WIDTH {
-                                            return Ok(());
-                                        }
-                                        child_vals.insert(k.clone(), v.clone());
-                                    }
-                                }
-                                _ => return Ok(()),
-                            }
-                        }
-                        *item = Item::Leaf(child_vals);
-                        Ok(())
-                    }
-                    _ => Ok(()),
                 }
             }
-            _ => unreachable!("`clean_child` param must be `Item::Ptr`"),
         }
+        if delete {
+            // only when item is a leaf and is empty after remove, the branch would be called
+            // the leaf is empty, should remove this leaf from this node
+            self.items.remove(item_index);
+            // set idx pos bit is zero
+            unset_bit(&mut self.bitfield, idx);
+        }
+        Ok(())
     }
-
     //    pub fn check_size(&self) -> Result<u64> {
     //        let cid = self.store.put(&self)?;
     //        let blk = self.store.get_block(&cid)?;

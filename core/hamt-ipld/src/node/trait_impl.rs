@@ -1,16 +1,14 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
+use std::cell::RefCell;
 use std::fmt;
 use std::result;
 
-use archery::{RcK, SharedPointerKind};
 use bigint::U256;
 use serde::de::{SeqAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{Item, Node};
-use crate::ipld::CborIpldStore;
-use std::cell::RefCell;
 
 impl Serialize for Node {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
