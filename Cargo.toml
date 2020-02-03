@@ -9,6 +9,7 @@ members = [
     "core/ipfs/blockstore",
     "core/block-format",
     "core/hamt-ipld",
+    "core/hamt-ipld2",
     "core/amt-ipld",
     "core/util",
     "core/merkledag",

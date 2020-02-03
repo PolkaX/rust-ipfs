@@ -1,46 +1,61 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-pub mod entry;
 pub mod trait_impl;
 
-use archery::{ArcK, RcK, SharedPointer, SharedPointerKind};
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::ops::{Deref, DerefMut};
+
 use bigint::U256;
 use cid::Cid;
 use ipld_cbor::{cbor_value_to_struct, struct_to_cbor_value};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_cbor::Value;
-use std::ops::{Deref, DerefMut};
 
-use self::entry::{PContent, Pointer, KV};
-pub use self::trait_impl::PartNode;
 use crate::error::*;
 use crate::hash::{hash, HashBits};
-use crate::ipld::{Blocks, CborIpldStor};
+use crate::ipld::CborIpldStore;
 
 const ARRAY_WIDTH: usize = 3;
 pub const DEFAULT_BIT_WIDTH: u32 = 8;
 
-pub type NodeP<B, P> = SharedPointer<Node<B, P>, P>;
-pub type NodeRc<B> = Node<B, RcK>;
-pub type NodeArc<B> = Node<B, ArcK>;
-pub type PartNodeRc<B> = PartNode<B, RcK>;
-pub type PartNodeArc<B> = PartNode<B, ArcK>;
-
-#[derive(Debug)]
-pub struct Node<B, P = RcK>
+/// Hamt struct, hold root node. for public, we use `Hamt`, not `Node`
+/// current `Hamt` is not thread safe, if want to use `Hamt` is multi thread, must use
+/// lock to wrap `Hamt`
+pub struct Hamt<B>
 where
-    B: Blocks,
-    P: SharedPointerKind,
+    B: CborIpldStore,
 {
-    // we use u64 here, for normally a branch of node would not over 64, 64 branch's wide is so large, if larger then 64, panic
-    /// bitmap
-    bitfield: U256,
-    /// branch node
-    pointers: Vec<Pointer<B, P>>,
-
-    /// for fetching and storing children
-    store: CborIpldStor<B>,
+    /// root node of `Hamt`
+    root: Node,
+    /// database to store the relationship of cid and node
+    bs: B,
     bit_width: u32,
+}
+
+pub type KV = BTreeMap<String, Value>;
+pub type KVT = (String, Value);
+
+/// Item would be `Link` `Ptr` and `Leaf`, but in factor, `Ptr` is the cache of `Link`.
+/// when call `load_item`, the `Link` would convert to `Ptr`.
+/// when call `flush`, the `Ptr` would refresh the `Link`
+/// when serialize/deserialize, should not serialize `Ptr`, otherwise would panic.
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(Clone))]
+pub enum Item {
+    Link(Cid),
+    Ptr(Box<Node>),
+    Leaf(KV),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(test, derive(Clone))]
+pub struct Node {
+    /// bitmap, we use U256 replace bigint, for we think the bit_width and HashBits couldn't
+    /// more then 256bit
+    bitfield: U256,
+    /// `Item` is wrapped by `Refcell` due to items would load in immutable `get` call.
+    items: Vec<RefCell<Item>>,
 }
 
 #[inline]
@@ -57,353 +72,409 @@ pub fn unset_bit(input: &mut U256, n: u32) {
 
 /// index for bit position in this bitmap
 #[inline]
-pub fn index_for_bitpos(bitmap: &U256, bit_pos: u32) -> u32 {
+pub fn bit_to_index(bitmap: &U256, bit_pos: u32) -> usize {
     let one: U256 = 1.into();
     let mask: U256 = (one << bit_pos as usize) - one;
     let r: U256 = mask & *bitmap;
-    r.0.iter().fold(0, |a, b| a + b.count_ones())
+    r.0.iter().fold(0, |a, b| a + b.count_ones() as usize)
 }
 
-impl<B, P> Node<B, P>
+impl<B> Hamt<B>
 where
-    B: Blocks,
-    P: SharedPointerKind,
+    B: CborIpldStore,
 {
-    #[cfg(test)]
-    pub fn test_init(
-        store: CborIpldStor<B>,
-        bitfield: &str,
-        pointers: Vec<Pointer<B, P>>,
-        bit_width: u32,
-    ) -> Self {
-        Node {
-            bitfield: U256::from_dec_str(bitfield).unwrap(),
-            pointers,
-            store,
+    /// create a new empty Hamt with bit_width
+    pub fn new_with_bitwidth(store: B, bit_width: u32) -> Self {
+        Hamt {
+            root: Node::new(),
+            bs: store,
             bit_width,
         }
     }
 
-    pub fn new(store: CborIpldStor<B>) -> Node<B, P> {
+    /// create a new empty Hamt
+    pub fn new(store: B) -> Self {
         Self::new_with_bitwidth(store, DEFAULT_BIT_WIDTH)
     }
 
-    pub fn new_with_bitwidth(store: CborIpldStor<B>, bit_width: u32) -> Node<B, P> {
-        Node {
-            bitfield: 0.into(),
-            pointers: vec![],
-            store,
+    /// load Hamt from cid with bitwidth
+    pub fn load_with_bitwidth(store: B, cid: &Cid, bit_width: u32) -> Result<Self> {
+        let root: Node = store.get(cid)?;
+        Ok(Hamt {
+            root,
+            bs: store,
             bit_width,
-        }
+        })
     }
 
-    pub fn new_pointer_node(store: CborIpldStor<B>) -> NodeP<B, P> {
-        SharedPointer::new(Self::new(store))
+    /// load Hamt from cid
+    pub fn load(store: B, cid: &Cid) -> Result<Self> {
+        Self::load_with_bitwidth(store, cid, DEFAULT_BIT_WIDTH)
     }
 
-    pub fn load_node(store: CborIpldStor<B>, c: Cid) -> Result<Node<B, P>> {
-        Self::load_node_with_bitwidth(store, c, DEFAULT_BIT_WIDTH)
-    }
-
-    pub fn load_node_with_bitwidth(
-        store: CborIpldStor<B>,
-        c: Cid,
-        bit_width: u32,
-    ) -> Result<Node<B, P>> {
-        let pn: PartNode<B, P> = store.get(&c)?;
-        let node = pn.into_node(store, bit_width);
-        Ok(node)
-    }
-
-    pub fn get_mut_bitfield(&mut self) -> &mut U256 {
-        &mut self.bitfield
-    }
-
-    pub fn get_mut_pointers(&mut self) -> &mut Vec<Pointer<B, P>> {
-        &mut self.pointers
-    }
-
-    pub fn get_pointers(&self) -> &Vec<Pointer<B, P>> {
-        &self.pointers
-    }
-
-    pub fn get_bitwidth(&self) -> u32 {
+    pub fn bit_width(&self) -> u32 {
         self.bit_width
     }
 
-    pub fn get_store(&self) -> CborIpldStor<B> {
-        self.store.clone()
+    pub fn root(&self) -> &Node {
+        &self.root
     }
 
+    /// get a value for k, if not find, would return Error::NotFound
     pub fn find<Output: DeserializeOwned>(&self, k: &str) -> Result<Output> {
         let hash = hash(k);
-        let mut hash_bits = HashBits::new(hash.as_ref());
-        self.get_value(&mut hash_bits, k)
-            .and_then(|v| cbor_value_to_struct(v).map_err(Error::IpldCbor))
+        let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
+        let v = self.root.get(&self.bs, &mut hash_bits, k, |v| {
+            cbor_value_to_struct(v.clone()).map_err(Error::IpldCbor)
+        })?;
+        Ok(v)
     }
 
-    pub fn delete(&mut self, k: &str) -> Result<()> {
-        let hash = hash(k);
-        let mut hash_bits = HashBits::new(hash.as_ref());
-        self.modify_value(&mut hash_bits, k, None)
-    }
-
+    /// set a value for k, if the value is already exist, override it.
     pub fn set<V: Serialize>(&mut self, k: &str, v: V) -> Result<()> {
         let hash = hash(k);
-        let mut hash_bits = HashBits::new(hash.as_ref());
+        let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
         let b = struct_to_cbor_value(&v).map_err(Error::IpldCbor)?;
-
-        self.modify_value(&mut hash_bits, k, Some(b))
+        self.root.set(&self.bs, &mut hash_bits, k, b)
     }
 
-    pub fn flush(&mut self) -> Result<()> {
-        for p in self.pointers.iter_mut() {
-            let mut guard_cache = p.cache.write().map_err(|_| Error::Lock)?;
-            if let Some(ref mut cache) = guard_cache.deref_mut() {
-                cache.flush()?;
-                let cid = self.store.put(cache)?;
-                p.data = PContent::Link(cid);
-            }
-            // clear cache
-            *guard_cache = None;
+    /// delete for k, if the k is not exist, return Error::NotFound
+    pub fn delete(&mut self, k: &str) -> Result<()> {
+        let hash = hash(k);
+        let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
+        self.root.remove(&self.bs, &mut hash_bits, k)
+    }
+
+    /// flush all `Ptr` into `Link`, every flush should treat as `Commit`,
+    /// means commit current all changes into database, and generate changed cids.
+    /// the operation equals to persistence. if store the root cid, then the Hamt is immutable,
+    /// could recover all child status from any root cid.
+    pub fn flush(&mut self) -> Result<Cid> {
+        self.root.flush(&mut self.bs)?;
+        self.bs.put(&self.root)
+    }
+
+    /// just for test
+    #[cfg(test)]
+    pub fn check_size(&mut self) -> Result<u64> {
+        self.flush()?;
+        self.root.check_size(&mut self.bs)
+    }
+}
+
+impl Item {
+    pub fn from_kvs(kvs: Vec<KVT>) -> Self {
+        Item::Leaf(kvs.into_iter().collect())
+    }
+
+    pub fn from_link(cid: Cid) -> Self {
+        Item::Link(cid)
+    }
+
+    fn load_item<B>(&mut self, bs: &B) -> Result<()>
+    where
+        B: CborIpldStore,
+    {
+        if let Item::Link(cid) = self {
+            let node: Node = bs.get(cid)?;
+            *self = Item::Ptr(Box::new(node));
         }
         Ok(())
     }
 
-    pub fn check_size(&self) -> Result<u64> {
-        let cid = self.store.put(&self)?;
-        let blk = self.store.get_block(&cid)?;
-        let mut total_size = blk.raw_data().len() as u64;
-        for child in self.pointers.iter() {
-            if child.is_shared() {
-                let child_node = child.load_child(self.store.clone(), self.bit_width)?;
-
-                let node = child_node.read().map_err(|_| Error::Lock)?;
-                if let Some(n) = node.deref() {
-                    let child_size = n.check_size()?;
-                    total_size += child_size;
-                } else {
-                    unreachable!("node cache must be `Some()` here")
+    fn clean_child(&mut self) -> Result<()> {
+        match self {
+            Item::Ptr(ref node) => {
+                let len = node.items.len();
+                match len {
+                    0 => Err(Error::InvalidFormatHAMT),
+                    1 => {
+                        // this branch means that if current node's child only have one child,
+                        // and this child first sub-child is a leaf, then use sub-child replace
+                        // current child directly.
+                        // due to rust mutable check, when we hold `node.items` ref, we can't
+                        // call mem::swap(self, node.items[0]), so that we just use a `tmp` item to
+                        // swap first, and then swap the `tmp` item into `self`
+                        let should_move_leaf = {
+                            let mut borrow = node.items[0].borrow_mut();
+                            let leaf = borrow.deref_mut();
+                            if let Item::Leaf(_) = leaf {
+                                // it's safe, for current child would be release after `*self = leaf`
+                                // so that we use a `tmp` Item to replace current sub-child,
+                                // and now `tmp` is `sub-child`
+                                let mut tmp = Item::Leaf(Default::default());
+                                std::mem::swap(&mut tmp, leaf);
+                                Some(tmp)
+                            } else {
+                                // if sub-child is not a leaf, do nothing.
+                                None
+                            }
+                        };
+                        // if sub-child is not leaf, this if branch would not hit
+                        if let Some(leaf) = should_move_leaf {
+                            *self = leaf
+                        }
+                        Ok(())
+                    }
+                    x if x <= ARRAY_WIDTH => {
+                        // should use clone instead of mem::swap, for this part may be return directly
+                        let mut child_vals = KV::default();
+                        for child_item in node.items.iter() {
+                            match child_item.borrow().deref() {
+                                Item::Leaf(kvs) => {
+                                    for (k, v) in kvs.iter() {
+                                        if child_vals.len() == ARRAY_WIDTH {
+                                            return Ok(());
+                                        }
+                                        child_vals.insert(k.clone(), v.clone());
+                                    }
+                                }
+                                _ => return Ok(()),
+                            }
+                        }
+                        *self = Item::Leaf(child_vals);
+                        Ok(())
+                    }
+                    _ => Ok(()),
                 }
+            }
+            _ => unreachable!("`clean_child` param must be `Item::Ptr`"),
+        }
+    }
+}
+
+#[cfg(test)]
+pub fn test_node(bitfield: &str, items: Vec<Item>) -> Node {
+    Node {
+        bitfield: U256::from_dec_str(bitfield).unwrap(),
+        items: items.into_iter().map(RefCell::new).collect(),
+    }
+}
+
+impl Node {
+    fn new() -> Self {
+        Node {
+            bitfield: U256::zero(),
+            items: vec![],
+        }
+    }
+
+    fn get<'hash, B, F, Output>(
+        &self,
+        bs: &B,
+        hv: &mut HashBits<'hash>,
+        k: &str,
+        f: F,
+    ) -> Result<Output>
+    where
+        B: CborIpldStore,
+        F: Fn(&Value) -> Result<Output>,
+    {
+        let idx = hv.next().ok_or(Error::MaxDepth)?;
+        if self.bitfield.bit(idx as usize) == false {
+            return Err(Error::NotFound(k.to_string()));
+        }
+        let child_index = bit_to_index(&self.bitfield, idx);
+        // load_item first
+        self.items[child_index]
+            .borrow_mut()
+            .deref_mut()
+            .load_item(bs)?;
+        let child = self.items[child_index].borrow();
+        let child = child.deref();
+        match child {
+            Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
+            Item::Ptr(node) => node.get(bs, hv, k, f),
+            Item::Leaf(kvs) => kvs
+                .get(k)
+                .ok_or(Error::NotFound(k.to_string()))
+                .and_then(|v| f(v)),
+        }
+    }
+
+    fn set<'hash, B>(&mut self, bs: &B, hv: &mut HashBits<'hash>, k: &str, v: Value) -> Result<()>
+    where
+        B: CborIpldStore,
+    {
+        let idx = hv.next().ok_or(Error::MaxDepth)?;
+        if self.bitfield.bit(idx as usize) == false {
+            return self.insert_child(idx, k, v);
+        }
+        let item_index = bit_to_index(&self.bitfield, idx);
+        let mut item = self.items[item_index].borrow_mut();
+        let item = item.deref_mut();
+        // try load node from cid
+        item.load_item(bs)?;
+
+        match item {
+            Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
+            Item::Ptr(node) => {
+                // it's branch, recurse to fetch child
+                node.set(bs, hv, k, v)
+            }
+            Item::Leaf(kvs) => {
+                let leaf_item = kvs.get_mut(k);
+                if let Some(old_v) = leaf_item {
+                    // find item for this key, reset to new value
+                    *old_v = v;
+                    return Ok(());
+                }
+
+                // a new key/value, if not beyond leaf capacity, insert it directly
+                if kvs.len() < ARRAY_WIDTH {
+                    kvs.insert(k.to_string(), v);
+                    return Ok(());
+                }
+
+                // current leaf is full, create a new branch and move leaf
+                // notice the HashBits use different instance
+                let mut child = Box::new(Node::new());
+                let mut hash_copy = hv.clone();
+                child.set(bs, &mut hash_copy, k, v)?;
+
+                for (old_k, old_v) in kvs.iter() {
+                    let new_hash = hash(old_k.as_bytes());
+                    let mut ch_hv =
+                        HashBits::new_with_consumed(new_hash.as_ref(), hv.consumed(), hv.bit_width);
+                    // must use clone, not mem::swap, for this `set` function may be failed(e.g. MaxDepth)
+                    // if failed, should not change the tree current struct
+                    child.set(bs, &mut ch_hv, old_k, old_v.clone())?;
+                }
+
+                let child_item = Item::Ptr(child);
+                *item = child_item;
+                Ok(())
+            }
+        }
+    }
+
+    pub fn remove<'hash, B>(&mut self, bs: &B, hv: &mut HashBits<'hash>, k: &str) -> Result<()>
+    where
+        B: CborIpldStore,
+    {
+        let idx = hv.next().ok_or(Error::MaxDepth)?;
+        if self.bitfield.bit(idx as usize) == false {
+            return Err(Error::NotFound(k.to_string()));
+        }
+        let item_index = bit_to_index(&self.bitfield, idx);
+        let mut delete = false;
+        {
+            // use block to ensure `item` would be release, then final delete from parent could be called
+            let mut item = self.items[item_index].borrow_mut();
+            let item = item.deref_mut();
+            // try load node from cid
+            item.load_item(bs)?;
+
+            match item {
+                Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
+                Item::Ptr(node) => {
+                    // it's branch, recurse to fetch child
+                    node.remove(bs, hv, k)?;
+                    // return directly
+                    return item.clean_child();
+                }
+                Item::Leaf(kvs) => {
+                    let _ = kvs.remove(k).ok_or(Error::NotFound(k.to_string()))?;
+                    if kvs.is_empty() {
+                        // after remove, when the leaf is empty, should remove from parent.
+                        // but due to rust immutable check, `items.remove` could not call here,
+                        // need be called after this block
+                        delete = true;
+                    }
+                }
+            }
+        }
+        if delete {
+            // only when item is a leaf and is empty after remove, the branch would be called
+            // the leaf is empty, should remove this leaf from this node
+            self.items.remove(item_index);
+            // set idx pos bit is zero
+            unset_bit(&mut self.bitfield, idx);
+        }
+        Ok(())
+    }
+
+    fn flush<B>(&mut self, bs: &mut B) -> Result<()>
+    where
+        B: CborIpldStore,
+    {
+        for item in self.items.iter() {
+            let mut borrow = item.borrow_mut();
+            let i = borrow.deref_mut();
+            if let Item::Ptr(node) = i {
+                node.flush(bs)?;
+                let cid = bs.put(&node)?;
+                // flush current item
+                *i = Item::Link(cid);
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn check_size<B>(&self, bs: &mut B) -> Result<u64>
+    where
+        B: CborIpldStore,
+    {
+        let cid = bs.put(&self)?;
+        let node: Node = bs.get(&cid)?;
+        let mut total_size = ipld_cbor::dump_object(&node)?.len() as u64;
+
+        for item in self.items.iter() {
+            item.borrow_mut().deref_mut().load_item(bs)?;
+            if let Item::Ptr(node) = item.borrow().deref() {
+                let child_size = node.check_size(bs)?;
+                total_size += child_size;
             }
         }
         Ok(total_size)
     }
 
-    fn get_value<'hash>(&self, hash_bits: &mut HashBits<'hash>, k: &str) -> Result<Value> {
-        let idx = hash_bits.next(self.bit_width).ok_or(Error::MaxDepth)?;
-        if self.bitfield.bit(idx as usize) == false {
-            return Err(Error::NotFound(k.to_string()));
-        }
-        let child_index = index_for_bitpos(&self.bitfield, idx) as usize;
-        let child = self
-            .pointers
-            .get(child_index)
-            .expect("[get_value]should not happen, bit counts must match pointers");
-        match child.data {
-            PContent::Link(_) => {
-                let child_node = child.load_child(self.store.clone(), self.bit_width)?;
-                let guard = child_node.read().map_err(|_| Error::Lock)?;
-                if let Some(node) = guard.deref() {
-                    node.get_value(hash_bits, k)
-                } else {
-                    unreachable!("node cache must be `Some()` here");
-                }
-            }
-            PContent::KVs(ref kvs) => {
-                for kv in kvs.iter() {
-                    if kv.key == k {
-                        return Ok(kv.value.clone());
-                    }
-                }
-                Err(Error::NotFound(k.to_string()))
-            }
-        }
-    }
-
-    fn modify_value<'hash>(
-        &mut self,
-        hv: &mut HashBits<'hash>,
-        k: &str,
-        v: Option<Value>,
-    ) -> Result<()> {
-        let idx = hv.next(self.bit_width).ok_or(Error::MaxDepth)?;
-        // bitmap do not have this bit, it's a new key for this bit position.
-        if self.bitfield.bit(idx as usize) == false {
-            return self.insert_child(idx, k, v);
-        }
-
-        let cindex = index_for_bitpos(&self.bitfield, idx);
-        let child = self
-            .pointers
-            .get_mut(cindex as usize)
-            .expect("[modify_value]should not happen, bit counts must match pointers");
-
-        match child.data {
-            PContent::Link(_) => {
-                let child_node_p = child.load_child(self.store.clone(), self.bit_width)?;
-                let need_delete = v.is_none();
-                {
-                    let mut guard = child_node_p.write().map_err(|_| Error::Lock)?;
-                    if let Some(n) = guard.deref_mut() {
-                        n.modify_value(hv, k, v)?;
-                    } else {
-                        unreachable!("node cache must be `Some()` here");
-                    }
-                }
-                if need_delete {
-                    let guard = child_node_p.read().map_err(|_| Error::Lock)?;
-                    if let Some(ref node) = guard.deref() {
-                        return self.clean_child(node, cindex);
-                    } else {
-                        unreachable!("node cache must be `Some()` here");
-                    }
-                }
-                Ok(())
-            }
-            PContent::KVs(ref mut kvs) => {
-                // when need to remove this key/value pair
-                if v.is_none() {
-                    let old_len = kvs.len();
-                    // remove pair when key equal to k
-                    kvs.retain(|entry| entry.key != k);
-
-                    let result = if kvs.is_empty() {
-                        // no pair left, remove this child node
-                        self.remove_child(cindex, idx)
-                    } else if old_len == kvs.len() {
-                        // no pair could be removed
-                        Err(Error::NotFound(k.to_string()))
-                    } else {
-                        // normally remove one pair from kvs.
-                        Ok(())
-                    };
-                    return result;
-                }
-
-                // check if key already exists
-                for kv in kvs.iter_mut() {
-                    // find key already has a value, replace it to new value
-                    if kv.key == k {
-                        kv.set_value(v.unwrap());
-                        return Ok(());
-                    }
-                }
-
-                // If the array is full, create a subshard and insert everything into it
-                if kvs.len() >= ARRAY_WIDTH {
-                    let mut sub =
-                        Node::<B, P>::new_with_bitwidth(self.store.clone(), self.bit_width);
-                    let mut hash_copy = hv.clone();
-                    sub.modify_value(&mut hash_copy, k, v)?;
-
-                    for p in kvs.iter() {
-                        let new_hash = hash(p.key.as_bytes());
-                        let mut ch_hv =
-                            HashBits::new_with_consumed(new_hash.as_ref(), hv.consumed());
-                        sub.modify_value(&mut ch_hv, p.key.as_str(), Some(p.value.clone()))?;
-                    }
-
-                    let c = self.store.put(sub)?;
-                    let pointer = Pointer::from_link(c);
-                    return self.set_child(cindex, pointer);
-                }
-
-                // otherwise insert the new element into the array in order
-                let np = KV::new(k.to_string(), v.unwrap());
-                kvs.push(np);
-                // TODO need to check string sort rule
-                kvs.sort_by(|a, b| a.key.cmp(&b.key));
-
-                Ok(())
-            }
-        }
-    }
-
     /// insert k,v to this bit position.
-    fn insert_child(&mut self, idx: u32, k: &str, v: Option<Value>) -> Result<()> {
-        // in insert, the value must exist, `None` represent delete this key.
-        let v = v.ok_or_else(|| Error::NotFound(k.to_string()))?;
-
-        let i = index_for_bitpos(&self.bitfield, idx);
+    fn insert_child(&mut self, idx: u32, k: &str, v: Value) -> Result<()> {
+        let i = bit_to_index(&self.bitfield, idx);
         // set bit for index i
         set_bit(&mut self.bitfield, idx);
-
-        // net pointer
-        let p = Pointer::from_kvs(vec![KV::new(k.to_string(), v)]);
-        self.pointers.insert(i as usize, p);
+        let leaf = Item::from_kvs(vec![(k.to_string(), v)]);
+        self.items.insert(i as usize, RefCell::new(leaf));
         Ok(())
-    }
-
-    fn clean_child(&mut self, child_node: &Node<B, P>, idx: u32) -> Result<()> {
-        let len = child_node.pointers.len();
-        match len {
-            0 => Err(Error::InvalidFormatHAMT),
-            1 => {
-                // TODO: only do this if its a value, cant do this for shards unless pairs requirements are met.
-                let p = child_node
-                    .pointers
-                    .get(0)
-                    .expect("[clean_child]should not happen, bit counts must match pointers");
-                if let PContent::Link(ref _cid) = p.data {
-                    // don't know why... todo
-                    return Ok(());
-                }
-
-                self.set_child(idx, (*p).clone())
-            }
-            x if x <= ARRAY_WIDTH => {
-                let mut chvals = vec![];
-                for p in child_node.pointers.iter() {
-                    match p.data {
-                        PContent::Link(_) => return Ok(()),
-                        PContent::KVs(ref kvs) => {
-                            for sp in kvs {
-                                if chvals.len() == ARRAY_WIDTH {
-                                    return Ok(());
-                                }
-                                chvals.push(sp.clone());
-                            }
-                        }
-                    }
-                }
-                self.set_child(idx, Pointer::from_kvs(chvals))
-            }
-            _ => Ok(()),
-        }
-    }
-
-    fn remove_child(&mut self, i: u32, idx: u32) -> Result<()> {
-        self.pointers.remove(i as usize);
-        // set idx pos bit is zero
-        unset_bit(&mut self.bitfield, idx);
-        Ok(())
-    }
-
-    fn set_child(&mut self, idx: u32, p: Pointer<B, P>) -> Result<()> {
-        let v = self
-            .pointers
-            .get_mut(idx as usize)
-            .expect("[set_child]should not happen, bit counts must match pointers");
-        *v = p;
-        Ok(())
-    }
-
-    pub fn deep_copy(&self) -> Node<B, P> {
-        Node::<B, P> {
-            bitfield: self.bitfield,
-            pointers: self.pointers.iter().map(|p| p.deep_copy()).collect(),
-            store: self.store.clone(),
-            bit_width: self.bit_width,
-        }
     }
 }
 
-pub fn load_node<B, P>(cs: CborIpldStor<B>, bit_width: u32, cid: &Cid) -> Result<Node<B, P>>
+#[cfg(test)]
+#[derive(Debug, Default)]
+pub struct HamtStats {
+    total_nodes: usize,
+    total_kvs: usize,
+    counts: BTreeMap<usize, usize>,
+}
+
+#[cfg(test)]
+pub fn stats<B>(hamt: &Hamt<B>) -> HamtStats
 where
-    B: Blocks,
-    P: SharedPointerKind,
+    B: CborIpldStore,
 {
-    let pn: PartNode<B, P> = cs.get(cid)?;
-    Ok(pn.into_node(cs, bit_width))
+    let mut st = HamtStats::default();
+    stats_rec(&hamt.bs, &hamt.root, &mut st);
+    st
+}
+
+#[cfg(test)]
+fn stats_rec<B>(bs: &B, node: &Node, st: &mut HamtStats)
+where
+    B: CborIpldStore,
+{
+    use std::borrow::BorrowMut;
+    st.total_nodes += 1;
+    for p in node.items.iter() {
+        p.borrow_mut().borrow_mut().load_item(bs).unwrap();
+        match p.borrow().deref() {
+            Item::Link(_) => unreachable!(""),
+            Item::Ptr(node) => stats_rec(bs, node, st),
+            Item::Leaf(kvs) => {
+                st.total_kvs += kvs.len();
+                *(st.counts.entry(kvs.len()).or_insert(0)) += 1;
+            }
+        }
+    }
 }

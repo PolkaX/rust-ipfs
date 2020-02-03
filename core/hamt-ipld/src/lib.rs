@@ -3,7 +3,7 @@
 //! A implementation of `ipld hamt` in Rust.
 
 #![cfg_attr(test, feature(matches_macro))]
-#![allow(clippy::bool_comparison, clippy::type_complexity)]
+#![allow(clippy::bool_comparison, clippy::type_complexity, clippy::or_fun_call)]
 
 mod error;
 mod hash;
@@ -12,8 +12,5 @@ pub mod node;
 #[cfg(test)]
 mod tests;
 
-pub use self::ipld::{BlockStore, Blocks, CborIpldStor};
-pub use self::node::{
-    entry::{PContent, Pointer, KV},
-    Node, NodeArc, NodeRc, PartNode, PartNodeArc, PartNodeRc, DEFAULT_BIT_WIDTH,
-};
+pub use self::ipld::{cst_from_bstore, BasicCborIpldStore, Blockstore, CborIpldStore};
+pub use self::node::{Hamt, DEFAULT_BIT_WIDTH};
