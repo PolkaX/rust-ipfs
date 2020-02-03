@@ -164,6 +164,7 @@ fn test_hash_delete() {
     );
 }
 
+#[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_basic() {
     let cs = new_cbor_store();
@@ -184,6 +185,7 @@ fn test_basic() {
     assert_eq!(v, val);
 }
 
+#[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_set_get() {
     let mut map: HashMap<String, Vec<u8>> = HashMap::new();
@@ -253,6 +255,7 @@ fn test_set_get() {
     }
 }
 
+#[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_reload_empty() {
     let cs = new_cbor_store();
@@ -262,6 +265,7 @@ fn test_reload_empty() {
     on.set("foo", b"bar".to_vec()).unwrap();
 }
 
+#[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_value_linking() {
     use ipld_cbor::Obj;
