@@ -39,8 +39,8 @@ fn test_basic_bytes_loading() {
     assert_eq!(b, s);
 }
 
-#[test]
 #[cfg(not(feature = "test-hash"))]
+#[test]
 fn test_kv() {
     use ipld_cbor::Obj;
     use std::collections::BTreeMap;

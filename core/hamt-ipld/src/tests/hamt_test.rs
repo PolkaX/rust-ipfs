@@ -1,14 +1,13 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use std::collections::BTreeMap;
 use std::time::Instant;
 
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
 use super::*;
-use crate::node::stats;
 
+#[cfg(not(feature = "test-hash"))]
 fn rand_string() -> String {
     let rand_string: String = thread_rng().sample_iter(&Alphanumeric).take(18).collect();
     rand_string
@@ -188,6 +187,8 @@ fn test_basic() {
 #[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_set_get() {
+    use crate::node::stats;
+
     let mut map: HashMap<String, Vec<u8>> = HashMap::new();
     for _ in 0..100_000 {
         map.insert(rand_string(), rand_value());
@@ -268,6 +269,8 @@ fn test_reload_empty() {
 #[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_value_linking() {
+    use std::collections::BTreeMap;
+
     use ipld_cbor::Obj;
 
     let mut cs = new_cbor_store();
