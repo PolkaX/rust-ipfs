@@ -5,9 +5,9 @@ use std::vec;
 
 use crate::blocks::Blocks;
 use crate::error::*;
-use crate::{FlushedRoot, Node, Root, BITS_PER_SUBKEY, WIDTH};
+use crate::{FlushedRoot, Node, Amt, BITS_PER_SUBKEY, WIDTH};
 
-impl<B> Root<B>
+impl<B> Amt<B>
 where
     B: Blocks,
 {
@@ -16,7 +16,7 @@ where
     where
         F: FnMut(u64, &Value) -> Result<()>,
     {
-        traversing(self.bs.clone(), &self.node, self.height, 0, f)
+        traversing(self.bs.clone(), &self.root, self.height, 0, f)
     }
 
     /// Subtract removes all elements of 'or' from 'self'
@@ -67,7 +67,7 @@ where
 {
     /// for `FlushedRoot`, the root must be a flushed tree, thus could load node from cid directly
     pub fn iter(&self) -> Iter<B> {
-        let node_ref = &self.root.node;
+        let node_ref = &self.root.root;
 
         let prefix_key_list = (0..WIDTH)
             .map(|prefix_key| (prefix_key, node_ref.get_bit(prefix_key)))

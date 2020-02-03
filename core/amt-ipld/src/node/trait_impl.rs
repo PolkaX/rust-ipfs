@@ -1,15 +1,17 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use std::fmt;
+use std::ops::Deref;
 use std::result;
 
+use cid::Cid;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_cbor::Value;
 
-use cid::Cid;
-
+use super::{Amt, Item, Node};
 use crate::blocks::Blocks;
-use crate::{Node, Root};
 
-impl<B> Serialize for Root<B>
+impl<B> Serialize for Amt<B>
 where
     B: Blocks,
 {
@@ -17,22 +19,22 @@ where
     where
         S: Serializer,
     {
-        (self.height, self.count, &self.node).serialize(serializer)
+        (self.height, self.count, &self.root).serialize(serializer)
     }
 }
 
-impl<B> Eq for Root<B> where B: Blocks {}
+impl<B> Eq for Amt<B> where B: Blocks {}
 
-impl<B> PartialEq for Root<B>
+impl<B> PartialEq for Amt<B>
 where
     B: Blocks,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.height.eq(&other.height) && self.count.eq(&other.count) && self.node.eq(&other.node)
+        self.height.eq(&other.height) && self.count.eq(&other.count) && self.root.eq(&other.root)
     }
 }
 
-impl<B> fmt::Debug for Root<B>
+impl<B> fmt::Debug for Amt<B>
 where
     B: Blocks,
 {
@@ -40,20 +42,32 @@ where
         write!(
             f,
             "Root{{ height:{:}, count:{:}, node:{:?} }}",
-            self.height, self.count, self.node
+            self.height, self.count, self.root
         )
     }
 }
 
 #[derive(Debug, Deserialize)]
-pub struct PartRoot(pub u64, pub u64, pub Node);
+pub struct PartAmt(pub u64, pub u64, pub Node);
 
-impl PartRoot {
-    pub fn into_root<B>(self, bs: B) -> Root<B>
+impl Serialize for Item {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
     where
-        B: Blocks,
+        S: Serializer,
     {
-        Root::<B>::from_partroot(self, bs)
+        match self {
+            Item::Link(cid) => cid.serialize(serializer),
+            Item::Ptr(_) => unreachable!(""),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Item {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Cid::deserialize(deserializer).map(Item::Link)
     }
 }
 
@@ -66,15 +80,15 @@ impl Serialize for Node {
         let bytes: [u8; 1] = [r[r.len() - 1]; 1];
         (
             serde_bytes::Bytes::new(bytes.as_ref()),
-            &self.links,
-            &self.values,
+            self.branches.borrow().deref(),
+            &self.leafs,
         )
             .serialize(serializer)
     }
 }
 
 #[derive(Deserialize)]
-struct NodeVisitor(serde_bytes::ByteBuf, Vec<Cid>, Vec<Value>);
+struct NodeVisitor(serde_bytes::ByteBuf, Vec<Item>, Vec<Value>);
 impl<'de> Deserialize<'de> for Node {
     fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
     where
@@ -87,12 +101,10 @@ impl<'de> Deserialize<'de> for Node {
                 visitor.0
             )));
         }
-
-        Ok(Node {
-            bitmap: visitor.0[0] as usize,
-            links: visitor.1,
-            values: visitor.2,
-            cache: Default::default(),
-        })
+        Ok(Node::new_from_raw(
+            visitor.0[0] as usize,
+            visitor.1,
+            visitor.2,
+        ))
     }
 }

@@ -43,7 +43,7 @@ fn root_test() {
         ]
     );
 
-    let pr: PartRoot = serde_cbor::from_slice(&v).unwrap();
+    let pr: PartAmt = serde_cbor::from_slice(&v).unwrap();
     let r = pr.into_root(db);
     assert_eq!(root, r);
 }

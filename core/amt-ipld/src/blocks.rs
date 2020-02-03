@@ -1,3 +1,5 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use block_format::{BasicBlock, Block as BlockT};
 use blockstore::Blockstore;
 use cid::{Cid, Codec, Hash as MHashEnum, Prefix};
@@ -7,7 +9,7 @@ use std::rc::Rc;
 
 use crate::error::*;
 
-pub trait Blocks: Clone {
+pub trait Blocks {
     fn get<Output: DeserializeOwned>(&self, cid: &Cid) -> Result<Output>;
     fn put<Input: Serialize>(&self, v: Input) -> Result<Cid>;
 }
