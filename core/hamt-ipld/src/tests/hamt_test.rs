@@ -64,7 +64,7 @@ fn add_and_remove_keys(bit_width: u32, keys: &[&str], extra_keys: &[&str]) {
 
 #[cfg(feature = "test-hash")]
 #[test]
-fn test_canonical_structure() {
+fn test_hash_canonical_structure() {
     let k1 = ["K"];
     let k2 = ["B"];
     add_and_remove_keys(DEFAULT_BIT_WIDTH, &k1, &k2);
@@ -75,7 +75,7 @@ fn test_canonical_structure() {
 
 #[cfg(feature = "test-hash")]
 #[test]
-fn test_canonical_structure_alternate_bit_width() {
+fn test_hash_canonical_structure_alternate_bit_width() {
     add_and_remove_keys(7, ["K"].as_ref(), ["B"].as_ref());
     add_and_remove_keys(
         7,
@@ -98,7 +98,7 @@ fn test_canonical_structure_alternate_bit_width() {
 
 #[cfg(feature = "test-hash")]
 #[test]
-fn test_overflow() {
+fn test_hash_overflow() {
     let keys = [
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1",
@@ -115,6 +115,53 @@ fn test_overflow() {
     assert!(matches!(res, Err(Error::MaxDepth)));
     // Try forcing the depth beyond 32
     node.set(&keys[3][1..], b"foobar".to_vec()).unwrap();
+}
+
+#[cfg(feature = "test-hash")]
+#[test]
+fn test_hash_delete() {
+    let cs = new_cbor_store();
+    let mut hamt = Hamt::new(cs);
+    hamt.set("K00", "K00").unwrap();
+    hamt.set("K01", "K01").unwrap();
+    hamt.set("K02", "K02").unwrap();
+    hamt.set("K03", "K03").unwrap();
+    hamt.set("K04", "K04").unwrap();
+
+    hamt.delete("K00").unwrap();
+    let cid = hamt.flush().unwrap();
+    assert_eq!(
+        &cid.to_string(),
+        "bafy2bzacedro73y3jw6pty567op7zen2nwns3vder2zl6bfiglwdnthzym3jq"
+    );
+
+    hamt.delete("K01").unwrap();
+    let cid = hamt.flush().unwrap();
+    assert_eq!(
+        &cid.to_string(),
+        "bafy2bzacea6u342rxxfa73nd7kymr4bnsmeupko5o22b5ysdnjkns7z7sjzri"
+    );
+
+    hamt.delete("K02").unwrap();
+    let cid = hamt.flush().unwrap();
+    assert_eq!(
+        &cid.to_string(),
+        "bafy2bzacedwuc7klbz327nddmckpdpdtc4z3fhdbe5rcsvzr4w23mrxcyouvu"
+    );
+
+    hamt.delete("K03").unwrap();
+    let cid = hamt.flush().unwrap();
+    assert_eq!(
+        &cid.to_string(),
+        "bafy2bzacebouo3627hr7jm2bxryhbazqttw4h4jcxuhouu7llgpxaqjyh3jvc"
+    );
+
+    hamt.delete("K04").unwrap();
+    let cid = hamt.flush().unwrap();
+    assert_eq!(
+        &cid.to_string(),
+        "bafy2bzaceamp42wmmgr2g2ymg46euououzfyck7szknvfacqscohrvaikwfay"
+    );
 }
 
 #[test]

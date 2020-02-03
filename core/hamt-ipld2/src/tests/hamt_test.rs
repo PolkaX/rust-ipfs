@@ -59,7 +59,7 @@ fn add_and_remove_keys(bit_width: u32, keys: &[&str], extra_keys: &[&str]) {
 
 #[cfg(feature = "test-hash")]
 #[test]
-fn test_canonical_structure() {
+fn test_hash_canonical_structure() {
     let k1 = ["K"];
     let k2 = ["B"];
     add_and_remove_keys(DEFAULT_BIT_WIDTH, &k1, &k2);
@@ -70,7 +70,7 @@ fn test_canonical_structure() {
 
 #[cfg(feature = "test-hash")]
 #[test]
-fn test_canonical_structure_alternate_bit_width() {
+fn test_hash_canonical_structure_alternate_bit_width() {
     add_and_remove_keys(7, ["K"].as_ref(), ["B"].as_ref());
     add_and_remove_keys(
         7,
@@ -93,7 +93,7 @@ fn test_canonical_structure_alternate_bit_width() {
 
 #[cfg(feature = "test-hash")]
 #[test]
-fn test_overflow() {
+fn test_hash_overflow() {
     let keys = [
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA0",
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1",
