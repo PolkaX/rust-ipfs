@@ -19,11 +19,16 @@ use crate::ipld::CborIpldStore;
 const ARRAY_WIDTH: usize = 3;
 pub const DEFAULT_BIT_WIDTH: u32 = 8;
 
+/// Hamt struct, hold root node. for public, we use `Hamt`, not `Node`
+/// current `Hamt` is not thread safe, if want to use `Hamt` is multi thread, must use
+/// lock to wrap `Hamt`
 pub struct Hamt<B>
 where
     B: CborIpldStore,
 {
+    /// root node of `Hamt`
     root: Node,
+    /// database to store the relationship of cid and node
     bs: B,
     bit_width: u32,
 }
@@ -31,6 +36,10 @@ where
 pub type KV = BTreeMap<String, Value>;
 pub type KVT = (String, Value);
 
+/// Item would be `Link` `Ptr` and `Leaf`, but in factor, `Ptr` is the cache of `Link`.
+/// when call `load_item`, the `Link` would convert to `Ptr`.
+/// when call `flush`, the `Ptr` would refresh the `Link`
+/// when serialize/deserialize, should not serialize `Ptr`, otherwise would panic.
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(Clone))]
 pub enum Item {
@@ -42,8 +51,10 @@ pub enum Item {
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(test, derive(Clone))]
 pub struct Node {
-    /// bitmap
+    /// bitmap, we use U256 replace bigint, for we think the bit_width and HashBits couldn't
+    /// more then 256bit
     bitfield: U256,
+    /// `Item` is wrapped by `Refcell` due to items would load in immutable `get` call.
     items: Vec<RefCell<Item>>,
 }
 
@@ -72,6 +83,7 @@ impl<B> Hamt<B>
 where
     B: CborIpldStore,
 {
+    /// create a new empty Hamt with bit_width
     pub fn new_with_bitwidth(store: B, bit_width: u32) -> Self {
         Hamt {
             root: Node::new(),
@@ -79,10 +91,13 @@ where
             bit_width,
         }
     }
+
+    /// create a new empty Hamt
     pub fn new(store: B) -> Self {
         Self::new_with_bitwidth(store, DEFAULT_BIT_WIDTH)
     }
 
+    /// load Hamt from cid with bitwidth
     pub fn load_with_bitwidth(store: B, cid: &Cid, bit_width: u32) -> Result<Self> {
         let root: Node = store.get(cid)?;
         Ok(Hamt {
@@ -92,6 +107,7 @@ where
         })
     }
 
+    /// load Hamt from cid
     pub fn load(store: B, cid: &Cid) -> Result<Self> {
         Self::load_with_bitwidth(store, cid, DEFAULT_BIT_WIDTH)
     }
@@ -104,6 +120,7 @@ where
         &self.root
     }
 
+    /// get a value for k, if not find, would return Error::NotFound
     pub fn find<Output: DeserializeOwned>(&self, k: &str) -> Result<Output> {
         let hash = hash(k);
         let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
@@ -113,6 +130,7 @@ where
         Ok(v)
     }
 
+    /// set a value for k, if the value is already exist, override it.
     pub fn set<V: Serialize>(&mut self, k: &str, v: V) -> Result<()> {
         let hash = hash(k);
         let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
@@ -120,17 +138,24 @@ where
         self.root.set(&self.bs, &mut hash_bits, k, b)
     }
 
+    /// delete for k, if the k is not exist, return Error::NotFound
     pub fn delete(&mut self, k: &str) -> Result<()> {
         let hash = hash(k);
         let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
         self.root.remove(&self.bs, &mut hash_bits, k)
     }
 
+    /// flush all `Ptr` into `Link`, every flush should treat as `Commit`,
+    /// means commit current all changes into database, and generate changed cids.
+    /// the operation equals to persistence. if store the root cid, then the Hamt is immutable,
+    /// could recover all child status from any root cid.
     pub fn flush(&mut self) -> Result<Cid> {
         self.root.flush(&mut self.bs)?;
         self.bs.put(&self.root)
     }
 
+    /// just for test
+    #[cfg(test)]
     pub fn check_size(&mut self) -> Result<u64> {
         self.flush()?;
         self.root.check_size(&mut self.bs)
@@ -146,7 +171,7 @@ impl Item {
         Item::Link(cid)
     }
 
-    pub fn load_item<B>(&mut self, bs: &B) -> Result<()>
+    fn load_item<B>(&mut self, bs: &B) -> Result<()>
     where
         B: CborIpldStore,
     {
@@ -157,7 +182,7 @@ impl Item {
         Ok(())
     }
 
-    pub fn clean_child(&mut self) -> Result<()> {
+    fn clean_child(&mut self) -> Result<()> {
         match self {
             Item::Ptr(ref node) => {
                 let len = node.items.len();
@@ -222,7 +247,7 @@ impl Item {
 pub fn test_node(bitfield: &str, items: Vec<Item>) -> Node {
     Node {
         bitfield: U256::from_dec_str(bitfield).unwrap(),
-        items: items.into_iter().map(|i| RefCell::new(i)).collect(),
+        items: items.into_iter().map(RefCell::new).collect(),
     }
 }
 
@@ -369,7 +394,7 @@ impl Node {
         Ok(())
     }
 
-    fn flush<'hash, B>(&mut self, bs: &mut B) -> Result<()>
+    fn flush<B>(&mut self, bs: &mut B) -> Result<()>
     where
         B: CborIpldStore,
     {
@@ -386,6 +411,7 @@ impl Node {
         Ok(())
     }
 
+    #[cfg(test)]
     fn check_size<B>(&self, bs: &mut B) -> Result<u64>
     where
         B: CborIpldStore,

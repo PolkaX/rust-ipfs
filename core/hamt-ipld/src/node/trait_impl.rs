@@ -95,10 +95,7 @@ impl<'de> Deserialize<'de> for Node {
         }
         // U256 receipt a big ending array
         let bitfield = buf.into();
-        let items = items
-            .into_iter()
-            .map(|i| RefCell::new(i))
-            .collect::<Vec<_>>();
+        let items = items.into_iter().map(RefCell::new).collect::<Vec<_>>();
         Ok(Node { bitfield, items })
     }
 }

@@ -122,7 +122,7 @@ fn test_basic() {
 
     let cid = begin_node.flush().unwrap();
 
-    let node = Hamt::load(cs.clone(), &cid).unwrap();
+    let node = Hamt::load(cs, &cid).unwrap();
     let v: Vec<u8> = node.find(key).unwrap();
     assert_eq!(v, val);
 }
@@ -157,7 +157,7 @@ fn test_set_get() {
     let cid = begin_node.flush().unwrap();
     println!("flush took: {}", now.elapsed().as_millis());
 
-    let mut node = Hamt::load_with_bitwidth(cs.clone(), &cid, begin_node.bit_width()).unwrap();
+    let mut node = Hamt::load_with_bitwidth(cs, &cid, begin_node.bit_width()).unwrap();
 
     let now = Instant::now();
     for (k, v) in map.iter() {
@@ -214,13 +214,13 @@ fn test_value_linking() {
     thingy1.insert("cat".to_string(), "dog".to_string());
     let c1 = cs.put(thingy1).unwrap();
 
-    let c = Obj::Cid(c1.clone());
+    let c = Obj::Cid(c1);
     let mut hash = BTreeMap::new();
     hash.insert("one".into(), c);
     hash.insert("foo".into(), Obj::Text("bar".to_string()));
     let thingy2 = Obj::Map(hash);
 
-    let mut n = Hamt::new(cs.clone());
+    let mut n = Hamt::new(cs);
     n.set("cat", thingy2).unwrap();
     let tcid = n.flush().unwrap();
 
