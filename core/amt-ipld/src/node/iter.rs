@@ -1,11 +1,13 @@
-use cid::Cid;
-use serde_cbor::Value;
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 use std::iter::Zip;
 use std::vec;
 
+use cid::Cid;
+use serde_cbor::Value;
+
 use crate::blocks::Blocks;
 use crate::error::*;
-use crate::{FlushedRoot, Node, Amt, BITS_PER_SUBKEY, WIDTH};
+use super::{Node, Amt, Item, BITS_PER_SUBKEY, WIDTH};
 
 impl<B> Amt<B>
 where
@@ -16,7 +18,7 @@ where
     where
         F: FnMut(u64, &Value) -> Result<()>,
     {
-        traversing(self.bs.clone(), &self.root, self.height, 0, f)
+        traversing(&self.bs, &self.root, self.height, 0, f)
     }
 
     /// Subtract removes all elements of 'or' from 'self'
@@ -31,30 +33,35 @@ where
     }
 }
 
-fn traversing<B, F>(bs: B, node: &Node, height: u64, prefix_key: u64, f: &mut F) -> Result<()>
+fn traversing<B, F>(bs: &B, node: &Node, height: u64, prefix_key: u64, f: &mut F) -> Result<()>
 where
     B: Blocks,
     F: FnMut(u64, &Value) -> Result<()>,
 {
     let prefix = prefix_key << BITS_PER_SUBKEY;
-    for i in 0..WIDTH {
-        let current_key = prefix + i as u64;
-        if height == 0 {
+    if height == 0 {
+        for i in 0..WIDTH {
             if node.get_bit(i) {
-                let index = node.index_for_bitpos(i);
-                if let Some(v) = node.values.get(index) {
-                    f(current_key, v)?;
-                } else {
-                    unreachable!("bitmap not match value list, the tree is corrupted")
-                }
+                let current_key = prefix + i as u64;
+                let index = node.bit_to_index(i);
+                f(current_key, &node.leafs[index])?;
             }
-        } else {
-            let r = node.load_node(bs.clone(), i, |node| {
-                traversing(bs.clone(), node, height - 1, current_key, f)
-            });
-            match r {
-                Ok(_) | Err(AmtIpldError::NoNodeForIndex(_)) => {}
-                Err(e) => return Err(e),
+        }
+        return Ok(())
+    }
+
+    let mut branches = node.branches.borrow_mut();
+
+    for i in 0..WIDTH {
+        if node.get_bit(i) {
+            let current_key = prefix + i as u64;
+            let index = node.bit_to_index(i);
+            branches[index].load_item(bs)?;
+
+            if let Item::Ptr(node) = &branches[index] {
+                traversing(bs, node, height - 1, current_key, f)?;
+            } else {
+                unreachable!("")
             }
         }
     }

@@ -1,7 +1,7 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
+mod iter;
 mod trait_impl;
-//mod iter;
 
 use std::cell::RefCell;
 use std::ops::DerefMut;
@@ -14,7 +14,7 @@ use self::trait_impl::PartAmt;
 use crate::blocks::Blocks;
 use crate::error::*;
 
-//const WIDTH: usize = 8; // 2^3
+const WIDTH: usize = 8; // 2^3
 const BITS_PER_SUBKEY: u64 = 3; // 3 is for bit_width 8 (2^3=8)
 const SUBKEY_MASK: u64 = 8 - 1; // 2^3 - 1
 
