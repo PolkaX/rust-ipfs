@@ -18,6 +18,7 @@ pub trait CborIpldStore {
 }
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(Clone))]
 pub struct BasicCborIpldStore<B: Blockstore> {
     blocks: B,
 }

@@ -29,33 +29,37 @@ fn test_hash() {
 #[test]
 fn test_hash_bits_overflow() {
     let buf = [255_u8];
-    let mut hb = HashBits::new(buf.as_ref());
+    let bit_width = 1;
+    let mut hb = HashBits::new(buf.as_ref(), bit_width);
     for _i in 0..8 {
-        let bit = hb.next(1).unwrap();
+        let bit = hb.next().unwrap();
         assert_eq!(bit, 1);
     }
-    assert_eq!(hb.next(1), None)
+    assert_eq!(hb.next(), None)
 }
 
 #[test]
 fn test_hash_bits_uneven() {
     let buf = [255_u8, 127, 79, 45, 116, 99, 35, 17];
-    let mut hb = HashBits::new(buf.as_ref());
-    let v = hb.next(4);
+    let bit_width = 4;
+    let mut hb = HashBits::new(buf.as_ref(), bit_width);
+    let v = hb.next();
     assert_eq!(v, Some(15));
 
-    let v = hb.next(4);
+    let v = hb.next();
     assert_eq!(v, Some(15));
 
-    let v = hb.next(3);
+    hb.bit_width = 3;
+    let v = hb.next();
     assert_eq!(v, Some(3));
 
-    let v = hb.next(3);
+    let v = hb.next();
     assert_eq!(v, Some(7));
 
-    let v = hb.next(3);
+    let v = hb.next();
     assert_eq!(v, Some(6));
 
-    let v = hb.next(15);
+    hb.bit_width = 15;
+    let v = hb.next();
     assert_eq!(v, Some(20269));
 }

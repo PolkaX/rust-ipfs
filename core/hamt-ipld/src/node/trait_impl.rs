@@ -10,7 +10,32 @@ use cid::Cid;
 use serde::de::{SeqAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Item, Node, KVT};
+use super::{Hamt, Item, Node, KVT};
+use crate::ipld::CborIpldStore;
+
+impl<B> PartialEq for Hamt<B>
+where
+    B: CborIpldStore,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.root == other.root && self.bit_width == other.bit_width
+    }
+}
+
+impl<B> Eq for Hamt<B> where B: CborIpldStore {}
+
+impl<B> fmt::Debug for Hamt<B>
+where
+    B: CborIpldStore,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Hamt{{ root: {:?},\n bit_width:{:}}}",
+            self.root, self.bit_width
+        )
+    }
+}
 
 impl Serialize for Node {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>

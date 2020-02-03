@@ -96,6 +96,14 @@ where
         Self::load_with_bitwidth(store, cid, DEFAULT_BIT_WIDTH)
     }
 
+    pub fn bit_width(&self) -> u32 {
+        self.bit_width
+    }
+
+    pub fn root(&self) -> &Node {
+        &self.root
+    }
+
     pub fn find<Output: DeserializeOwned>(&self, k: &str) -> Result<Output> {
         let hash = hash(k);
         let mut hash_bits = HashBits::new(hash.as_ref(), self.bit_width);
@@ -383,7 +391,7 @@ impl Node {
         B: CborIpldStore,
     {
         let cid = bs.put(&self)?;
-        let node = bs.get(&cid)?;
+        let node: Node = bs.get(&cid)?;
         let mut total_size = ipld_cbor::dump_object(&node)?.len() as u64;
 
         for item in self.items.iter() {
@@ -404,5 +412,43 @@ impl Node {
         let leaf = Item::from_kvs(vec![(k.to_string(), v)]);
         self.items.insert(i as usize, RefCell::new(leaf));
         Ok(())
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Default)]
+pub struct HamtStats {
+    total_nodes: usize,
+    total_kvs: usize,
+    counts: BTreeMap<usize, usize>,
+}
+
+#[cfg(test)]
+pub fn stats<B>(hamt: &Hamt<B>) -> HamtStats
+where
+    B: CborIpldStore,
+{
+    let mut st = HamtStats::default();
+    stats_rec(&hamt.bs, &hamt.root, &mut st);
+    st
+}
+
+#[cfg(test)]
+fn stats_rec<B>(bs: &B, node: &Node, st: &mut HamtStats)
+where
+    B: CborIpldStore,
+{
+    use std::borrow::BorrowMut;
+    st.total_nodes += 1;
+    for p in node.items.iter() {
+        p.borrow_mut().borrow_mut().load_item(bs).unwrap();
+        match p.borrow().deref() {
+            Item::Link(_) => unreachable!(""),
+            Item::Ptr(node) => stats_rec(bs, node, st),
+            Item::Leaf(kvs) => {
+                st.total_kvs += kvs.len();
+                *(st.counts.entry(kvs.len()).or_insert(0)) += 1;
+            }
+        }
     }
 }
