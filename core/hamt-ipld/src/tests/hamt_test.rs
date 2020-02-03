@@ -20,6 +20,16 @@ fn rand_value() -> Vec<u8> {
 }
 
 #[cfg(feature = "test-hash")]
+fn node_equal<B>(h1: &mut Hamt<B>, h2: &mut Hamt<B>)
+where
+    B: CborIpldStore,
+{
+    let cid1 = h1.flush().unwrap();
+    let cid2 = h2.flush().unwrap();
+    assert_eq!(cid1, cid2);
+}
+
+#[cfg(feature = "test-hash")]
 fn add_and_remove_keys(bit_width: u32, keys: &[&str], extra_keys: &[&str]) {
     let all: Vec<(&str, Vec<u8>)> = keys.iter().map(|k| (*k, rand_value())).collect();
 
