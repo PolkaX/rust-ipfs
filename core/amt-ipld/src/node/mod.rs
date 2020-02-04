@@ -168,9 +168,10 @@ where
         Ok(())
     }
 
-    pub fn flush(mut self) -> Result<Cid> {
+    pub fn flush(&mut self) -> Result<Cid> {
         self.root.flush(&mut self.bs, self.height)?;
-        let cid = self.bs.put(&self)?;
+        // (&self.height, &self.count, &self.root) equal to Serialize for `Amt<B>`
+        let cid = self.bs.put((&self.height, &self.count, &self.root))?;
         Ok(cid)
     }
 }

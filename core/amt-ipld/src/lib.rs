@@ -5,8 +5,8 @@
 mod blocks;
 mod error;
 mod node;
-#[cfg(test)]
-mod tests;
+//#[cfg(test)]
+//mod tests;
 
 pub use crate::error::*;
 pub use crate::node::Amt;

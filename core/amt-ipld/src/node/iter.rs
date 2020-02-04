@@ -1,13 +1,11 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
-use std::iter::Zip;
 use std::vec;
 
-use cid::Cid;
 use serde_cbor::Value;
 
+use super::{Amt, Item, Node, BITS_PER_SUBKEY, WIDTH};
 use crate::blocks::Blocks;
 use crate::error::*;
-use super::{Node, Amt, Item, BITS_PER_SUBKEY, WIDTH};
 
 impl<B> Amt<B>
 where
@@ -47,7 +45,7 @@ where
                 f(current_key, &node.leafs[index])?;
             }
         }
-        return Ok(())
+        return Ok(());
     }
 
     let mut branches = node.branches.borrow_mut();
@@ -68,13 +66,13 @@ where
     Ok(())
 }
 
-impl<B> FlushedRoot<B>
+impl<B> Amt<B>
 where
     B: Blocks,
 {
     /// for `FlushedRoot`, the root must be a flushed tree, thus could load node from cid directly
     pub fn iter(&self) -> Iter<B> {
-        let node_ref = &self.root.root;
+        let node_ref = &self.root;
 
         let prefix_key_list = (0..WIDTH)
             .map(|prefix_key| (prefix_key, node_ref.get_bit(prefix_key)))
@@ -82,24 +80,18 @@ where
             .map(|(pref, _)| pref as u64)
             .collect::<Vec<_>>();
 
-        let init = if self.root.height == 0 {
-            assert_eq!(prefix_key_list.len(), node_ref.values.len());
-            let zip = prefix_key_list
-                .into_iter()
-                .zip(node_ref.values.clone().into_iter());
-            Traversing::Leaf(zip)
+        let init_node = &self.root as *const Node;
+
+        let init = if self.height == 0 {
+            Traversing::Leaf(0, (prefix_key_list, init_node))
         } else {
-            assert_eq!(prefix_key_list.len(), node_ref.links.len());
-            let zip = prefix_key_list
-                .into_iter()
-                .zip(node_ref.links.clone().into_iter());
-            Traversing::Link(zip)
+            Traversing::Branch(prefix_key_list, init_node)
         };
         Iter {
-            size: self.root.count,
+            size: self.count,
             count: 0,
             stack: vec![init],
-            bs: self.root.bs.clone(),
+            bs: &self.bs,
         }
     }
 }
@@ -107,7 +99,7 @@ where
 /// this `Iter` only could be used for FlushedRoot, due to current module use child_cache to store child,
 /// and the child ref is under `RefCell`. So that we could only iterate the tree after flushing.
 /// if someone do not what iterating the free after flushing, could use `for_each`.
-pub struct Iter<B>
+pub struct Iter<'a, B>
 where
     B: Blocks,
 {
@@ -115,63 +107,65 @@ where
     count: u64,
     stack: Vec<Traversing>,
     // blocks ref, use for load node from cid
-    bs: B,
+    bs: &'a B,
 }
 
-#[derive(Clone)]
 enum Traversing {
-    Leaf(Zip<vec::IntoIter<u64>, vec::IntoIter<Value>>),
-    Link(Zip<vec::IntoIter<u64>, vec::IntoIter<Cid>>),
+    Leaf(usize, (Vec<u64>, *const Node)),
+    Branch(Vec<u64>, *const Node),
 }
 
-impl<B> Iterator for Iter<B>
+impl<'a, B> Iterator for Iter<'a, B>
 where
     B: Blocks,
 {
-    type Item = (u64, Value);
+    type Item = (u64, &'a Value);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let last = match self.stack.last_mut() {
+        let last = match self.stack.pop() {
             Some(last) => last,
             None => {
                 return None;
             }
         };
         match last {
-            Traversing::Leaf(ref mut iter) => match iter.next() {
-                Some(v) => {
-                    self.count += 1;
-                    Some(v)
-                }
-                None => {
-                    self.stack.pop();
-                    self.next()
-                }
-            },
-            Traversing::Link(ref mut iter) => match iter.next() {
-                Some((key, cid)) => {
-                    let n: Node = self.bs.get(&cid).ok()?;
-
-                    let prefix_key_list = (0..WIDTH)
-                        .map(|prefix_key| (prefix_key, n.get_bit(prefix_key)))
-                        .filter(|(_, need)| *need)
-                        .map(|(pref, _)| (key << BITS_PER_SUBKEY) + pref as u64)
-                        .collect::<Vec<_>>();
-
-                    if n.bitmap != 0 && !n.values.is_empty() {
-                        let zip = prefix_key_list.into_iter().zip(n.values.into_iter());
-                        self.stack.push(Traversing::Leaf(zip));
-                    } else {
-                        let zip = prefix_key_list.into_iter().zip(n.links.into_iter());
-                        self.stack.push(Traversing::Link(zip));
+            Traversing::Leaf(pos, (keys, leaf_node)) => {
+                let r = unsafe { (*leaf_node).leafs.get(pos).map(|v| (keys[pos], v)) };
+                match r {
+                    Some(v) => {
+                        let pos = pos + 1;
+                        self.stack.push(Traversing::Leaf(pos, (keys, leaf_node)));
+                        self.count += 1;
+                        return Some(v);
                     }
-                    self.next()
+                    None => self.next(),
                 }
-                None => {
-                    self.stack.pop();
-                    self.next()
+            }
+            Traversing::Branch(keys, node_ref) => {
+                unsafe {
+                    let node = &(*node_ref);
+                    let mut children = vec![];
+                    for (b, key ) in node.branches.borrow_mut().iter_mut().zip(keys.into_iter()) {
+                        b.load_item(self.bs).ok()?;
+                        if let Item::Ptr(child_node) = b {
+                            let prefix_key_list = (0..WIDTH)
+                                .map(|prefix_key| (prefix_key, child_node.get_bit(prefix_key)))
+                                .filter(|(_, need)| *need)
+                                .map(|(pref, _)| (key << BITS_PER_SUBKEY) + pref as u64)
+                                .collect::<Vec<_>>();
+
+                            let node_ptr = child_node.as_ref() as *const Node;
+                            if !child_node.leafs.is_empty() {
+                                children.push(Traversing::Leaf(0, (prefix_key_list, node_ptr)));
+                            } else {
+                                children.push(Traversing::Branch(prefix_key_list, node_ptr));
+                            }
+                        }
+                    }
+                    self.stack.extend(children.into_iter().rev());
                 }
-            },
+                self.next()
+            }
         }
     }
 

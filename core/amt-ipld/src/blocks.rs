@@ -11,7 +11,7 @@ use crate::error::*;
 
 pub trait Blocks {
     fn get<Output: DeserializeOwned>(&self, cid: &Cid) -> Result<Output>;
-    fn put<Input: Serialize>(&self, v: Input) -> Result<Cid>;
+    fn put<Input: Serialize>(&mut self, v: Input) -> Result<Cid>;
 }
 
 pub struct BStoreWrapper<BS: Blockstore> {
@@ -33,7 +33,7 @@ impl<BS: Blockstore> Blocks for BStoreWrapper<BS> {
         Ok(o)
     }
 
-    fn put<Input: Serialize>(&self, v: Input) -> Result<Cid> {
+    fn put<Input: Serialize>(&mut self, v: Input) -> Result<Cid> {
         let v = serde_cbor::to_vec(&v)?;
         let pref = Prefix::new_prefix_v1(Codec::DagCBOR, MHashEnum::Blake2b256);
         let cid = pref.sum(v.as_ref())?;
