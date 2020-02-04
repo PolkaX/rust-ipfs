@@ -2,7 +2,6 @@
 
 //! A implementation of `ipld hamt` in Rust.
 
-#![cfg_attr(test, feature(matches_macro))]
 #![allow(clippy::bool_comparison, clippy::type_complexity, clippy::or_fun_call)]
 
 mod error;
