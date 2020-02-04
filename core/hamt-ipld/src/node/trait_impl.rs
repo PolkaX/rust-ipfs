@@ -1,6 +1,5 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::result;
@@ -95,8 +94,7 @@ impl<'de> Deserialize<'de> for Node {
         }
         // U256 receipt a big ending array
         let bitfield = buf.into();
-        let items = items.into_iter().map(RefCell::new).collect::<Vec<_>>();
-        Ok(Node { bitfield, items })
+        Ok(Node::from_raw(bitfield, items))
     }
 }
 

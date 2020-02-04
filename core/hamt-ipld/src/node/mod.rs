@@ -4,7 +4,6 @@ pub mod trait_impl;
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ops::{Deref, DerefMut};
 
 use bigint::U256;
 use cid::Cid;
@@ -55,7 +54,7 @@ pub struct Node {
     /// more then 256bit
     bitfield: U256,
     /// `Item` is wrapped by `Refcell` due to items would load in immutable `get` call.
-    items: Vec<RefCell<Item>>,
+    items: RefCell<Vec<Item>>,
 }
 
 #[inline]
@@ -184,20 +183,20 @@ impl Item {
 
     fn clean_child(&mut self) -> Result<()> {
         match self {
-            Item::Ptr(ref node) => {
-                let len = node.items.len();
+            Item::Ptr(node) => {
+                let len = node.items.borrow().len();
                 match len {
                     0 => Err(Error::InvalidFormatHAMT),
                     1 => {
                         // this branch means that if current node's child only have one child,
                         // and this child first sub-child is a leaf, then use sub-child replace
                         // current child directly.
-                        // due to rust mutable check, when we hold `node.items` ref, we can't
+                        // due to rust mutable check, when we hold `self` ref, we can't
                         // call mem::swap(self, node.items[0]), so that we just use a `tmp` item to
-                        // swap first, and then swap the `tmp` item into `self`
+                        // swap first, and then move the `tmp` item replace `self`
                         let should_move_leaf = {
-                            let mut borrow = node.items[0].borrow_mut();
-                            let leaf = borrow.deref_mut();
+                            let mut items = node.items.borrow_mut();
+                            let leaf = &mut items[0];
                             if let Item::Leaf(_) = leaf {
                                 // it's safe, for current child would be release after `*self = leaf`
                                 // so that we use a `tmp` Item to replace current sub-child,
@@ -219,8 +218,8 @@ impl Item {
                     x if x <= ARRAY_WIDTH => {
                         // should use clone instead of mem::swap, for this part may be return directly
                         let mut child_vals = KV::default();
-                        for child_item in node.items.iter() {
-                            match child_item.borrow().deref() {
+                        for child_item in node.items.borrow().iter() {
+                            match child_item {
                                 Item::Leaf(kvs) => {
                                     for (k, v) in kvs.iter() {
                                         if child_vals.len() == ARRAY_WIDTH {
@@ -245,17 +244,21 @@ impl Item {
 
 #[cfg(test)]
 pub fn test_node(bitfield: &str, items: Vec<Item>) -> Node {
-    Node {
-        bitfield: U256::from_dec_str(bitfield).unwrap(),
-        items: items.into_iter().map(RefCell::new).collect(),
-    }
+    Node::from_raw(U256::from_dec_str(bitfield).unwrap(), items)
 }
 
 impl Node {
     fn new() -> Self {
         Node {
             bitfield: U256::zero(),
-            items: vec![],
+            items: Default::default(),
+        }
+    }
+
+    fn from_raw(bitfield: U256, items: Vec<Item>) -> Self {
+        Node {
+            bitfield,
+            items: RefCell::new(items),
         }
     }
 
@@ -276,12 +279,10 @@ impl Node {
         }
         let child_index = bit_to_index(&self.bitfield, idx);
         // load_item first
-        self.items[child_index]
-            .borrow_mut()
-            .deref_mut()
-            .load_item(bs)?;
-        let child = self.items[child_index].borrow();
-        let child = child.deref();
+        self.items.borrow_mut()[child_index].load_item(bs)?;
+
+        let items = self.items.borrow();
+        let child = &items[child_index];
         match child {
             Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
             Item::Ptr(node) => node.get(bs, hv, k, f),
@@ -301,8 +302,10 @@ impl Node {
             return self.insert_child(idx, k, v);
         }
         let item_index = bit_to_index(&self.bitfield, idx);
-        let mut item = self.items[item_index].borrow_mut();
-        let item = item.deref_mut();
+
+        let mut items = self.items.borrow_mut();
+
+        let item = &mut items[item_index];
         // try load node from cid
         item.load_item(bs)?;
 
@@ -357,55 +360,43 @@ impl Node {
             return Err(Error::NotFound(k.to_string()));
         }
         let item_index = bit_to_index(&self.bitfield, idx);
-        let mut delete = false;
-        {
-            // use block to ensure `item` would be release, then final delete from parent could be called
-            let mut item = self.items[item_index].borrow_mut();
-            let item = item.deref_mut();
-            // try load node from cid
-            item.load_item(bs)?;
 
-            match item {
-                Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
-                Item::Ptr(node) => {
-                    // it's branch, recurse to fetch child
-                    node.remove(bs, hv, k)?;
-                    // return directly
-                    return item.clean_child();
+        let mut items = self.items.borrow_mut();
+        let item = &mut items[item_index];
+        // try load node from cid
+        item.load_item(bs)?;
+
+        match item {
+            Item::Link(_) => unreachable!("after `load_item`, should not be Link now"),
+            Item::Ptr(node) => {
+                // it's branch, recurse to fetch child
+                node.remove(bs, hv, k)?;
+                // return directly
+                item.clean_child()
+            }
+            Item::Leaf(kvs) => {
+                let _ = kvs.remove(k).ok_or(Error::NotFound(k.to_string()))?;
+                if kvs.is_empty() {
+                    items.remove(item_index);
+                    // set idx pos bit is zero
+                    unset_bit(&mut self.bitfield, idx);
                 }
-                Item::Leaf(kvs) => {
-                    let _ = kvs.remove(k).ok_or(Error::NotFound(k.to_string()))?;
-                    if kvs.is_empty() {
-                        // after remove, when the leaf is empty, should remove from parent.
-                        // but due to rust immutable check, `items.remove` could not call here,
-                        // need be called after this block
-                        delete = true;
-                    }
-                }
+                Ok(())
             }
         }
-        if delete {
-            // only when item is a leaf and is empty after remove, the branch would be called
-            // the leaf is empty, should remove this leaf from this node
-            self.items.remove(item_index);
-            // set idx pos bit is zero
-            unset_bit(&mut self.bitfield, idx);
-        }
-        Ok(())
     }
 
     fn flush<B>(&mut self, bs: &mut B) -> Result<()>
     where
         B: CborIpldStore,
     {
-        for item in self.items.iter() {
-            let mut borrow = item.borrow_mut();
-            let i = borrow.deref_mut();
-            if let Item::Ptr(node) = i {
+        let mut items = self.items.borrow_mut();
+        for item in &mut items[..].iter_mut() {
+            if let Item::Ptr(node) = item {
                 node.flush(bs)?;
                 let cid = bs.put(&node)?;
                 // flush current item
-                *i = Item::Link(cid);
+                *item = Item::Link(cid);
             }
         }
         Ok(())
@@ -419,10 +410,9 @@ impl Node {
         let cid = bs.put(&self)?;
         let node: Node = bs.get(&cid)?;
         let mut total_size = ipld_cbor::dump_object(&node)?.len() as u64;
-
-        for item in self.items.iter() {
-            item.borrow_mut().deref_mut().load_item(bs)?;
-            if let Item::Ptr(node) = item.borrow().deref() {
+        for item in self.items.borrow_mut().iter_mut() {
+            item.load_item(bs)?;
+            if let Item::Ptr(node) = item {
                 let child_size = node.check_size(bs)?;
                 total_size += child_size;
             }
@@ -436,7 +426,7 @@ impl Node {
         // set bit for index i
         set_bit(&mut self.bitfield, idx);
         let leaf = Item::from_kvs(vec![(k.to_string(), v)]);
-        self.items.insert(i as usize, RefCell::new(leaf));
+        self.items.borrow_mut().insert(i as usize, leaf);
         Ok(())
     }
 }
@@ -464,11 +454,12 @@ fn stats_rec<B>(bs: &B, node: &Node, st: &mut HamtStats)
 where
     B: CborIpldStore,
 {
-    use std::borrow::BorrowMut;
     st.total_nodes += 1;
-    for p in node.items.iter() {
-        p.borrow_mut().borrow_mut().load_item(bs).unwrap();
-        match p.borrow().deref() {
+
+    let mut items = node.items.borrow_mut();
+    for p in items.iter_mut() {
+        p.load_item(bs).unwrap();
+        match p {
             Item::Link(_) => unreachable!(""),
             Item::Ptr(node) => stats_rec(bs, node, st),
             Item::Leaf(kvs) => {

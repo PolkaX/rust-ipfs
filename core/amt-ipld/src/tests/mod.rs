@@ -1,11 +1,17 @@
 mod amt_test;
 mod cbor_test;
 
-use cid::{Cid, Codec, Hash as MHashEnum, Prefix};
-use serde::de::DeserializeOwned;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::result;
+
+use serde::{de::DeserializeOwned, Serialize};
+use serde_cbor::Value;
+
+use cid::{Cid, Codec, Hash as MHashEnum, Prefix};
+
+use crate::node::{create_root, Item, Node, PartAmt};
 
 use super::*;
 
@@ -26,18 +32,12 @@ impl Blocks for DB {
         Ok(o)
     }
 
-    fn put<Input: Serialize>(&self, v: Input) -> result::Result<Cid, AmtIpldError> {
+    fn put<Input: Serialize>(&mut self, v: Input) -> result::Result<Cid, AmtIpldError> {
         let v = serde_cbor::to_vec(&v)?;
         let pref = Prefix::new_prefix_v1(Codec::DagCBOR, MHashEnum::Blake2b256);
         let cid = pref.sum(v.as_ref())?;
         self.db.borrow_mut().insert(cid.to_bytes(), v);
         Ok(cid)
-    }
-}
-
-pub fn db_refcell() -> DB {
-    DB {
-        db: Rc::new(RefCell::new(Default::default())),
     }
 }
 
