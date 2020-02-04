@@ -1,13 +1,14 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use bytes::Bytes;
-use cid::{Cid, CidT, Multihash};
+
+use cid::{AsCidRef, Cid, Multihash};
 use util::sha2_256_hash;
 
-use crate::error::{BlockFormatError, Result};
+use crate::error::Result;
 
 /// The trait for getting raw data and cid of block.
-pub trait Block: CidT {
+pub trait Block: AsCidRef {
     /// Get the raw data of block.
     fn raw_data(&self) -> &Bytes;
 }
@@ -33,6 +34,7 @@ impl BasicBlock {
     pub fn new_with_cid(data: Bytes, cid: Cid) -> Result<BasicBlock> {
         #[cfg(debug_assertions)]
         {
+            use crate::error::BlockFormatError;
             let checked_cid = cid
                 .prefix()
                 .sum(data.as_ref())
@@ -57,7 +59,7 @@ impl Block for BasicBlock {
     }
 }
 
-impl CidT for BasicBlock {
+impl AsCidRef for BasicBlock {
     fn cid(&self) -> &Cid {
         &self.cid
     }

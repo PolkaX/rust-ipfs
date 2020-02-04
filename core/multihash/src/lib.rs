@@ -1,5 +1,8 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 //! wrapper for parity-multihash, current support `Blake2b256` and `Blake2s128`
+
+#![deny(missing_docs)]
 
 use bytes::{BufMut, BytesMut};
 use parity_multihash::encode as parity_encode;
@@ -28,6 +31,7 @@ fn encode_hash(hash: Hash) -> (usize, BytesMut) {
     (code.len() + 1, output)
 }
 
+/// Encodes data into a multihash.
 pub fn encode(hash: Hash, input: &[u8]) -> Result<Multihash, EncodeError> {
     match hash {
         Hash::Blake2b256 => {

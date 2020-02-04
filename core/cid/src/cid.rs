@@ -1,13 +1,14 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use integer_encoding::VarIntWriter;
+
 use multibase::Base;
 use multihash::{Hash, Multihash};
 
 use crate::codec::Codec;
-use crate::error::{Error, Result};
+use crate::error::{CidError, Result};
 use crate::prefix::Prefix;
-use crate::to_cid::ToCid;
+use crate::traits::ToCid;
 use crate::version::Version;
 
 /// Representation of a CID.
@@ -19,33 +20,6 @@ pub struct Cid {
     codec: Codec,
     /// The hash of CID.
     hash: Multihash,
-}
-
-/// Cid Trait
-pub trait CidT {
-    /// Get cid ref
-    fn cid(&self) -> &Cid;
-}
-
-#[cfg(feature = "hascid")]
-///
-pub trait HasCid {
-    ///
-    fn has_cid(&self) -> Option<&Cid>;
-}
-
-#[cfg(feature = "hascid")]
-impl<T> HasCid for T {
-    default fn has_cid(&self) -> Option<&Cid> {
-        None
-    }
-}
-
-#[cfg(feature = "hascid")]
-impl<T: CidT> HasCid for T {
-    fn has_cid(&self) -> Option<&Cid> {
-        Some(self.cid())
-    }
 }
 
 impl Cid {
@@ -61,7 +35,7 @@ impl Cid {
     /// A helper function to create CIDv0.
     pub fn new_cid_v0(mh: Multihash) -> Result<Cid> {
         if mh.algorithm() != Hash::SHA2256 || mh.digest().len() != 32 {
-            return Err(Error::InvalidCidV0(mh.algorithm(), mh.digest().len()));
+            return Err(CidError::InvalidCidV0(mh.algorithm(), mh.digest().len()));
         }
 
         Ok(Cid::new(Version::V0, Codec::DagProtobuf, mh))

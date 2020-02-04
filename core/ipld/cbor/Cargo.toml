@@ -19,15 +19,21 @@ bytes = { version = "0.5", features = ["serde"] }
 num-bigint = { version = "0.2", optional = true }
 multihash = { package = "rust-multihash", path = "../../multihash" }
 
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"] }
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
 ipld-format = { package = "rust-ipld-format", path = "../format" }
 block-format = { package = "rust-block-format", path = "../../block-format" }
 cid = { package = "rust-cid", path = "../../cid", features = ["serde_support"] }
 
 [dev-dependencies]
+criterion = "0.3"
 util = { package = "rust-ipfs-util", path = "../../util" }
 hex-literal = "0.2.1"
+maplit = "1.0"
 
 [features]
-bench = []
 bigint = [ "num-bigint" ]
+
+[[bench]]
+name = "benchmarks"
+path = "benches/benchmarks.rs"
+harness = false

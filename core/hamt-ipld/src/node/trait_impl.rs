@@ -1,78 +1,42 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
+use std::collections::BTreeMap;
 use std::fmt;
 use std::result;
 
-use archery::{RcK, SharedPointerKind};
 use bigint::U256;
+use cid::Cid;
 use serde::de::{SeqAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Node, Pointer};
-use crate::ipld::{Blocks, CborIpldStor};
+use super::{Hamt, Item, Node, KVT};
+use crate::ipld::CborIpldStore;
 
-#[derive(Debug)]
-pub struct PartNode<B, P = RcK>
+impl<B> PartialEq for Hamt<B>
 where
-    B: Blocks,
-    P: SharedPointerKind,
-{
-    bitfield: U256,
-    pointers: Vec<Pointer<B, P>>,
-}
-
-impl<B, P> PartNode<B, P>
-where
-    B: Blocks,
-    P: SharedPointerKind,
-{
-    pub fn into_node(self, store: CborIpldStor<B>, bit_width: u32) -> Node<B, P> {
-        Node {
-            bitfield: self.bitfield,
-            pointers: self.pointers,
-            store,
-            bit_width,
-        }
-    }
-}
-
-impl<B, P> PartialEq for Node<B, P>
-where
-    B: Blocks,
-    P: SharedPointerKind,
+    B: CborIpldStore,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.bitfield == other.bitfield
-            && self.pointers == other.pointers
-            && self.bit_width == other.bit_width
+        self.root == other.root && self.bit_width == other.bit_width
     }
 }
 
-impl<B, P> Eq for Node<B, P>
-where
-    B: Blocks,
-    P: SharedPointerKind,
-{
-}
+impl<B> Eq for Hamt<B> where B: CborIpldStore {}
 
-impl<B, P> Clone for Node<B, P>
+impl<B> fmt::Debug for Hamt<B>
 where
-    B: Blocks,
-    P: SharedPointerKind,
+    B: CborIpldStore,
 {
-    fn clone(&self) -> Self {
-        Node {
-            bitfield: self.bitfield,
-            pointers: self.pointers.clone(),
-            store: self.store.clone(),
-            bit_width: self.bit_width,
-        }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Hamt{{ root: {:?},\n bit_width:{:}}}",
+            self.root, self.bit_width
+        )
     }
 }
 
-impl<B, P> Serialize for Node<B, P>
-where
-    B: Blocks,
-    P: SharedPointerKind,
-{
+impl Serialize for Node {
     fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -83,32 +47,21 @@ where
         let index = bitmap_bytes
             .iter()
             .position(|i| *i != 0)
-            .unwrap_or(std::mem::size_of_val(&self.bitfield));
+            .unwrap_or_else(|| std::mem::size_of_val(&self.bitfield));
         let b = serde_bytes::Bytes::new(&bitmap_bytes[index..]);
-        let tuple = (b, &self.pointers);
+        let tuple = (b, &self.items);
         tuple.serialize(serializer)
     }
 }
 
-impl<'de, B, P> Deserialize<'de> for PartNode<B, P>
-where
-    B: Blocks,
-    P: SharedPointerKind,
-{
+impl<'de> Deserialize<'de> for Node {
     fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct TupleVisitor<B: Blocks, P: SharedPointerKind>(
-            std::marker::PhantomData<B>,
-            std::marker::PhantomData<P>,
-        );
-        impl<'de, B, P> Visitor<'de> for TupleVisitor<B, P>
-        where
-            B: Blocks,
-            P: SharedPointerKind,
-        {
-            type Value = (serde_bytes::ByteBuf, Vec<Pointer<B, P>>);
+        struct TupleVisitor;
+        impl<'de> Visitor<'de> for TupleVisitor {
+            type Value = (serde_bytes::ByteBuf, Vec<Item>);
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "tuple must be 2 item, bytes and Vec<Pointer>")
@@ -126,10 +79,7 @@ where
                 Ok((first, second))
             }
         }
-        let (byte_buf, pointers) = deserializer.deserialize_tuple(
-            2,
-            TupleVisitor::<B, P>(std::marker::PhantomData, std::marker::PhantomData),
-        )?;
+        let (byte_buf, items) = deserializer.deserialize_tuple(2, TupleVisitor)?;
 
         // it's big ending bytes, we copy value from end.
         // the buf is size of `u64` u8 array, notice could not out of bounds.
@@ -144,7 +94,49 @@ where
         }
         // U256 receipt a big ending array
         let bitfield = buf.into();
+        Ok(Node::from_raw(bitfield, items))
+    }
+}
 
-        Ok(PartNode { bitfield, pointers })
+impl Serialize for Item {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Item::Link(cid) => {
+                let mut m = BTreeMap::new();
+                m.insert("0", cid);
+                m.serialize(serializer)
+            }
+            Item::Leaf(kvs) => {
+                let mut m = BTreeMap::new();
+                m.insert("1", kvs.iter().collect::<Vec<_>>());
+                m.serialize(serializer)
+            }
+            Item::Ptr(_) => unreachable!("should not happen, could not serialize a node ptr"),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+enum ItemRef {
+    #[serde(rename = "0")]
+    Link(Cid),
+    #[serde(rename = "1")]
+    KVs(Vec<KVT>),
+}
+
+impl<'de> Deserialize<'de> for Item {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let item_ref = ItemRef::deserialize(deserializer)?;
+        let i = match item_ref {
+            ItemRef::Link(cid) => Item::from_link(cid),
+            ItemRef::KVs(kvs) => Item::from_kvs(kvs),
+        };
+        Ok(i)
     }
 }

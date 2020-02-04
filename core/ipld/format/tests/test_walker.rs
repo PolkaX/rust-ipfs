@@ -18,7 +18,7 @@ fn test_walker() {
     });
     let n2 = Arc::new(N {
         inner: EmptyNode::new(),
-        child: vec![n2_1.clone(), n2_2.clone()],
+        child: vec![n2_1, n2_2],
     });
     let n1_1 = Arc::new(N {
         inner: EmptyNode::new(),
@@ -26,14 +26,14 @@ fn test_walker() {
     });
     let n1 = Arc::new(N {
         inner: EmptyNode::new(),
-        child: vec![n1_1.clone()],
+        child: vec![n1_1],
     });
     let root = Arc::new(N {
         inner: EmptyNode::new(),
-        child: vec![n1.clone(), n2.clone()],
+        child: vec![n1, n2],
     });
 
-    let counter = Walker::new(root).into_iter().count();
+    let counter = Walker::new(root).count();
     assert_eq!(counter, 6);
 
     // root -> 1 -> 3
@@ -49,13 +49,13 @@ fn test_walker() {
     });
     let n1 = Arc::new(N {
         inner: EmptyNode::new(),
-        child: vec![n3.clone()],
+        child: vec![n3],
     });
     let root = Arc::new(N {
         inner: EmptyNode::new(),
-        child: vec![n1.clone(), n2.clone()],
+        child: vec![n1, n2],
     });
 
-    let counter = Walker::new(root).into_iter().count();
+    let counter = Walker::new(root).count();
     assert_eq!(counter, 5);
 }

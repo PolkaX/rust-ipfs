@@ -1,10 +1,14 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
+use std::cmp::Ordering;
+
 #[cfg(not(feature = "test-hash"))]
 use fasthash::murmur3::hash128;
 
 /// ```go
 /// func (d *digest64) Sum64() uint64 {
-/// 	h1, _ = (*digest128)(d).Sum128()
-/// 	return h1
+///     h1, _ = (*digest128)(d).Sum128()
+///     return h1
 /// }
 /// ```
 /// murmur3 hash for a bytes value. using hash128 but just pick half for result
@@ -25,11 +29,8 @@ pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 8] {
 #[cfg(feature = "test-hash")]
 pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 32] {
     let mut bytes = [0_u8; 32];
-
-    let mut index = 0;
-    for i in v.as_ref().iter().take(32) {
-        bytes[index] = *i;
-        index += 1;
+    for (index, byte) in v.as_ref().iter().take(32).enumerate() {
+        bytes[index] = *byte;
     }
     bytes
 }
@@ -41,15 +42,20 @@ pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 32] {
 pub struct HashBits<'a> {
     b: &'a [u8],
     consumed: u32,
+    pub bit_width: u32,
 }
 
 impl<'a> HashBits<'a> {
-    pub fn new(buf: &'a [u8]) -> HashBits<'a> {
-        Self::new_with_consumed(buf, 0)
+    pub fn new(buf: &'a [u8], bit_width: u32) -> HashBits<'a> {
+        Self::new_with_consumed(buf, 0, bit_width)
     }
 
-    pub fn new_with_consumed(buf: &'a [u8], consumed: u32) -> HashBits<'a> {
-        HashBits { b: buf, consumed }
+    pub fn new_with_consumed(buf: &'a [u8], consumed: u32, bit_width: u32) -> HashBits<'a> {
+        HashBits {
+            b: buf,
+            consumed,
+            bit_width,
+        }
     }
 
     pub fn consumed(&self) -> u32 {
@@ -58,7 +64,8 @@ impl<'a> HashBits<'a> {
 
     /// Next returns the next 'i' bits of the hashBits value as an u32,
     /// or `None `if there aren't enough bits.
-    pub fn next(&mut self, i: u32) -> Option<u32> {
+    pub fn next(&mut self) -> Option<u32> {
+        let i = self.bit_width;
         let new_consumed = self.consumed.checked_add(i)?;
         if new_consumed > self.b.len() as u32 * 8 {
             return None;
@@ -77,29 +84,33 @@ impl<'a> HashBits<'a> {
         let left_bit = 8 - (self.consumed % 8); // consumed % 8, left_bit is less and equal than 8
 
         let cur_byte = self.b[cur_byte_index];
-        if i == left_bit {
-            // i and left_bit must less or equal than 8
-            let out = mkmask(i) & cur_byte;
-            self.consumed += i;
-            out as u32
-        } else if i < left_bit {
-            // i must less than 8, left_bit must less or equal than 8
-            // e.g. cur_byte: 0b11111111, self.consumed % 8=1, left_bit=7, i=2, then:
-            // a=0b_1111111
-            let a = cur_byte & mkmask(left_bit); // mask out the high bits we don't want, do not need consumed bits
-                                                 // b=0b_11_____
-            let b = a & (!mkmask(left_bit - i)); // mask out the low bits we don't want, do not need unused bits
-                                                 // c=0b______11
-            let c = b as u32 >> left_bit - i; // shift whats left down
-            self.consumed += i;
-            c
-        } else {
-            // must beyond current byte, pick all left_bit
-            let mut out = (mkmask(left_bit) & cur_byte) as u32;
-            out <<= i - left_bit;
-            self.consumed += left_bit;
-            out += self.next_bit(i - left_bit);
-            out
+        match i.cmp(&left_bit) {
+            Ordering::Equal => {
+                // i and left_bit must less or equal than 8
+                let out = mkmask(i) & cur_byte;
+                self.consumed += i;
+                out as u32
+            }
+            Ordering::Less => {
+                // i must less than 8, left_bit must less or equal than 8
+                // e.g. cur_byte: 0b11111111, self.consumed % 8=1, left_bit=7, i=2, then:
+                // a=0b_1111111
+                let a = cur_byte & mkmask(left_bit); // mask out the high bits we don't want, do not need consumed bits
+                                                     // b=0b_11_____
+                let b = a & (!mkmask(left_bit - i)); // mask out the low bits we don't want, do not need unused bits
+                                                     // c=0b______11
+                let c = b as u32 >> (left_bit - i); // shift whats left down
+                self.consumed += i;
+                c
+            }
+            Ordering::Greater => {
+                // must beyond current byte, pick all left_bit
+                let mut out = (mkmask(left_bit) & cur_byte) as u32;
+                out <<= i - left_bit;
+                self.consumed += left_bit;
+                out += self.next_bit(i - left_bit);
+                out
+            }
         }
     }
 }

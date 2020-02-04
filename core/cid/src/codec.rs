@@ -1,6 +1,6 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use crate::error::{Error, Result};
+use crate::error::{CidError, Result};
 
 macro_rules! build_codec_enum {
     {$( #[$attr:meta] $code:expr => $codec:ident, )*} => {
@@ -22,7 +22,7 @@ macro_rules! build_codec_enum {
             pub fn from(raw: u16) -> Result<Self> {
         	    match raw {
                     $( $code => Ok(Self::$codec), )*
-            	    _ => Err(Error::UnknownCodec(raw)),
+            	    _ => Err(CidError::UnknownCodec(raw)),
         	    }
             }
         }

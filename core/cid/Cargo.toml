@@ -12,9 +12,9 @@ keywords = ["ipfs", "cid"]
 [dependencies]
 thiserror = "1.0"
 integer-encoding = "1.0"
-serde = { version = "1.0", features = ["derive"], optional = true }
+serde = { version = "1.0", optional = true }
 serde_bytes = { version = "0.11", optional = true }
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "impl-tag", features = ["tags"], optional = true }
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"], optional = true }
 
 multihash = { package = "rust-multihash", path = "../multihash" }
 multibase = { package = "rust-multibase", path = "../multibase" }

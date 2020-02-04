@@ -20,4 +20,5 @@ rand = "0.7"
 
 [[bench]]
 name = "multibase"
+path = "benches/multibase.rs"
 harness = false

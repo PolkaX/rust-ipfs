@@ -3,12 +3,40 @@
 use std::io::Cursor;
 
 use integer_encoding::VarIntReader;
+
 use multihash::Multihash;
 
 use crate::cid::Cid;
 use crate::codec::Codec;
-use crate::error::{Error, Result};
+use crate::error::{CidError, Result};
 use crate::version::Version;
+
+/// A trait for getting CID reference.
+pub trait AsCidRef {
+    /// Get CID reference.
+    fn cid(&self) -> &Cid;
+}
+
+/// A trait that represents whether a CID exists.
+#[cfg(feature = "hascid")]
+pub trait HasCid {
+    /// For
+    fn has_cid(&self) -> Option<&Cid>;
+}
+
+#[cfg(feature = "hascid")]
+impl<T> HasCid for T {
+    default fn has_cid(&self) -> Option<&Cid> {
+        None
+    }
+}
+
+#[cfg(feature = "hascid")]
+impl<T: AsCidRef> HasCid for T {
+    fn has_cid(&self) -> Option<&Cid> {
+        Some(self.cid())
+    }
+}
 
 /// A trait for converting data into CID format.
 pub trait ToCid {
@@ -79,7 +107,7 @@ impl ToCid for str {
         };
 
         if hash.len() < 2 {
-            return Err(Error::InputTooShort);
+            return Err(CidError::InputTooShort);
         }
 
         if Version::is_v0_str(hash) {
@@ -91,7 +119,7 @@ impl ToCid for str {
 }
 
 impl std::str::FromStr for Cid {
-    type Err = Error;
+    type Err = CidError;
 
     fn from_str(src: &str) -> Result<Self> {
         src.to_cid()

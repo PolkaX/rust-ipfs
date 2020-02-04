@@ -1,11 +1,11 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use cid::{Cid, Error as CidError};
+use cid::{Cid, CidError};
 
-/// The special result type for `block format`.
+/// Type alias to use this library's [`BlockFormatError`] type in a `Result`.
 pub type Result<T> = std::result::Result<T, BlockFormatError>;
 
-/// The special error type for `block format`.
+/// Errors generated from this library.
 #[derive(Debug, thiserror::Error)]
 pub enum BlockFormatError {
     /// The data of block is not match given hash.
