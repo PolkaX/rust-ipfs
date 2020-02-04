@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::time::Instant;
 
 use archery::SharedPointerKind;
+use matches::matches;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
