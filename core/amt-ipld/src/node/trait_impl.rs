@@ -57,7 +57,7 @@ impl Serialize for Item {
     {
         match self {
             Item::Link(cid) => cid.serialize(serializer),
-            Item::Ptr(_) => unreachable!(""),
+            Item::Ptr(_) => unreachable!("could not serialize `Ptr`, just allow `Link`"),
         }
     }
 }

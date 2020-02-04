@@ -22,6 +22,7 @@ fn bit_pos(h: u64, s: u64) -> usize {
     ((h >> s) & SUBKEY_MASK) as usize
 }
 
+/// Root of Amt nodes. store current tree height and count as well
 pub struct Amt<B>
 where
     B: Blocks,
@@ -33,6 +34,10 @@ where
     bs: B,
 }
 
+/// branch for Node.
+/// when `load_item`, must be `Ptr`
+/// when `flush`, must be `Link`
+/// when `serialize/deserialize`, must be `Link`
 #[derive(Debug, Eq, PartialEq)]
 pub enum Item {
     Link(Cid),
@@ -50,6 +55,7 @@ impl<B> Amt<B>
 where
     B: Blocks,
 {
+    /// create a new empy Amt tree
     pub fn new(bs: B) -> Self {
         Amt::<B> {
             height: 0,
@@ -59,6 +65,7 @@ where
         }
     }
 
+    /// load an Amt tree from cid
     pub fn load(cid: &Cid, bs: B) -> Result<Self> {
         let part_root: PartAmt = bs.get(cid)?;
         Ok(Self::from_part(part_root, bs))
@@ -73,16 +80,19 @@ where
         }
     }
 
+    /// create an Amt tree from a value list. the key would follow list sequence
     pub fn from_array<I: Serialize, L: AsRef<[I]>>(arr: L, bs: B) -> Result<Cid> {
         let mut root = Self::new(bs);
         root.batch_set(arr)?;
         root.flush()
     }
 
+    /// current Amt tree item count
     pub fn count(&self) -> u64 {
         self.count
     }
 
+    /// set a k/v for Amt tree
     pub fn set<Input: Serialize>(&mut self, k: u64, input: Input) -> Result<()> {
         let v: Value = ipld_cbor::struct_to_cbor_value(&input)?;
 
@@ -107,6 +117,7 @@ where
         Ok(())
     }
 
+    /// batch operation for `set()`
     pub fn batch_set<I: Serialize, L: AsRef<[I]>>(&mut self, vals: L) -> Result<()> {
         for (i, v) in vals.as_ref().iter().enumerate() {
             self.set(i as u64, v)?;
@@ -114,6 +125,7 @@ where
         Ok(())
     }
 
+    /// get a value for k, if k is not exist, would return `Error::NotFound`
     pub fn get<Output: DeserializeOwned>(&self, k: u64) -> Result<Output> {
         let test = k >> (BITS_PER_SUBKEY * (self.height + 1));
         if test != 0 {
@@ -129,6 +141,7 @@ where
         Ok(output)
     }
 
+    /// delete for k, if k is not exist, would return `Error::NotFound`
     pub fn delete(&mut self, k: u64) -> Result<()> {
         let current_shift = BITS_PER_SUBKEY * self.height;
         self.root.delete(&self.bs, self.height, k, current_shift)?;
@@ -149,8 +162,7 @@ where
                     std::mem::swap(node.deref_mut(), &mut empty);
                     empty
                 } else {
-                    // TODO
-                    unreachable!("")
+                    unreachable!("after `load_item`, Item must be `Ptr`")
                 }
             };
 
@@ -161,6 +173,7 @@ where
         Ok(())
     }
 
+    /// batch operation for `delete()`
     pub fn batch_delete(&mut self, keys: &[u64]) -> Result<()> {
         for k in keys.iter() {
             self.delete(*k)?;
@@ -168,6 +181,7 @@ where
         Ok(())
     }
 
+    /// commit all changes into db and generate new cid for current Amt
     pub fn flush(&mut self) -> Result<Cid> {
         self.root.flush(&mut self.bs, self.height)?;
         // (&self.height, &self.count, &self.root) equal to Serialize for `Amt<B>`
@@ -193,12 +207,16 @@ impl Item {
     }
 }
 
+// only could put outside of `Node` to avoid mutable check
+/// set 1 for bit position index in bitmap
 #[inline]
 fn set_bit(bitmap: &mut usize, index: usize) {
     let b = 1 << index;
     *bitmap |= b;
 }
 
+// only could put outside of `Node` to avoid mutable check
+/// set 0 for bit position index in bitmap
 #[inline]
 fn unset_bit(bitmap: &mut usize, index: usize) {
     let b = 1 << index;
@@ -272,19 +290,11 @@ impl Node {
         if let Item::Ptr(node) = &mut branches[index] {
             node.set(bs, height - 1, key, v, shift - BITS_PER_SUBKEY)
         } else {
-            // TODO
-            unreachable!("")
+            unreachable!("after `load_item`, Item must be `Ptr`")
         }
     }
 
-    pub fn get<B, F, Output>(
-        &self,
-        bs: &B,
-        height: u64,
-        key: u64,
-        shift: u64,
-        f: F,
-    ) -> Result<Output>
+    fn get<B, F, Output>(&self, bs: &B, height: u64, key: u64, shift: u64, f: F) -> Result<Output>
     where
         B: Blocks,
         F: Fn(&Value) -> Result<Output>,
@@ -309,12 +319,11 @@ impl Node {
         if let Item::Ptr(node) = b {
             node.get(bs, height - 1, key, shift - BITS_PER_SUBKEY, f)
         } else {
-            // TODO
-            unreachable!("")
+            unreachable!("after `load_item`, Item must be `Ptr`")
         }
     }
 
-    pub fn delete<B>(&mut self, bs: &B, height: u64, key: u64, shift: u64) -> Result<()>
+    fn delete<B>(&mut self, bs: &B, height: u64, key: u64, shift: u64) -> Result<()>
     where
         B: Blocks,
     {
@@ -342,12 +351,11 @@ impl Node {
             }
             Ok(())
         } else {
-            // TODO
-            unreachable!("")
+            unreachable!("after `load_item`, Item must be `Ptr`")
         }
     }
 
-    pub fn flush<B>(&mut self, bs: &mut B, depth: u64) -> Result<()>
+    fn flush<B>(&mut self, bs: &mut B, depth: u64) -> Result<()>
     where
         B: Blocks,
     {

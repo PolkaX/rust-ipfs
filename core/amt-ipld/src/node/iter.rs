@@ -59,7 +59,7 @@ where
             if let Item::Ptr(node) = &branches[index] {
                 traversing(bs, node, height - 1, current_key, f)?;
             } else {
-                unreachable!("")
+                unreachable!("after `load_item`, Item must be `Ptr`")
             }
         }
     }
@@ -70,7 +70,8 @@ impl<B> Amt<B>
 where
     B: Blocks,
 {
-    /// for `FlushedRoot`, the root must be a flushed tree, thus could load node from cid directly
+    /// `iter()` is equal to `for_each` now(could use before `flush()`).
+    /// but `iter()` would cast more resource
     pub fn iter(&self) -> Iter<B> {
         let node_ref = &self.root;
 
@@ -121,6 +122,11 @@ where
 {
     type Item = (u64, &'a Value);
 
+    /// it's safe to use unsafe here, for except root node, every node is in heap,
+    /// and be refered from root node. thus we use unsafe to avoid lifetime check
+    /// and mutable check.
+    /// notice iterator would load node for cid, thus after iter, all tree is in
+    /// `Ptr` mode, in other word, is being expanded
     fn next(&mut self) -> Option<Self::Item> {
         let last = match self.stack.pop() {
             Some(last) => last,
@@ -170,9 +176,7 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (
-            (self.size - self.count) as usize,
-            Some((self.size - self.count) as usize),
-        )
+        let hint = (self.size - self.count) as usize;
+        (hint, Some(hint))
     }
 }
