@@ -11,7 +11,7 @@ use serde_cbor::Value;
 
 use cid::{Cid, Codec, Hash as MHashEnum, Prefix};
 
-use crate::node::{create_root, Node, Item, PartAmt};
+use crate::node::{create_root, Item, Node, PartAmt};
 
 use super::*;
 

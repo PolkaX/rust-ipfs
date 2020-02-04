@@ -136,7 +136,7 @@ where
                         let pos = pos + 1;
                         self.stack.push(Traversing::Leaf(pos, (keys, leaf_node)));
                         self.count += 1;
-                        return Some(v);
+                        Some(v)
                     }
                     None => self.next(),
                 }
@@ -145,7 +145,7 @@ where
                 unsafe {
                     let node = &(*node_ref);
                     let mut children = vec![];
-                    for (b, key ) in node.branches.borrow_mut().iter_mut().zip(keys.into_iter()) {
+                    for (b, key) in node.branches.borrow_mut().iter_mut().zip(keys.into_iter()) {
                         b.load_item(self.bs).ok()?;
                         if let Item::Ptr(child_node) = b {
                             let prefix_key_list = (0..WIDTH)

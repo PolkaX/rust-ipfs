@@ -8,6 +8,6 @@ mod node;
 #[cfg(test)]
 mod tests;
 
+pub use crate::blocks::Blocks;
 pub use crate::error::*;
 pub use crate::node::Amt;
-pub use crate::blocks::Blocks;
