@@ -10,7 +10,7 @@ use cid::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_cbor::Value;
 
-use self::trait_impl::PartAmt;
+pub use self::trait_impl::PartAmt;
 use crate::blocks::Blocks;
 use crate::error::*;
 
@@ -34,7 +34,7 @@ where
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum Item {
+pub enum Item {
     Link(Cid),
     Ptr(Box<Node>),
 }
@@ -64,7 +64,7 @@ where
         Ok(Self::from_part(part_root, bs))
     }
 
-    fn from_part(part_root: PartAmt, bs: B) -> Self {
+    pub(crate) fn from_part(part_root: PartAmt, bs: B) -> Self {
         Amt::<B> {
             height: part_root.0,
             count: part_root.1,
@@ -218,7 +218,7 @@ impl Node {
         }
     }
 
-    fn new_from_raw(bitmap: usize, branches: Vec<Item>, leafs: Vec<Value>) -> Self {
+    pub fn new_from_raw(bitmap: usize, branches: Vec<Item>, leafs: Vec<Value>) -> Self {
         Node {
             bitmap,
             branches: RefCell::new(branches),

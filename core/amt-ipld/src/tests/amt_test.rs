@@ -8,7 +8,7 @@ fn one_root_node() {
     root.set(0, "0").unwrap();
     root.set(1, "1").unwrap();
     root.set(7, "7").unwrap();
-    let (cid, _) = root.flush().unwrap();
+    let cid = root.flush().unwrap();
     let s = cid.to_string();
     println!("{}", s);
     assert_eq!(
@@ -26,7 +26,7 @@ fn one_root_node_reorder_insert() {
     root.set(5, "5").unwrap();
     root.set(0, "0").unwrap();
     root.set(2, "2").unwrap();
-    let (cid, root) = root.flush().unwrap();
+    let cid = root.flush().unwrap();
     let s = cid.to_string();
     println!("{}", s);
     assert_eq!(
@@ -35,7 +35,6 @@ fn one_root_node_reorder_insert() {
     );
 
     let mut collection = vec![];
-    let root = root.downgrade();
     let _ = root.for_each(&mut |key, value| {
         collection.push((key, value.clone()));
         Ok(())
@@ -46,8 +45,7 @@ fn one_root_node_reorder_insert() {
         assert_eq!(Value::Text(src.to_string()), value);
     }
 
-    let (_, flushed) = root.flush().unwrap();
-    for (src, (key, _)) in m.iter().zip(flushed.iter()) {
+    for (src, (key, _)) in m.iter().zip(root.iter()) {
         assert_eq!(*src, key)
     }
 }
@@ -59,7 +57,7 @@ fn tow_level_node() {
     root.set(7, "7").unwrap();
     root.set(1, "1").unwrap();
     root.set(8, "8").unwrap();
-    let (cid, _) = root.flush().unwrap();
+    let cid = root.flush().unwrap();
     let s = cid.to_string();
     println!("{}", s);
     assert_eq!(
@@ -71,10 +69,9 @@ fn tow_level_node() {
     let mut root = Amt::new(bs);
     root.set(7, "7").unwrap();
     root.set(1, "1").unwrap();
-    let (_, root) = root.flush().unwrap();
-    let mut root = root.downgrade();
+    let _ = root.flush().unwrap();
     root.set(8, "8").unwrap();
-    let (cid, _) = root.flush().unwrap();
+    let cid = root.flush().unwrap();
     let s = cid.to_string();
     println!("{}", s);
     assert_eq!(
@@ -90,7 +87,7 @@ fn tow_level_node_reorder_insert() {
     root.set(8, "8").unwrap();
     root.set(7, "7").unwrap();
     root.set(1, "1").unwrap();
-    let (cid, root) = root.flush().unwrap();
+    let cid = root.flush().unwrap();
     let s = cid.to_string();
     println!("{}", s);
     assert_eq!(
@@ -99,7 +96,6 @@ fn tow_level_node_reorder_insert() {
     );
 
     let mut collection = vec![];
-    let root = root.downgrade();
     let _ = root.for_each(&mut |key, value| {
         collection.push((key, value.clone()));
         Ok(())
@@ -113,11 +109,10 @@ fn tow_level_node_reorder_insert() {
     let bs = db();
     let mut root = Amt::new(bs);
     root.set(8, "8").unwrap();
-    let (_, root) = root.flush().unwrap();
-    let mut root = root.downgrade();
+    let _ = root.flush().unwrap();
     root.set(7, "7").unwrap();
     root.set(1, "1").unwrap();
-    let (cid, root) = root.flush().unwrap();
+    let cid = root.flush().unwrap();
     let s = cid.to_string();
     println!("{}", s);
     assert_eq!(
@@ -126,7 +121,6 @@ fn tow_level_node_reorder_insert() {
     );
 
     let mut collection = vec![];
-    let root = root.downgrade();
     let _ = root.for_each(&mut |key, value| {
         collection.push((key, value.clone()));
         Ok(())
@@ -137,8 +131,7 @@ fn tow_level_node_reorder_insert() {
         assert_eq!(Value::Text(src.to_string()), value);
     }
 
-    let (_, flushed) = root.flush().unwrap();
-    for (src, (key, _)) in m.iter().zip(flushed.iter()) {
+    for (src, (key, _)) in m.iter().zip(root.iter()) {
         assert_eq!(*src, key)
     }
 }
@@ -157,7 +150,7 @@ fn there_level() {
         root.set(*i, *i).unwrap();
     }
 
-    let (cid, root) = root.flush().unwrap();
+    let cid = root.flush().unwrap();
     let s = cid.to_string();
     println!("{}", s);
     assert_eq!(
@@ -166,7 +159,6 @@ fn there_level() {
     );
 
     let mut collection = vec![];
-    let root = root.downgrade();
     let _ = root.for_each(&mut |key, value| {
         collection.push((key, value.clone()));
         Ok(())
@@ -177,8 +169,7 @@ fn there_level() {
         assert_eq!(Value::Integer(*src as i128), value);
     }
 
-    let (_, flushed) = root.flush().unwrap();
-    for (src, (key, _)) in m.iter().zip(flushed.iter()) {
+    for (src, (key, _)) in m.iter().zip(root.iter()) {
         assert_eq!(*src, key)
     }
 }
@@ -196,7 +187,7 @@ fn amt_basic_get_set_test() {
     assert_get(&root, 2, "foo");
     assert_eq!(root.count(), 1);
 
-    let (c, _) = root.flush().unwrap();
+    let c = root.flush().unwrap();
 
     let root = Amt::load(&c, bs).unwrap();
     assert_get(&root, 2, "foo");
@@ -215,7 +206,7 @@ fn test_expand() {
     assert_get(&root, 11, "bar");
     assert_get(&root, 79, "baz");
 
-    let (c, _) = root.flush().unwrap();
+    let c = root.flush().unwrap();
     let root = Amt::load(&c, bs).unwrap();
 
     assert_get(&root, 2, "foo");
@@ -237,7 +228,7 @@ fn test_insert_a_bunch() {
         assert_get(&root, i, "foo foo bar");
     }
 
-    let (c, _) = root.flush().unwrap();
+    let c = root.flush().unwrap();
     assert_eq!(
         &c.to_string(),
         "bafy2bzacedjhcq7542wu7ike4i4srgq7hwxxc5pmw5sub4secqk33mugl4zda"
@@ -264,7 +255,7 @@ fn test_delete_first_entry() {
 
     assert_delete(&mut root, 0);
 
-    let (c, _) = root.flush().unwrap();
+    let c = root.flush().unwrap();
 
     let root = Amt::load(&c, bs).unwrap();
     assert_eq!(root.count(), 1);
@@ -299,14 +290,13 @@ fn test_delete() {
 
     assert_eq!(root.count(), 1);
 
-    let (c, root) = root.flush().unwrap();
+    let c = root.flush().unwrap();
     let new_root = Amt::load(&c, bs.clone()).unwrap();
     assert_eq!(new_root.count(), 1);
 
     let mut root2 = Amt::new(bs);
     root2.set(24, "dog").unwrap();
-    let root = root.downgrade();
-    let (c2, _) = root.flush().unwrap();
+    let c2 = root.flush().unwrap();
     assert_eq!(c, c2);
 }
 
@@ -316,19 +306,18 @@ fn test_delete_reduce_height() {
     let mut root = Amt::new(bs.clone());
 
     root.set(1, "thing").unwrap();
-    let (c1, r) = root.flush().unwrap();
-    let mut root = r.downgrade();
+    let c1 = root.flush().unwrap();
 
     root.set(37, "other").unwrap();
 
-    let (c2, _) = root.flush().unwrap();
+    let c2 = root.flush().unwrap();
 
     let mut root2 = Amt::load(&c2, bs).unwrap();
 
     assert_delete(&mut root2, 37);
     assert_eq!(root2.count(), 1);
 
-    let (c3, _) = root2.flush().unwrap();
+    let c3 = root2.flush().unwrap();
 
     assert_eq!(c1, c3);
 }
@@ -341,8 +330,7 @@ fn test_for_each() {
     for i in INDEXS.iter() {
         root.set(*i, "value").unwrap();
     }
-    let (c1, r) = root.flush().unwrap();
-    let root = r.downgrade();
+    let c1 = root.flush().unwrap();
 
     println!("c1:{}", c1.to_string());
     assert_eq!(
@@ -356,7 +344,7 @@ fn test_for_each() {
 
     assert_eq!(root.count(), INDEXS.len() as u64);
 
-    let (c2, _) = root.flush().unwrap();
+    let c2 = root.flush().unwrap();
     println!("c2:{}", c2.to_string());
 
     assert_eq!(
@@ -378,8 +366,7 @@ fn test_for_each() {
     assert_eq!(x, INDEXS.len());
 
     x = 0;
-    let (_, flushed) = root2.flush().unwrap();
-    for (_, item) in flushed.iter().enumerate() {
+    for (_, item) in root2.iter().enumerate() {
         assert_eq!(item.0, INDEXS[x]);
         x += 1;
     }
