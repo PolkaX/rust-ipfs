@@ -7,7 +7,7 @@ use bytes::Bytes;
 
 use super::Entry;
 
-pub trait Filter {
+pub trait Filter: fmt::Debug + Sync + Send {
     fn filter(&self, e: &Entry) -> bool;
 }
 

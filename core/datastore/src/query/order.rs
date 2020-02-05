@@ -6,26 +6,18 @@ use std::fmt;
 use super::Entry;
 use std::ops::DerefMut;
 
-pub trait Order {
+pub trait Order: fmt::Debug + Sync + Send {
     fn cmp(&self, a: &Entry, b: &Entry) -> Ordering;
 }
 
 impl<F> Order for F
 where
-    F: Fn(&Entry, &Entry) -> Ordering,
+    F: Fn(&Entry, &Entry) -> Ordering + fmt::Debug + Sync + Send,
 {
     fn cmp(&self, a: &Entry, b: &Entry) -> Ordering {
         self(a, b)
     }
 }
-
-//impl<F> fmt::Debug for F where
-//    F: Fn(&Entry, &Entry) -> Ordering
-//{
-//    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//        write!(f, "FN")
-//    }
-//}
 
 /// OrderByValue is used to signal to datastores they should apply internal
 /// orderings.
