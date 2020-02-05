@@ -12,14 +12,12 @@ keywords = ["ipfs", "ipld", "hamt"]
 [dependencies]
 bigint = "4.4"
 bytes = { version = "0.5", features = ["serde"] }
+multihash = { package = "parity-multihash", version = "0.2.2" }
 murmur3 = "0.5"
-serde = "1.0"
-serde_derive = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
 thiserror = "1.0"
-
-multihash = { package = "rust-multihash", path = "../multihash" }
 
 block-format = { package = "rust-block-format", path = "../block-format" }
 cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
