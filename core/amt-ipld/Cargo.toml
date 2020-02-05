@@ -11,14 +11,14 @@ keywords = ["ipfs", "ipld", "amt"]
 
 [dependencies]
 serde = "1.0"
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
 serde_bytes = "0.11"
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
 thiserror = "1.0"
 
-cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
-ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor" }
 blockstore = { package = "rust-ipfs-blockstore", path = "../ipfs/blockstore" }
 block-format = { package = "rust-block-format", path = "../block-format" }
+cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
+ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor" }
 
 [dev-dependencies]
 matches = "0.1"

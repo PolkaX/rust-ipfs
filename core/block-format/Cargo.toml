@@ -10,11 +10,11 @@ description = "Implementation of the block format"
 keywords = ["ipfs", "block-format"]
 
 [dependencies]
-thiserror = "1.0"
 bytes = { version = "0.5", features = ["serde"] }
+thiserror = "1.0"
 
 cid = { package = "rust-cid", path = "../cid" }
 util = { package = "rust-ipfs-util", path = "../util" }
 
 [dev-dependencies]
-multihash = { package = "rust-multihash", path = "../multihash" }
+multihash = { package = "parity-multihash", version = "0.2.2" }

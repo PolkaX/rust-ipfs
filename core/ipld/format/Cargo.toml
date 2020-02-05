@@ -10,9 +10,9 @@ description = "Implementation of the ipld format"
 keywords = ["ipfs", "ipld", "format"]
 
 [dependencies]
-thiserror = "1.0"
 lazy_static = "1.4"
-multihash = { package = "rust-multihash", path = "../../multihash" }
+multihash = { package = "parity-multihash", version = "0.2.2" }
+thiserror = "1.0"
 
 block-format = { package = "rust-block-format", path = "../../block-format" }
 cid = { package = "rust-cid", path = "../../cid" }
