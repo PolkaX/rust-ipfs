@@ -7,9 +7,9 @@ jobs:
     name: Lint and Test
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest]
-        rust: [nightly-2019-12-20]
-    runs-on: ${{ matrix.os }}
+        platform: [ubuntu-latest, macos-latest]
+        toolchain: [nightly-2019-12-20]
+    runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout sources
@@ -19,7 +19,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: ${{ matrix.rust }}
+          toolchain: ${{ matrix.toolchain }}
           override: true
           components: rustfmt, clippy
 
