@@ -1,3 +1,5 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 mod error;
 
 use block_format::BasicBlock;
@@ -19,12 +21,4 @@ pub trait Blockstore {
     fn put(&mut self, block: BasicBlock) -> Result<()>;
     fn put_many(&mut self, block: &[BasicBlock]) -> Result<()>;
     fn hash_on_read(&mut self, enable: bool);
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

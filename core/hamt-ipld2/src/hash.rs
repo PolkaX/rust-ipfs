@@ -11,12 +11,8 @@ use std::cmp::Ordering;
 /// murmur3 hash for a bytes value. using hash128 but just pick half for result
 #[cfg(not(feature = "test-hash"))]
 pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 8] {
-    let mut cursor = std::io::Cursor::new(v);
-    let result = if cfg!(target_pointer_width = "64") {
-        murmur3::murmur3_x64_128(&mut cursor, 0).expect("")
-    } else {
-        murmur3::murmur3_x86_128(&mut cursor, 0).expect("")
-    };
+    let result =
+        murmur3::murmur3_x64_128(&mut v.as_ref(), 0).expect("murmur3 hash shouldn't be fail");
     // to big-ending sequence
     let all: [u8; 16] = result.to_be_bytes();
     // digest64 is half a digest128.
