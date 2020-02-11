@@ -37,7 +37,7 @@ where
 /// Warning: will panic if prefix not found when it should be there. This is
 /// to avoid insidious data inconsistency errors.
 pub struct PrefixTransform {
-    prefix: Key,
+    pub prefix: Key,
 }
 
 impl KeyTransform for PrefixTransform {

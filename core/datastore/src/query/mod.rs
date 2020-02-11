@@ -3,10 +3,10 @@
 pub mod filter;
 pub mod order;
 
-use std::fmt;
+use async_std::sync::{channel, Receiver, Sender};
 use async_std::task;
-use async_std::sync::{channel, Sender, Receiver};
 use async_trait::async_trait;
+use std::fmt;
 
 use bytes::Bytes;
 
@@ -15,30 +15,31 @@ use filter::Filter;
 use order::Order;
 use std::future::Future;
 
+#[derive(Default, Clone)]
 pub struct Entry {
-    key: String,
-    value: Bytes,
-    size: usize,
+    pub key: String,
+    pub value: Bytes,
+    pub size: usize,
     // expiration
 }
 
 pub struct Query {
     /// namespaces the query to results whose keys have Prefix
-    prefix: String,
+    pub prefix: String,
     /// filter results. apply sequentially
-    filters: Vec<Box<dyn Filter>>,
+    pub filters: Vec<Box<dyn Filter>>,
     /// order results. apply hierarchically
-    orders: Vec<Box<dyn Order>>,
+    pub orders: Vec<Box<dyn Order>>,
     /// maximum number of results
-    limit: usize,
+    pub limit: usize,
     /// skip given number of results
-    offset: usize,
+    pub offset: usize,
     /// return only keys.
-    keys_only: bool,
+    pub keys_only: bool,
     /// always return sizes. If not set, datastore impl can return
     /// it anyway if it doesn't involve a performance cost. If KeysOnly
     /// is not set, Size should always be set.
-    returns_sizes: bool,
+    pub returns_sizes: bool,
     // return expirations (see TTLDatastore)
     // expiration,
 }
@@ -109,14 +110,14 @@ impl fmt::Debug for Query {
 #[async_trait]
 pub trait Results {
     fn query(&self) -> &Query;
-    async fn next(&self) -> Option<Result<Entry>>;
-    fn next_sync(&self) -> Option<Result<Entry>>;
+    async fn next(&self) -> Option<QResult>;
+    fn next_sync(&self) -> Option<QResult>;
     fn rest(&self) -> Result<Vec<Entry>>;
 }
 
 struct SingleResult {
     query: Query,
-    res: Receiver<Result<Entry>>
+    res: Receiver<QResult>,
 }
 
 #[async_trait]
@@ -124,6 +125,7 @@ impl Results for SingleResult {
     fn query(&self) -> &Query {
         &self.query
     }
+
     async fn next(&self) -> Option<Result<Entry>> {
         self.res.recv().await
     }
@@ -142,7 +144,9 @@ impl Results for SingleResult {
     }
 }
 
-pub type ResultChannel = (Sender<Result<Entry>>, Receiver<Result<Entry>>);
+pub type QResult = Result<Entry>;
+
+pub type ResultChannel = (Sender<Result<Entry>>, Receiver<QResult>);
 
 pub struct ResultBuilder {
     query: Query,

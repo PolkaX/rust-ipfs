@@ -16,6 +16,12 @@ impl fmt::Display for Key {
     }
 }
 
+impl Key {
+    pub fn str(&self) -> &str {
+        &self.0
+    }
+}
+
 pub const LEFT_SLASH: u8 = '/' as u8;
 pub const LEFT_SLASH_STR: &'static str = "/";
 
