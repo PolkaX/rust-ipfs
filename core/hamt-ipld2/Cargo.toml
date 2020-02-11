@@ -10,27 +10,26 @@ description = "Implementation of the ipld hamt"
 keywords = ["ipfs", "ipld", "hamt"]
 
 [dependencies]
-fasthash = "0.4"
-thiserror = "1.0"
-serde = "1.0"
-serde_derive = "1.0"
-serde_bytes = "0.11"
-serde_tuple = "0.4"
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
-bytes = { version = "0.5", features = ["serde"] }
 archery = "0.3"
-bigint = { version = "4.4" }
-
-multihash = { package = "rust-multihash", path = "../multihash" }
+bigint = "4.4"
+bytes = { version = "0.5", features = ["serde"] }
+multihash = { package = "parity-multihash", version = "0.2.2" }
+murmur3 = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_bytes = "0.11"
+serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
+serde_tuple = "0.4"
+thiserror = "1.0"
 
 block-format = { package = "rust-block-format", path = "../block-format" }
 cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
 ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor", features = ["bigint"] }
 
 [dev-dependencies]
-util = { package = "rust-ipfs-util", path = "../util" }
-serde_json = "1.0"
+matches = "0.1"
 rand = "0.7"
+serde_json = "1.0"
+util = { package = "rust-ipfs-util", path = "../util" }
 
 [features]
 test-hash = []

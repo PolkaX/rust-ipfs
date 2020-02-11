@@ -2,6 +2,7 @@
 
 use std::time::Instant;
 
+use matches::matches;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 

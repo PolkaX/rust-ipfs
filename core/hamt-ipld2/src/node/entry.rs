@@ -34,7 +34,7 @@ mod kv {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PContent {
     #[serde(rename = "0")]
     Link(Cid),
@@ -188,5 +188,5 @@ where
 
 // hack for compile pass `Serialize_tuple` and `Deserialize_tuple`, use an empty struct to import `Serialize` and `Deserialize`
 #[allow(unused)]
-#[derive(serde_derive::Serialize, serde_derive::Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct PlaceHolder;

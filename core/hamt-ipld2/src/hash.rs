@@ -2,9 +2,6 @@
 
 use std::cmp::Ordering;
 
-#[cfg(not(feature = "test-hash"))]
-use fasthash::murmur3::hash128;
-
 /// ```go
 /// func (d *digest64) Sum64() uint64 {
 ///     h1, _ = (*digest128)(d).Sum128()
@@ -14,7 +11,8 @@ use fasthash::murmur3::hash128;
 /// murmur3 hash for a bytes value. using hash128 but just pick half for result
 #[cfg(not(feature = "test-hash"))]
 pub fn hash<T: AsRef<[u8]>>(v: T) -> [u8; 8] {
-    let result = hash128(v);
+    let result =
+        murmur3::murmur3_x64_128(&mut v.as_ref(), 0).expect("murmur3 hash shouldn't be fail");
     // to big-ending sequence
     let all: [u8; 16] = result.to_be_bytes();
     // digest64 is half a digest128.

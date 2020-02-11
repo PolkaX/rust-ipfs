@@ -1,3 +1,5 @@
+// Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+
 use cid::Cid;
 
 /// Type alias to use this library's [`BlockstoreError`] type in a `Result`.
