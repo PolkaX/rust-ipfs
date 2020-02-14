@@ -4,6 +4,9 @@ use bytes::Bytes;
 
 use crate::error::*;
 use crate::key::Key;
+#[cfg(feature = "async")]
+use crate::query::AsyncResult;
+use crate::query::{self, SyncResults};
 
 /// Write is the write-side of the Datastore interface.
 pub trait Write {
@@ -16,8 +19,15 @@ pub trait Read {
     fn get(&self, key: &Key) -> Result<Bytes>;
     fn has(&self, key: &Key) -> Result<bool>;
     fn get_size(&self, key: &Key) -> Result<usize>;
-    // TODO query
-    //    fn query(&self)
+}
+
+pub trait SyncQuery {
+    fn query<R: SyncResults>(&self, query: query::Query) -> Result<R>;
+}
+
+#[cfg(feature = "async")]
+pub trait AsyncQuery {
+    fn query<R: AsyncQuery>(&self, query: query::Query) -> Result<R>;
 }
 
 pub trait Datastore: Write + Read {

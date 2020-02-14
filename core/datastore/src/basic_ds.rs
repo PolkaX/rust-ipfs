@@ -29,7 +29,7 @@ impl Read for MapDatastore {
         self.values
             .get(key)
             .map(|v| v.to_owned())
-            .ok_or(Error::Other)
+            .ok_or(DSError::Other)
     }
 
     fn has(&self, key: &Key) -> Result<bool> {
@@ -38,7 +38,7 @@ impl Read for MapDatastore {
 
     fn get_size(&self, key: &Key) -> Result<usize> {
         // TODO
-        self.values.get(key).map(|v| v.len()).ok_or(Error::Other)
+        self.values.get(key).map(|v| v.len()).ok_or(DSError::Other)
     }
 }
 

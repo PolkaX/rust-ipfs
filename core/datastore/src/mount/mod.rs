@@ -1,12 +1,16 @@
 //! mount provides a Datastore that has other Datastores
 //! mounted at various key prefixes and is threadsafe
 
-use crate::datastore::{Datastore as DatastoreT, Read, Write};
-use crate::error::Error;
-use crate::key::Key;
-use crate::query::{self, QResult, Query, Results};
+mod async_results;
+mod sync_results;
+
 use bytes::Bytes;
 use std::cmp::Ordering;
+
+use crate::datastore::{Datastore as DatastoreT, Read, Write};
+use crate::error::DSError;
+use crate::key::Key;
+use crate::query::{self, QResult, Query};
 
 pub struct Mount<D: DatastoreT> {
     pub prefix: Key,
@@ -28,8 +32,8 @@ impl<D: DatastoreT> Datastore<D> {
         for m in self.mounts.iter() {
             if &m.prefix == key || m.prefix.is_ancestor_of(key) {
                 // trim prefix
-                let s = &key.str().as_bytes()[..m.prefix.str().as_bytes().len()];
-                let s = std::str::from_utf8(s).expect("must be str");
+                let s = &key.as_bytes()[..m.prefix.as_bytes().len()];
+                let s = unsafe { std::str::from_utf8_unchecked(s) };
                 let k = Key::new(s);
                 // TODO
                 // return Some(m.datastor, m.prefix.clone(), k)
@@ -38,14 +42,15 @@ impl<D: DatastoreT> Datastore<D> {
         None
     }
 }
-
+// TODO
+/*
 struct QueryResults {
     mount: Key,
-    results: Box<dyn Results>,
+    results: Box<dyn AsyncResults>,
     next: QResult,
 }
 
-fn advance(mount: &Key, results: &mut Box<dyn Results>) -> Option<QResult> {
+fn advance(mount: &Key, results: &mut Box<dyn AsyncResults>) -> Option<QResult> {
     let mut r = results.next_sync();
     match r {
         None => {
@@ -63,8 +68,8 @@ fn advance(mount: &Key, results: &mut Box<dyn Results>) -> Option<QResult> {
     }
 }
 impl QueryResults {
-    fn new_with_advance(mount: Key, results: impl Results + 'static) -> Option<Self> {
-        let mut results: Box<dyn Results> = Box::new(results);
+    fn new_with_advance(mount: Key, results: impl AsyncResults + 'static) -> Option<Self> {
+        let mut results: Box<dyn AsyncResults> = Box::new(results);
         advance(&mount, &mut results).map(|next| QueryResults {
             mount,
             results,
@@ -100,7 +105,7 @@ impl QuerySet {
     fn pop(&mut self) -> Option<QueryResults> {
         self.heads.pop()
     }
-    fn add_results(&mut self, mount: Key, results: impl Results + 'static) {
+    fn add_results(&mut self, mount: Key, results: impl AsyncResults + 'static) {
         if let Some(r) = QueryResults::new_with_advance(mount, results) {
             self.push(r);
         }
@@ -178,6 +183,7 @@ impl Iterator for QuerySet {
         }
     }
 }
+*/
 /*
 impl Read for Datastore {
     fn get(&self, key: &Key) -> Result<Bytes, Error> {

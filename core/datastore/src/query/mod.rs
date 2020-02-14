@@ -1,19 +1,25 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
+#[cfg(feature = "async")]
+mod async_results;
+mod sync_results;
+
 pub mod filter;
 pub mod order;
 
-use async_std::sync::{channel, Receiver, Sender};
-use async_std::task;
-use async_trait::async_trait;
 use std::fmt;
+use std::future::Future;
 
 use bytes::Bytes;
 
 use crate::error::*;
 use filter::Filter;
 use order::Order;
-use std::future::Future;
+
+// re-export
+#[cfg(feature = "async")]
+pub use async_results::{AsyncResult, AsyncResultBuilder, AsyncResults};
+pub use sync_results::{SyncResult, SyncResults};
 
 #[derive(Default, Clone)]
 pub struct Entry {
@@ -107,66 +113,4 @@ impl fmt::Debug for Query {
 //   }
 //
 
-#[async_trait]
-pub trait Results {
-    fn query(&self) -> &Query;
-    async fn next(&self) -> Option<QResult>;
-    fn next_sync(&self) -> Option<QResult>;
-    fn rest(&self) -> Result<Vec<Entry>>;
-}
-
-struct SingleResult {
-    query: Query,
-    res: Receiver<QResult>,
-}
-
-#[async_trait]
-impl Results for SingleResult {
-    fn query(&self) -> &Query {
-        &self.query
-    }
-
-    async fn next(&self) -> Option<Result<Entry>> {
-        self.res.recv().await
-    }
-
-    fn next_sync(&self) -> Option<Result<Entry>> {
-        task::block_on(self.next())
-    }
-
-    fn rest(&self) -> Result<Vec<Entry>> {
-        let mut es = vec![];
-        while let Some(r) = self.next_sync() {
-            let e = r?;
-            es.push(e);
-        }
-        Ok(es)
-    }
-}
-
 pub type QResult = Result<Entry>;
-
-pub type ResultChannel = (Sender<Result<Entry>>, Receiver<QResult>);
-
-pub struct ResultBuilder {
-    query: Query,
-    output: ResultChannel,
-}
-
-const NORMAL_BUF_SIZE: usize = 1;
-impl ResultBuilder {
-    pub fn new(q: Query) -> Self {
-        ResultBuilder {
-            query: q,
-            output: channel(NORMAL_BUF_SIZE),
-        }
-    }
-    pub fn results(self) -> SingleResult {
-        SingleResult {
-            query: self.query,
-            res: self.output.1,
-        }
-    }
-}
-
-// TODO need more info to complete the rest

@@ -2,10 +2,10 @@
 
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, DSError>;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum DSError {
     #[error("")]
     Other,
 }

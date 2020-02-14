@@ -16,15 +16,10 @@ impl fmt::Display for Key {
     }
 }
 
-impl Key {
-    pub fn str(&self) -> &str {
-        &self.0
-    }
-}
-
 pub const LEFT_SLASH: u8 = '/' as u8;
 pub const LEFT_SLASH_STR: &'static str = "/";
 
+/// ensure after clean, string is start with "/", and cleaned with the rule of "path_clean"
 pub fn clean<S: AsRef<str>>(s: S) -> String {
     let b = s.as_ref().as_bytes();
     if b.len() == 0 {
@@ -113,6 +108,18 @@ impl Key {
     pub fn list(&self) -> Vec<&str> {
         // equal to strings.Split(k.string, "/")[1:], just ignore first item
         self.0.split(LEFT_SLASH_STR).skip(1).collect::<Vec<_>>()
+    }
+
+    pub fn split_prefix(&self) -> (Option<(&str)>, &str) {
+        // key first char must be "/", skip check it
+        let skip = 1;
+        if let Some(i) = &self.0[skip..].find(LEFT_SLASH_STR) {
+            let (a, b) = self.0.split_at(*i + skip);
+            let b = unsafe { b.get_unchecked(1..) };
+            (Some(a), b)
+        } else {
+            (None, &self)
+        }
     }
 
     /// `reverse()` returns the reverse of this Key.
