@@ -1,6 +1,7 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use bytes::Bytes;
+use std::time::Duration;
 
 use crate::error::*;
 use crate::key::Key;
@@ -39,6 +40,19 @@ pub trait Datastore: Write + Read {
     fn sync(&mut self, prefix: Key) -> Result<()>;
 }
 
+// TTLDatastore is an interface that should be implemented by datastores that
+// support expiring entries.
+pub trait TTLDatastore: Datastore + TTL {}
+
+impl<T: Datastore + TTL> TTLDatastore for T {}
+
+// TTL encapulates the methods that deal with entries with time-to-live.
+pub trait TTL {
+    fn put_with_ttl(&mut self, key: Key, value: Bytes, ttl: Duration) -> Result<()>;
+    fn set_ttl(&mut self, key: Key, ttl: Duration) -> Result<()>;
+    fn get_expiration(&self, key: &Key) -> Result<Duration>;
+}
+
 pub trait Txn: Write + Read {
     fn commit(&mut self) -> Result<()>;
 
@@ -46,7 +60,7 @@ pub trait Txn: Write + Read {
 }
 
 pub trait TxnDatastore: Datastore {
-    fn new_transaction(&self, read_only: bool) -> Box<dyn Txn>;
+    fn new_transaction<T: Txn>(&self, read_only: bool) -> T;
 }
 
 pub trait Batch: Write {
@@ -54,7 +68,7 @@ pub trait Batch: Write {
 }
 
 pub trait Batching: Datastore {
-    fn batch(&mut self) -> Box<dyn Batch>;
+    fn batch<B: Batch>(&self) -> B;
 }
 
 pub trait CheckedDatastore: Datastore {
