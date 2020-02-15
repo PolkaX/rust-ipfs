@@ -466,18 +466,19 @@ impl Database {
 
     /// Commit transaction to database.
     pub fn write_buffered(&self, tr: DBTransaction) {
-        self.check_and_extend_cols(&tr).expect("");
+        self.check_and_extend_cols(&tr)
+            .expect("extend col cannot be failed");
         let mut overlay = self.overlay.write();
         let ops = tr.ops;
         for op in ops {
             match op {
                 DBOp::Insert { col, key, value } => overlay
                     .get_mut::<str>(&col)
-                    .expect("")
+                    .expect("col must be exist after extend")
                     .insert(key, KeyState::Insert(value)),
                 DBOp::Delete { col, key } => overlay
                     .get_mut::<str>(&col)
-                    .expect("")
+                    .expect("col must be exist after extend")
                     .insert(key, KeyState::Delete),
             };
         }
@@ -561,7 +562,7 @@ impl Database {
                     self.overlay
                         .write()
                         .get_mut(op.col())
-                        .expect("")
+                        .expect("col must be exist after extend")
                         .remove(op.key());
 
                     let cf = cfs.cf(op.col());
