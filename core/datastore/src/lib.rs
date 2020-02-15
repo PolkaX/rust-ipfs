@@ -3,8 +3,8 @@
 mod basic_ds;
 mod datastore;
 mod error;
-#[cfg(test)]
-mod tests;
+//#[cfg(test)]
+//mod tests;
 
 pub mod key;
 pub mod keytransform;

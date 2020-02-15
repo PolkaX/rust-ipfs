@@ -69,11 +69,11 @@ impl TTL for RocksDB {
         unimplemented!()
     }
 
-    fn set_ttl(&mut self, key: Key, ttl: Duration) -> Result<()> {
+    fn set_ttl(&mut self, key: Key, ttl: Duration) -> DSResult<()> {
         unimplemented!()
     }
 
-    fn get_expiration(&self, key: &Key) -> Result<Duration> {
+    fn get_expiration(&self, key: &Key) -> DSResult<Duration> {
         unimplemented!()
     }
 }

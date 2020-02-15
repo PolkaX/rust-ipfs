@@ -16,9 +16,10 @@
 
 //! Key-Value store abstraction.
 
-use bytes::Bytes;
+use lru_time_cache::LruCache;
 use smallvec::SmallVec;
 use std::io;
+use std::sync::{Arc, Mutex};
 
 mod io_stats;
 
@@ -33,22 +34,28 @@ pub type DBKey = SmallVec<[u8; 32]>;
 pub use io_stats::{IoStats, Kind as IoStatsKind};
 
 /// Write transaction. Batches a sequence of put/delete operations for efficiency.
-#[derive(Default, Clone, PartialEq)]
+#[derive(Clone)]
 pub struct DBTransaction {
     /// Database operations.
     pub ops: Vec<DBOp>,
+    cache: StrCache,
+}
+impl PartialEq for DBTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.ops.eq(&other.ops)
+    }
 }
 
 /// Database operation.
 #[derive(Clone, PartialEq)]
 pub enum DBOp {
     Insert {
-        col: u32,
+        col: Arc<String>,
         key: DBKey,
         value: DBValue,
     },
     Delete {
-        col: u32,
+        col: Arc<String>,
         key: DBKey,
     },
 }
@@ -63,38 +70,69 @@ impl DBOp {
     }
 
     /// Returns the column associated with this operation.
-    pub fn col(&self) -> u32 {
-        match *self {
-            DBOp::Insert { col, .. } => col,
-            DBOp::Delete { col, .. } => col,
+    pub fn col(&self) -> &str {
+        match self {
+            DBOp::Insert { col, .. } => col.as_str(),
+            DBOp::Delete { col, .. } => col.as_str(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct StrCache {
+    cache: Arc<Mutex<LruCache<String, Arc<String>>>>,
+}
+
+impl StrCache {
+    pub fn with_capacity(cache_size: usize) -> Self {
+        StrCache {
+            cache: Arc::new(Mutex::new(LruCache::with_capacity(cache_size))),
+        }
+    }
+}
+
+impl StrCache {
+    fn get(&self, col: &str) -> Arc<String> {
+        let mut cache = self.cache.lock().unwrap();
+
+        match cache.get(col) {
+            Some(s) => s.clone(),
+            None => {
+                let s = Arc::new(col.to_string());
+                cache.insert(col.to_string(), s.clone());
+                s
+            }
         }
     }
 }
 
 impl DBTransaction {
     /// Create new transaction.
-    pub fn new() -> DBTransaction {
-        DBTransaction::with_capacity(256)
+    pub fn new(cache: StrCache) -> DBTransaction {
+        DBTransaction::with_capacity(cache, 256)
     }
 
     /// Create new transaction with capacity.
-    pub fn with_capacity(cap: usize) -> DBTransaction {
+    pub fn with_capacity(cache: StrCache, cap: usize) -> DBTransaction {
         DBTransaction {
             ops: Vec::with_capacity(cap),
+            cache,
         }
     }
 
     /// Insert a key-value pair in the transaction. Any existing value will be overwritten upon write.
-    pub fn put(&mut self, col: u32, key: &[u8], value: &[u8]) {
+    pub fn put(&mut self, col: &str, key: &[u8], value: &[u8]) {
+        let col = self.cache.get(col);
         self.ops.push(DBOp::Insert {
             col,
             key: DBKey::from_slice(key),
-            value: value.to_vec(),
+            value: value.to_vec().into(),
         })
     }
 
     /// Insert a key-value pair in the transaction. Any existing value will be overwritten upon write.
-    pub fn put_vec(&mut self, col: u32, key: &[u8], value: Bytes) {
+    pub fn put_vec(&mut self, col: &str, key: &[u8], value: DBValue) {
+        let col = self.cache.get(col);
         self.ops.push(DBOp::Insert {
             col,
             key: DBKey::from_slice(key),
@@ -103,7 +141,8 @@ impl DBTransaction {
     }
 
     /// Delete value by key.
-    pub fn delete(&mut self, col: u32, key: &[u8]) {
+    pub fn delete(&mut self, col: &str, key: &[u8]) {
+        let col = self.cache.get(col);
         self.ops.push(DBOp::Delete {
             col,
             key: DBKey::from_slice(key),
@@ -129,17 +168,17 @@ impl DBTransaction {
 ///
 /// The API laid out here, along with the `Sync` bound implies interior synchronization for
 /// implementation.
-pub trait KeyValueDB: Sync + Send + parity_util_mem::MallocSizeOf {
+pub trait KeyValueDB: Sync + Send {
     /// Helper to create a new transaction.
-    fn transaction(&self) -> DBTransaction {
-        DBTransaction::new()
+    fn transaction(&self, cache: StrCache) -> DBTransaction {
+        DBTransaction::new(cache)
     }
 
     /// Get a value by key.
-    fn get(&self, col: u32, key: &[u8]) -> io::Result<Option<DBValue>>;
+    fn get(&self, col: &str, key: &[u8]) -> io::Result<Option<DBValue>>;
 
     /// Get a value by partial key. Only works for flushed data.
-    fn get_by_prefix(&self, col: u32, prefix: &[u8]) -> Option<Box<[u8]>>;
+    fn get_by_prefix(&self, col: &str, prefix: &[u8]) -> Option<Box<[u8]>>;
 
     /// Write a transaction of changes to the buffer.
     fn write_buffered(&self, transaction: DBTransaction);
@@ -154,12 +193,12 @@ pub trait KeyValueDB: Sync + Send + parity_util_mem::MallocSizeOf {
     fn flush(&self) -> io::Result<()>;
 
     /// Iterate over flushed data for a given column.
-    fn iter<'a>(&'a self, col: u32) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)> + 'a>;
+    fn iter<'a>(&'a self, col: &str) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)> + 'a>;
 
     /// Iterate over flushed data for a given column, starting from a given prefix.
     fn iter_from_prefix<'a>(
         &'a self,
-        col: u32,
+        col: &str,
         prefix: &'a [u8],
     ) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)> + 'a>;
 

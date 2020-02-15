@@ -9,7 +9,6 @@ edition = "2018"
 
 [dependencies]
 smallvec = "1.0.0"
-bytes = { version = "0.5", features = ["serde"] }
-parity-util-mem = { version = "0.5"}
+lru_time_cache = { version = "0.9" }
 
 datastore = { package = "rust-datastore", path = "../../core/datastore" }
