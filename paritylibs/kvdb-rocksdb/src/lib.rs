@@ -940,60 +940,58 @@ mod tests {
     use std::io::{self, Read};
     use tempdir::TempDir;
 
-    fn create() -> io::Result<Database> {
+    fn create() -> io::Result<(Database, TempDir)> {
         let tempdir = TempDir::new("")?;
         let config = DatabaseConfig::default();
-        let r = Database::open(
+        Database::open(
             &config,
             tempdir
                 .path()
                 .to_str()
                 .expect("tempdir path is valid unicode"),
-        );
-        // use forget to avoid the database be removed after drop tempdir
-        std::mem::forget(tempdir);
-        r
+        )
+        .map(|db| (db, tempdir))
     }
 
     #[test]
     fn get_fails_with_non_existing_column() -> io::Result<()> {
-        let db = create()?;
+        let (db, _dir) = create()?;
         st::test_get_fails_with_non_existing_column(&db)
     }
 
     #[test]
     fn put_and_get() -> io::Result<()> {
-        let db = create()?;
+        let (db, _dir) = create()?;
         st::test_put_and_get(&db)
     }
 
     #[test]
     fn delete_and_get() -> io::Result<()> {
-        let db = create()?;
+        let (db, _dir) = create()?;
         st::test_delete_and_get(&db)
     }
 
     #[test]
     fn iter() -> io::Result<()> {
-        let db = create()?;
+        let (db, _dir) = create()?;
         st::test_iter(&db)
     }
 
     #[test]
     fn iter_from_prefix() -> io::Result<()> {
-        let db = create()?;
+        let (db, _dir) = create()?;
         st::test_iter_from_prefix(&db)
     }
 
     #[test]
     fn complex() -> io::Result<()> {
-        let db = create()?;
+        let (db, _dir) = create()?;
         st::test_complex(&db)
     }
 
     #[test]
     fn stats() -> io::Result<()> {
-        let db = create()?;
+        let (db, _dir) = create()?;
         st::test_io_stats(&db)
     }
 
