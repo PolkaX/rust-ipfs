@@ -18,10 +18,11 @@ use crate::datastore::Datastore as DatastoreT;
 use crate::key::Key;
 use crate::keytransform::{self, Datastore, PrefixTransform};
 
+#[inline]
 pub fn prefix_transform(prefix: Key) -> PrefixTransform {
     PrefixTransform { prefix }
 }
 
-pub fn wrap(child: impl DatastoreT + 'static, prefix: Key) -> Datastore {
+pub fn wrap<D: DatastoreT>(child: D, prefix: Key) -> Datastore<D, PrefixTransform> {
     keytransform::wrap(child, prefix_transform(prefix))
 }
