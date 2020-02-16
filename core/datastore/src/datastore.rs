@@ -37,7 +37,7 @@ pub trait Datastore: Write + Read {
     /// returns, even if the program crashes. If Put/Delete operations already
     /// satisfy these requirements then Sync may be a no-op.
     /// If the prefix fails to Sync this method returns an error.
-    fn sync(&mut self, prefix: Key) -> Result<()>;
+    fn sync(&mut self, prefix: &Key) -> Result<()>;
 }
 
 // TTLDatastore is an interface that should be implemented by datastores that
@@ -60,7 +60,8 @@ pub trait Txn: Write + Read {
 }
 
 pub trait TxnDatastore: Datastore {
-    fn new_transaction<T: Txn>(&self, read_only: bool) -> T;
+    type Txn: Txn;
+    fn new_transaction(&self, read_only: bool) -> Self::Txn;
 }
 
 pub trait Batch: Write {
@@ -68,7 +69,8 @@ pub trait Batch: Write {
 }
 
 pub trait Batching: Datastore {
-    fn batch<B: Batch>(&self) -> B;
+    type Batch: Batch;
+    fn batch(&self) -> Self::Batch;
 }
 
 pub trait CheckedDatastore: Datastore {

@@ -114,8 +114,7 @@ impl Key {
         // key first char must be "/", skip check it
         let skip = 1;
         if let Some(i) = &self.0[skip..].find(LEFT_SLASH_STR) {
-            let (a, b) = self.0.split_at(*i + skip);
-            let b = unsafe { b.get_unchecked(1..) };
+            let (a, b) = self.0.split_at(*i);
             (Some(a), b)
         } else {
             (None, &self)
@@ -198,17 +197,17 @@ impl Key {
     /// `child()` returns the `child` Key of this Key.
     ///   NewKey("/Comedy/MontyPython").Child(NewKey("Actor:JohnCleese"))
     ///   NewKey("/Comedy/MontyPython/Actor:JohnCleese")
-    pub fn child(&self, k2: Key) -> Key {
+    pub fn child<K: AsRef<Key> + Into<Key>>(&self, k2: K) -> Key {
         self.clone().into_child(k2)
     }
 
-    pub fn into_child(self, k2: Key) -> Key {
+    pub fn into_child<K: AsRef<Key> + Into<Key>>(self, k2: K) -> Key {
         if self.as_str() == "/" {
-            k2
-        } else if self.as_str() == "/" {
+            k2.into()
+        } else if k2.as_ref().as_str() == "/" {
             self
         } else {
-            Key::from_raw(self.0 + k2.as_str())
+            Key::from_raw(self.0 + k2.as_ref().as_str())
         }
     }
 
@@ -228,9 +227,9 @@ impl Key {
     /// `is_ancestor_of()` returns whether this key contains another as a prefix.
     ///   NewKey("/Comedy").IsAncestorOf("/Comedy/MontyPython")
     ///   true
-    pub fn is_ancestor_of(&self, other: &Key) -> bool {
-        if other.as_str().starts_with(self.as_str()) {
-            other.as_bytes().len() > self.as_bytes().len()
+    pub fn is_ancestor_of<K: AsRef<str>>(&self, other: K) -> bool {
+        if other.as_ref().starts_with(self.as_str()) {
+            other.as_ref().as_bytes().len() > self.as_bytes().len()
         } else {
             false
         }
@@ -239,9 +238,9 @@ impl Key {
     /// `is_descendant_of()` returns whether this key contains another as a prefix.
     ///   NewKey("/Comedy/MontyPython").IsDescendantOf("/Comedy")
     ///   true
-    pub fn is_descendant_of(&self, other: &Key) -> bool {
-        if self.as_str().starts_with(other.as_str()) {
-            self.as_bytes().len() > other.as_bytes().len()
+    pub fn is_descendant_of<K: AsRef<str>>(&self, other: K) -> bool {
+        if self.as_str().starts_with(other.as_ref()) {
+            self.as_bytes().len() > other.as_ref().as_bytes().len()
         } else {
             false
         }
@@ -279,6 +278,12 @@ impl Into<Vec<u8>> for Key {
     }
 }
 
+impl Into<Key> for &Key {
+    fn into(self) -> Key {
+        (*self).clone()
+    }
+}
+
 impl From<String> for Key {
     fn from(s: String) -> Self {
         Key::new(s)
@@ -300,6 +305,12 @@ impl AsRef<str> for Key {
 impl AsRef<[u8]> for Key {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
+    }
+}
+
+impl AsRef<Key> for Key {
+    fn as_ref(&self) -> &Key {
+        &self
     }
 }
 

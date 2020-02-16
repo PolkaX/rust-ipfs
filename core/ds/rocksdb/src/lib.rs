@@ -3,22 +3,45 @@ mod error;
 mod tests;
 
 use bytes::Bytes;
+use std::ops::{Deref, DerefMut};
 use std::result;
+use std::sync::Arc;
+use std::time::Duration;
 
 use datastore::{key::Key, query, Datastore, Read, SyncQuery, Txn, TxnDatastore, Write, TTL};
 use error::*;
+use kvdb::DBTransaction;
 use kvdb_rocksdb::{Database as RocksDatabase, DatabaseConfig};
-use std::time::Duration;
 
 pub type DSResult<T> = result::Result<T, datastore::DSError>;
 
 pub struct RocksDB {
-    db: RocksDatabase,
+    prefix: bool,
+    db: Arc<RocksDatabase>,
 }
 
-pub fn new_database(path: &str, config: &DatabaseConfig) -> Result<RocksDB> {
+//impl Deref for RocksDB {
+//    type Target = RocksDatabase;
+//
+//    fn deref(&self) -> &Self::Target {
+//        unsafe { &*self.db.value.get() }
+//    }
+//}
+//
+//impl DerefMut for RocksDB {
+//    fn deref_mut(&mut self) -> &mut RocksDatabase {
+//        unsafe { &mut *self.db.value.get() }
+//    }
+//}
+
+struct Tx(DBTransaction);
+
+pub fn new_database(path: &str, prefix: bool, config: &DatabaseConfig) -> Result<RocksDB> {
     let db = RocksDatabase::open(config, path)?;
-    Ok(RocksDB { db })
+    Ok(RocksDB {
+        prefix,
+        db: Arc::new(db),
+    })
 }
 
 impl Read for RocksDB {
@@ -52,17 +75,19 @@ impl Write for RocksDB {
 }
 
 impl Datastore for RocksDB {
-    fn sync(&mut self, prefix: Key) -> DSResult<()> {
+    fn sync(&mut self, _prefix: &Key) -> DSResult<()> {
         // do nothing
         Ok(())
     }
 }
 
-impl TxnDatastore for RocksDB {
-    fn new_transaction<T: Txn>(&self, read_only: bool) -> T {
-        unimplemented!()
-    }
-}
+//impl TxnDatastore for RocksDB {
+//    type Txn = ();
+//
+//    fn new_transaction(&self, read_only: bool) -> Self::Txn {
+//        unimplemented!()
+//    }
+//}
 
 impl TTL for RocksDB {
     fn put_with_ttl(&mut self, key: Key, value: Bytes, ttl: Duration) -> DSResult<()> {
