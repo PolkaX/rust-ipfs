@@ -19,7 +19,6 @@ mod stats;
 
 use std::{cmp, collections::HashMap, convert::identity, error, fs, io, mem, path::Path, result};
 
-use parity_util_mem::MallocSizeOf;
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use rocksdb::{
     BlockBasedOptions, ColumnFamily, ColumnFamilyDescriptor, Error, Options, ReadOptions,
@@ -29,7 +28,7 @@ use rocksdb::{
 use crate::iter::KeyValuePair;
 use fs_swap::{swap, swap_nonatomic};
 use interleaved_ordered::interleave_ordered;
-use kvdb::{DBKey, DBOp, DBTransaction, DBValue, KeyValueDB};
+use kvdb::{init_cache, DBKey, DBOp, DBTransaction, DBValue, KeyValueDB};
 use log::{debug, warn};
 
 #[cfg(target_os = "linux")]
@@ -60,7 +59,8 @@ pub const DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB: MiB = 128;
 /// The default memory budget in MiB.
 pub const DB_DEFAULT_MEMORY_BUDGET_MB: MiB = 512;
 
-#[derive(MallocSizeOf)]
+pub const DEFAULT_COLUMN_NAME: &'static str = "default";
+
 enum KeyState {
     Insert(DBValue),
     Delete,
@@ -177,7 +177,7 @@ pub struct DatabaseConfig {
     /// write buffer size for each column including the default one.
     /// If the memory budget of a column is not specified,
     /// `DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB` is used for that column.
-    pub memory_budget: HashMap<u32, MiB>,
+    pub memory_budget: HashMap<String, MiB>,
     /// Compaction profile.
     pub compaction: CompactionProfile,
     /// Set number of columns.
@@ -185,7 +185,7 @@ pub struct DatabaseConfig {
     /// # Safety
     ///
     /// The number of columns must not be zero.
-    pub columns: u32,
+    pub columns: Vec<String>,
     /// Specify the maximum number of info/debug log files to be kept.
     pub keep_log_file_num: i32,
 }
@@ -197,9 +197,12 @@ impl DatabaseConfig {
     /// # Safety
     ///
     /// The number of `columns` must not be zero.
-    pub fn with_columns(columns: u32) -> Self {
-        assert!(columns > 0, "the number of columns must not be zero");
-
+    pub fn with_columns(columns: Vec<String>) -> Self {
+        // insert default column
+        let mut columns = columns;
+        if !columns.iter().any(|name| name == DEFAULT_COLUMN_NAME) {
+            columns.push(DEFAULT_COLUMN_NAME.to_owned())
+        }
         Self {
             columns,
             ..Default::default()
@@ -208,26 +211,43 @@ impl DatabaseConfig {
 
     /// Returns the total memory budget in bytes.
     pub fn memory_budget(&self) -> MiB {
-        (0..self.columns)
-            .map(|i| {
-                self.memory_budget
-                    .get(&i)
-                    .unwrap_or(&DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB)
-                    * MB
+        let sum = self
+            .columns
+            .iter()
+            .filter_map(|s| {
+                if s.as_str() == DEFAULT_COLUMN_NAME {
+                    None
+                } else {
+                    Some(
+                        self.memory_budget
+                            .get(s)
+                            .unwrap_or(&DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB)
+                            * MB,
+                    )
+                }
             })
-            .sum()
+            .sum();
+        if sum == 0 {
+            DB_DEFAULT_MEMORY_BUDGET_MB * MB
+        } else {
+            sum
+        }
     }
 
     /// Returns the memory budget of the specified column in bytes.
-    fn memory_budget_for_col(&self, col: u32) -> MiB {
-        self.memory_budget
-            .get(&col)
-            .unwrap_or(&DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB)
-            * MB
+    fn memory_budget_for_col(&self, col: &str) -> MiB {
+        if col == DEFAULT_COLUMN_NAME {
+            DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB * MB
+        } else {
+            self.memory_budget
+                .get::<str>(col)
+                .unwrap_or(&DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB)
+                * MB
+        }
     }
 
     // Get column family configuration with the given block based options.
-    fn column_config(&self, block_opts: &BlockBasedOptions, col: u32) -> Options {
+    fn column_config(&self, block_opts: &BlockBasedOptions, col: &str) -> Options {
         let column_mem_budget = self.memory_budget_for_col(col);
         let mut opts = Options::default();
 
@@ -247,7 +267,7 @@ impl Default for DatabaseConfig {
             max_open_files: 512,
             memory_budget: HashMap::new(),
             compaction: CompactionProfile::default(),
-            columns: 1,
+            columns: vec![DEFAULT_COLUMN_NAME.to_string()],
             keep_log_file_num: 1,
         }
     }
@@ -258,33 +278,15 @@ struct DBAndColumns {
     column_names: Vec<String>,
 }
 
-impl MallocSizeOf for DBAndColumns {
-    fn size_of(&self, ops: &mut parity_util_mem::MallocSizeOfOps) -> usize {
-        let mut total = self.column_names.size_of(ops)
-			// we have at least one column always, so we can call property on it
-			+ self.db
-				.property_int_value_cf(self.cf(0), "rocksdb.block-cache-usage")
-				.unwrap_or(Some(0))
-				.map(|x| x as usize)
-				.unwrap_or(0);
-
-        for v in 0..self.column_names.len() {
-            total += self.static_property_or_warn(v, "rocksdb.estimate-table-readers-mem");
-            total += self.static_property_or_warn(v, "rocksdb.cur-size-all-mem-tables");
-        }
-
-        total
-    }
-}
-
+#[allow(unused)]
 impl DBAndColumns {
-    fn cf(&self, i: usize) -> &ColumnFamily {
+    fn cf(&self, i: &str) -> &ColumnFamily {
         self.db
-            .cf_handle(&self.column_names[i])
+            .cf_handle(i)
             .expect("the specified column name is correct; qed")
     }
 
-    fn static_property_or_warn(&self, col: usize, prop: &str) -> usize {
+    fn static_property_or_warn(&self, col: &str, prop: &str) -> usize {
         match self.db.property_int_value_cf(self.cf(col), prop) {
             Ok(Some(v)) => v as usize,
             _ => {
@@ -299,24 +301,18 @@ impl DBAndColumns {
 }
 
 /// Key-Value database.
-#[derive(MallocSizeOf)]
 pub struct Database {
     db: RwLock<Option<DBAndColumns>>,
-    #[ignore_malloc_size_of = "insignificant"]
     config: DatabaseConfig,
     path: String,
-    #[ignore_malloc_size_of = "insignificant"]
     write_opts: WriteOptions,
-    #[ignore_malloc_size_of = "insignificant"]
     read_opts: ReadOptions,
-    #[ignore_malloc_size_of = "insignificant"]
     block_opts: BlockBasedOptions,
     // Dirty values added with `write_buffered`. Cleaned on `flush`.
-    overlay: RwLock<Vec<HashMap<DBKey, KeyState>>>,
-    #[ignore_malloc_size_of = "insignificant"]
+    overlay: RwLock<HashMap<String, HashMap<DBKey, KeyState>>>,
     stats: stats::RunningDbStats,
     // Values currently being flushed. Cleared when `flush` completes.
-    flushing: RwLock<Vec<HashMap<DBKey, KeyState>>>,
+    flushing: RwLock<HashMap<String, HashMap<DBKey, KeyState>>>,
     // Prevents concurrent flushes.
     // Value indicates if a flush is in progress.
     flushing_lock: Mutex<bool>,
@@ -353,6 +349,7 @@ fn generate_options(config: &DatabaseConfig) -> Options {
 
     opts.set_use_fsync(false);
     opts.create_if_missing(true);
+    opts.create_missing_column_families(true);
     opts.set_max_open_files(config.max_open_files);
     opts.set_bytes_per_sync(1 * MB as u64);
     opts.set_keep_log_file_num(1);
@@ -392,7 +389,14 @@ impl Database {
     ///
     /// The number of `config.columns` must not be zero.
     pub fn open(config: &DatabaseConfig, path: &str) -> io::Result<Database> {
-        assert!(config.columns > 0, "the number of columns must not be zero");
+        assert!(
+            config.columns.len() > 0,
+            "the number of columns must not be zero"
+        );
+        assert!(
+            config.columns.contains(&DEFAULT_COLUMN_NAME.to_owned()),
+            "columns must contains \"default\" col"
+        );
 
         let opts = generate_options(config);
         let block_opts = generate_block_based_options(config);
@@ -405,38 +409,33 @@ impl Database {
             fs::remove_file(db_corrupted)?;
         }
 
-        let column_names: Vec<_> = (0..config.columns).map(|c| format!("col{}", c)).collect();
+        let column_names: Vec<_> = config.columns.iter().map(|c| c.to_owned()).collect();
+        init_cache(&column_names);
 
         let write_opts = WriteOptions::default();
         let mut read_opts = ReadOptions::default();
         read_opts.set_verify_checksums(false);
 
-        let cf_descriptors: Vec<_> = (0..config.columns)
-            .map(|i| {
-                ColumnFamilyDescriptor::new(
-                    &column_names[i as usize],
-                    config.column_config(&block_opts, i),
-                )
-            })
-            .collect();
-
-        let db = match DB::open_cf_descriptors(&opts, path, cf_descriptors) {
-            Err(_) => {
-                // retry and create CFs
-                match DB::open_cf(&opts, path, &[] as &[&str]) {
-                    Ok(mut db) => {
-                        for (i, name) in column_names.iter().enumerate() {
-                            let _ = db
-                                .create_cf(name, &config.column_config(&block_opts, i as u32))
-                                .map_err(other_io_err)?;
+        let generate_cf_desc = || -> Vec<_> {
+            column_names
+                .iter()
+                .map(|col_name| {
+                    let options = if col_name.as_str() == DEFAULT_COLUMN_NAME {
+                        if config.memory_budget.contains_key(col_name) {
+                            config.column_config(&block_opts, col_name)
+                        } else {
+                            Default::default()
                         }
-                        Ok(db)
-                    }
-                    err => err,
-                }
-            }
-            ok => ok,
+                    } else {
+                        config.column_config(&block_opts, col_name)
+                    };
+                    ColumnFamilyDescriptor::new(col_name, options)
+                })
+                .collect()
         };
+        let cf_descriptors: Vec<_> = generate_cf_desc();
+
+        let db = DB::open_cf_descriptors(&opts, path, cf_descriptors);
 
         let db = match db {
             Ok(db) => db,
@@ -444,24 +443,25 @@ impl Database {
                 warn!("DB corrupted: {}, attempting repair", s);
                 DB::repair(&opts, path).map_err(other_io_err)?;
 
-                let cf_descriptors: Vec<_> = (0..config.columns)
-                    .map(|i| {
-                        ColumnFamilyDescriptor::new(
-                            &column_names[i as usize],
-                            config.column_config(&block_opts, i),
-                        )
-                    })
-                    .collect();
+                let cf_descriptors: Vec<_> = generate_cf_desc();
 
                 DB::open_cf_descriptors(&opts, path, cf_descriptors).map_err(other_io_err)?
             }
             Err(s) => return Err(other_io_err(s)),
         };
+        let overlay = column_names
+            .iter()
+            .map(|s| (s.to_string(), HashMap::new()))
+            .collect();
+        let flushing = column_names
+            .iter()
+            .map(|s| (s.to_string(), HashMap::new()))
+            .collect();
         Ok(Database {
             db: RwLock::new(Some(DBAndColumns { db, column_names })),
             config: config.clone(),
-            overlay: RwLock::new((0..config.columns).map(|_| HashMap::new()).collect()),
-            flushing: RwLock::new((0..config.columns).map(|_| HashMap::new()).collect()),
+            overlay: RwLock::new(overlay),
+            flushing: RwLock::new(flushing),
             flushing_lock: Mutex::new(false),
             path: path.to_owned(),
             read_opts,
@@ -483,9 +483,17 @@ impl Database {
         for op in ops {
             match op {
                 DBOp::Insert { col, key, value } => {
-                    overlay[col as usize].insert(key, KeyState::Insert(value))
+                    overlay
+                        .get_mut::<str>(&col)
+                        .expect("col must in columns")
+                        .insert(key, KeyState::Insert(value));
                 }
-                DBOp::Delete { col, key } => overlay[col as usize].insert(key, KeyState::Delete),
+                DBOp::Delete { col, key } => {
+                    overlay
+                        .get_mut::<str>(&col)
+                        .expect("col must in columns")
+                        .insert(key, KeyState::Delete);
+                }
             };
         }
     }
@@ -499,7 +507,7 @@ impl Database {
                 let mut bytes: usize = 0;
                 mem::swap(&mut *self.overlay.write(), &mut *self.flushing.write());
                 {
-                    for (c, column) in self.flushing.read().iter().enumerate() {
+                    for (c, column) in self.flushing.read().iter() {
                         ops += column.len();
                         for (key, state) in column.iter() {
                             let cf = cfs.cf(c);
@@ -522,7 +530,7 @@ impl Database {
                 self.stats.tally_writes(ops as u64);
                 self.stats.tally_bytes_written(bytes as u64);
 
-                for column in self.flushing.write().iter_mut() {
+                for (_, column) in self.flushing.write().iter_mut() {
                     column.clear();
                     column.shrink_to_fit();
                 }
@@ -563,9 +571,13 @@ impl Database {
 
                 for op in ops {
                     // remove any buffered operation for this key
-                    self.overlay.write()[op.col() as usize].remove(op.key());
+                    self.overlay
+                        .write()
+                        .get_mut::<str>(op.col())
+                        .expect("col must in columns")
+                        .remove(op.key());
 
-                    let cf = cfs.cf(op.col() as usize);
+                    let cf = cfs.cf(op.col());
 
                     match op {
                         DBOp::Insert { col: _, key, value } => {
@@ -588,26 +600,26 @@ impl Database {
     }
 
     /// Get value by key.
-    pub fn get(&self, col: u32, key: &[u8]) -> io::Result<Option<DBValue>> {
+    pub fn get(&self, col: &str, key: &[u8]) -> io::Result<Option<DBValue>> {
         match *self.db.read() {
             Some(ref cfs) => {
                 self.stats.tally_reads(1);
                 let guard = self.overlay.read();
                 let overlay = guard
-                    .get(col as usize)
+                    .get::<str>(col)
                     .ok_or_else(|| other_io_err("kvdb column index is out of bounds"))?;
                 match overlay.get(key) {
                     Some(&KeyState::Insert(ref value)) => Ok(Some(value.clone())),
                     Some(&KeyState::Delete) => Ok(None),
                     None => {
-                        let flushing = &self.flushing.read()[col as usize];
+                        let flushing = &self.flushing.read()[col];
                         match flushing.get(key) {
                             Some(&KeyState::Insert(ref value)) => Ok(Some(value.clone())),
                             Some(&KeyState::Delete) => Ok(None),
                             None => {
                                 let acquired_val = cfs
                                     .db
-                                    .get_pinned_cf_opt(cfs.cf(col as usize), key, &self.read_opts)
+                                    .get_pinned_cf_opt(cfs.cf(col), key, &self.read_opts)
                                     .map(|r| r.map(|v| v.to_vec()))
                                     .map_err(other_io_err);
 
@@ -631,18 +643,18 @@ impl Database {
 
     /// Get value by partial key. Prefix size should match configured prefix size. Only searches flushed values.
     // TODO: support prefix seek for unflushed data
-    pub fn get_by_prefix(&self, col: u32, prefix: &[u8]) -> Option<Box<[u8]>> {
+    pub fn get_by_prefix(&self, col: &str, prefix: &[u8]) -> Option<Box<[u8]>> {
         self.iter_from_prefix(col, prefix).next().map(|(_, v)| v)
     }
 
     /// Get database iterator for flushed data.
     /// Will hold a lock until the iterator is dropped
     /// preventing the database from being closed.
-    pub fn iter<'a>(&'a self, col: u32) -> impl Iterator<Item = KeyValuePair> + 'a {
+    pub fn iter<'a>(&'a self, col: &str) -> impl Iterator<Item = KeyValuePair> + 'a {
         let read_lock = self.db.read();
         let optional = if read_lock.is_some() {
             let overlay_data = {
-                let overlay = &self.overlay.read()[col as usize];
+                let overlay = &self.overlay.read()[col];
                 let mut overlay_data = overlay
                     .iter()
                     .filter_map(|(k, v)| match *v {
@@ -670,7 +682,7 @@ impl Database {
     /// preventing the database from being closed.
     fn iter_from_prefix<'a>(
         &'a self,
-        col: u32,
+        col: &str,
         prefix: &'a [u8],
     ) -> impl Iterator<Item = iter::KeyValuePair> + 'a {
         let read_lock = self.db.read();
@@ -728,34 +740,27 @@ impl Database {
         // reopen the database and steal handles into self
         let db = Self::open(&self.config, &self.path)?;
         *self.db.write() = mem::replace(&mut *db.db.write(), None);
-        *self.overlay.write() = mem::replace(&mut *db.overlay.write(), Vec::new());
-        *self.flushing.write() = mem::replace(&mut *db.flushing.write(), Vec::new());
+        *self.overlay.write() = mem::replace(&mut *db.overlay.write(), Default::default());
+        *self.flushing.write() = mem::replace(&mut *db.flushing.write(), Default::default());
         Ok(())
     }
 
     /// The number of column families in the db.
-    pub fn num_columns(&self) -> u32 {
+    pub fn columns(&self) -> Vec<String> {
         self.db
             .read()
             .as_ref()
-            .and_then(|db| {
-                if db.column_names.is_empty() {
-                    None
-                } else {
-                    Some(db.column_names.len())
-                }
-            })
-            .map(|n| n as u32)
-            .unwrap_or(0)
+            .map(|n| n.column_names.clone())
+            .unwrap_or(vec![])
     }
 
     /// The number of keys in a column (estimated).
     /// Does not take into account the unflushed data.
-    pub fn num_keys(&self, col: u32) -> io::Result<u64> {
+    pub fn num_keys(&self, col: &str) -> io::Result<u64> {
         const ESTIMATE_NUM_KEYS: &str = "rocksdb.estimate-num-keys";
         match *self.db.read() {
             Some(ref cfs) => {
-                let cf = cfs.cf(col as usize);
+                let cf = cfs.cf(col);
                 match cfs.db.property_int_value_cf(cf, ESTIMATE_NUM_KEYS) {
                     Ok(estimate) => Ok(estimate.unwrap_or_default()),
                     Err(err_string) => Err(other_io_err(err_string)),
@@ -766,14 +771,16 @@ impl Database {
     }
 
     /// Remove the last column family in the database. The deletion is definitive.
-    pub fn remove_last_column(&self) -> io::Result<()> {
+    pub fn remove_column(&self, col: &str) -> io::Result<()> {
         match *self.db.write() {
             Some(DBAndColumns {
                 ref mut db,
                 ref mut column_names,
             }) => {
-                if let Some(name) = column_names.pop() {
-                    db.drop_cf(&name).map_err(other_io_err)?;
+                let pre_len = column_names.len();
+                column_names.retain(|c| c.as_str() != col);
+                if pre_len != column_names.len() {
+                    db.drop_cf(col).map_err(other_io_err)?;
                 }
                 Ok(())
             }
@@ -782,17 +789,25 @@ impl Database {
     }
 
     /// Add a new column family to the DB.
-    pub fn add_column(&self) -> io::Result<()> {
+    pub fn add_column(&self, col: &str) -> io::Result<()> {
         match *self.db.write() {
             Some(DBAndColumns {
                 ref mut db,
                 ref mut column_names,
             }) => {
-                let col = column_names.len() as u32;
-                let name = format!("col{}", col);
-                let col_config = self.config.column_config(&self.block_opts, col as u32);
-                let _ = db.create_cf(&name, &col_config).map_err(other_io_err)?;
-                column_names.push(name);
+                let name = col.to_string();
+                if !column_names.contains(&name) {
+                    let col_config = self.config.column_config(&self.block_opts, &name);
+                    let _ = db.create_cf(&name, &col_config).map_err(other_io_err)?;
+
+                    self.overlay
+                        .write()
+                        .insert(name.clone(), Default::default());
+                    self.flushing
+                        .write()
+                        .insert(name.clone(), Default::default());
+                    column_names.push(name);
+                }
                 Ok(())
             }
             None => Ok(()),
@@ -803,11 +818,11 @@ impl Database {
 // duplicate declaration of methods here to avoid trait import in certain existing cases
 // at time of addition.
 impl KeyValueDB for Database {
-    fn get(&self, col: u32, key: &[u8]) -> io::Result<Option<DBValue>> {
+    fn get(&self, col: &str, key: &[u8]) -> io::Result<Option<DBValue>> {
         Database::get(self, col, key)
     }
 
-    fn get_by_prefix(&self, col: u32, prefix: &[u8]) -> Option<Box<[u8]>> {
+    fn get_by_prefix(&self, col: &str, prefix: &[u8]) -> Option<Box<[u8]>> {
         Database::get_by_prefix(self, col, prefix)
     }
 
@@ -823,14 +838,14 @@ impl KeyValueDB for Database {
         Database::flush(self)
     }
 
-    fn iter<'a>(&'a self, col: u32) -> Box<dyn Iterator<Item = KeyValuePair> + 'a> {
+    fn iter<'a>(&'a self, col: &str) -> Box<dyn Iterator<Item = KeyValuePair> + 'a> {
         let unboxed = Database::iter(self, col);
         Box::new(unboxed.into_iter())
     }
 
     fn iter_from_prefix<'a>(
         &'a self,
-        col: u32,
+        col: &str,
         prefix: &'a [u8],
     ) -> Box<dyn Iterator<Item = KeyValuePair> + 'a> {
         let unboxed = Database::iter_from_prefix(self, col, prefix);
@@ -876,7 +891,7 @@ mod tests {
     use std::io::{self, Read};
     use tempdir::TempDir;
 
-    fn create(columns: u32) -> io::Result<Database> {
+    fn create(columns: Vec<String>) -> io::Result<(Database, TempDir)> {
         let tempdir = TempDir::new("")?;
         let config = DatabaseConfig::with_columns(columns);
         Database::open(
@@ -886,47 +901,48 @@ mod tests {
                 .to_str()
                 .expect("tempdir path is valid unicode"),
         )
+        .map(|db| (db, tempdir))
     }
 
     #[test]
     fn get_fails_with_non_existing_column() -> io::Result<()> {
-        let db = create(1)?;
+        let (db, _) = create(vec![])?;
         st::test_get_fails_with_non_existing_column(&db)
     }
 
     #[test]
     fn put_and_get() -> io::Result<()> {
-        let db = create(1)?;
+        let (db, _) = create(vec![])?;
         st::test_put_and_get(&db)
     }
 
     #[test]
     fn delete_and_get() -> io::Result<()> {
-        let db = create(1)?;
+        let (db, _) = create(vec![])?;
         st::test_delete_and_get(&db)
     }
 
     #[test]
     fn iter() -> io::Result<()> {
-        let db = create(1)?;
+        let (db, _) = create(vec![])?;
         st::test_iter(&db)
     }
 
     #[test]
     fn iter_from_prefix() -> io::Result<()> {
-        let db = create(1)?;
+        let (db, _) = create(vec![])?;
         st::test_iter_from_prefix(&db)
     }
 
     #[test]
     fn complex() -> io::Result<()> {
-        let db = create(1)?;
+        let (db, _) = create(vec![])?;
         st::test_complex(&db)
     }
 
     #[test]
     fn stats() -> io::Result<()> {
-        let db = create(3)?;
+        let (db, _) = create(vec!["0".to_string(), "1".to_string(), "2".to_string()])?;
         st::test_io_stats(&db)
     }
 
@@ -934,11 +950,13 @@ mod tests {
     fn mem_tables_size() {
         let tempdir = TempDir::new("").unwrap();
 
+        let mut columns: Vec<_> = (1..12).into_iter().map(|i| format!("col{}", i)).collect();
+        columns.push(DEFAULT_COLUMN_NAME.to_owned());
         let config = DatabaseConfig {
             max_open_files: 512,
             memory_budget: HashMap::new(),
             compaction: CompactionProfile::default(),
-            columns: 11,
+            columns,
             keep_log_file_num: 1,
         };
 
@@ -946,7 +964,11 @@ mod tests {
 
         let mut batch = db.transaction();
         for i in 0u32..10000u32 {
-            batch.put(i / 1000 + 1, &i.to_le_bytes(), &(i * 17).to_le_bytes());
+            batch.put(
+                &format!("col{}", i / 1000 + 1),
+                &i.to_le_bytes(),
+                &(i * 17).to_le_bytes(),
+            );
         }
         db.write(batch).unwrap();
 
@@ -955,7 +977,12 @@ mod tests {
         {
             let db = db.db.read();
             db.as_ref().map(|db| {
-                assert!(db.static_property_or_warn(0, "rocksdb.cur-size-all-mem-tables") > 512);
+                assert!(
+                    db.static_property_or_warn(
+                        DEFAULT_COLUMN_NAME,
+                        "rocksdb.cur-size-all-mem-tables"
+                    ) > 512
+                );
             });
         }
     }
@@ -978,16 +1005,15 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn db_config_with_zero_columns() {
-        let _cfg = DatabaseConfig::with_columns(0);
+        let _cfg = DatabaseConfig::with_columns(vec![]);
     }
 
     #[test]
     #[should_panic]
     fn open_db_with_zero_columns() {
         let cfg = DatabaseConfig {
-            columns: 0,
+            columns: vec![],
             ..Default::default()
         };
         let _db = Database::open(&cfg, "");
@@ -996,32 +1022,44 @@ mod tests {
     #[test]
     fn add_columns() {
         let config_1 = DatabaseConfig::default();
-        let config_5 = DatabaseConfig::with_columns(5);
+        let config_5 = DatabaseConfig::with_columns(vec![
+            "1".to_string(),
+            "2".to_string(),
+            "3".to_string(),
+            "4".to_string(),
+            "5".to_string(),
+        ]);
 
         let tempdir = TempDir::new("").unwrap();
 
-        // open 1, add 4.
+        // open 1, add 5.
         {
             let db = Database::open(&config_1, tempdir.path().to_str().unwrap()).unwrap();
-            assert_eq!(db.num_columns(), 1);
+            assert_eq!(db.columns().len(), 1);
 
-            for i in 2..=5 {
-                db.add_column().unwrap();
-                assert_eq!(db.num_columns(), i);
+            for i in 1..=5 {
+                db.add_column(&i.to_string()).unwrap();
+                assert_eq!(db.columns().len(), i + 1);
             }
         }
 
         // reopen as 5.
         {
             let db = Database::open(&config_5, tempdir.path().to_str().unwrap()).unwrap();
-            assert_eq!(db.num_columns(), 5);
+            assert_eq!(db.columns().len(), 6);
         }
     }
 
     #[test]
     fn remove_columns() {
-        let config_1 = DatabaseConfig::default();
-        let config_5 = DatabaseConfig::with_columns(5);
+        let config_1 = DatabaseConfig::with_columns(vec!["0".to_string()]);
+        let config_5 = DatabaseConfig::with_columns(vec![
+            "0".to_owned(),
+            "1".to_owned(),
+            "2".to_owned(),
+            "3".to_owned(),
+            "4".to_owned(),
+        ]);
 
         let tempdir = TempDir::new("drop_columns").unwrap();
 
@@ -1029,38 +1067,38 @@ mod tests {
         {
             let db = Database::open(&config_5, tempdir.path().to_str().unwrap())
                 .expect("open with 5 columns");
-            assert_eq!(db.num_columns(), 5);
+            assert_eq!(db.columns().len(), 6);
 
             for i in (1..5).rev() {
-                db.remove_last_column().unwrap();
-                assert_eq!(db.num_columns(), i);
+                db.remove_column(&i.to_string()).unwrap();
+                assert_eq!(db.columns().len(), i + 1);
             }
         }
 
         // reopen as 1.
         {
             let db = Database::open(&config_1, tempdir.path().to_str().unwrap()).unwrap();
-            assert_eq!(db.num_columns(), 1);
+            assert_eq!(db.columns().len(), 2);
         }
     }
 
     #[test]
     fn test_num_keys() {
         let tempdir = TempDir::new("").unwrap();
-        let config = DatabaseConfig::with_columns(1);
+        let config = DatabaseConfig::with_columns(vec!["0".to_string()]);
         let db = Database::open(&config, tempdir.path().to_str().unwrap()).unwrap();
 
         assert_eq!(
-            db.num_keys(0).unwrap(),
+            db.num_keys("0").unwrap(),
             0,
             "database is empty after creation"
         );
         let key1 = b"beef";
         let mut batch = db.transaction();
-        batch.put(0, key1, key1);
+        batch.put("0", key1, key1);
         db.write(batch).unwrap();
         assert_eq!(
-            db.num_keys(0).unwrap(),
+            db.num_keys("0").unwrap(),
             1,
             "adding a key increases the count"
         );
@@ -1069,19 +1107,19 @@ mod tests {
     #[test]
     fn default_memory_budget() {
         let c = DatabaseConfig::default();
-        assert_eq!(c.columns, 1);
+        assert_eq!(c.columns.len(), 1);
         assert_eq!(
             c.memory_budget(),
-            DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB * MB,
+            DB_DEFAULT_MEMORY_BUDGET_MB * MB,
             "total memory budget is default"
         );
         assert_eq!(
-            c.memory_budget_for_col(0),
+            c.memory_budget_for_col("0"),
             DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB * MB,
             "total memory budget for column 0 is the default"
         );
         assert_eq!(
-            c.memory_budget_for_col(999),
+            c.memory_budget_for_col("999"),
             DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB * MB,
             "total memory budget for any column is the default"
         );
@@ -1089,8 +1127,16 @@ mod tests {
 
     #[test]
     fn memory_budget() {
-        let mut c = DatabaseConfig::with_columns(3);
-        c.memory_budget = [(0, 10), (1, 15), (2, 20)].iter().cloned().collect();
+        let mut c =
+            DatabaseConfig::with_columns(vec!["0".to_string(), "1".to_string(), "2".to_string()]);
+        c.memory_budget = [
+            ("0".to_string(), 10),
+            ("1".to_string(), 15),
+            ("2".to_string(), 20),
+        ]
+        .iter()
+        .cloned()
+        .collect();
         assert_eq!(
             c.memory_budget(),
             45 * MB,
@@ -1101,11 +1147,14 @@ mod tests {
     #[test]
     fn rocksdb_settings() {
         const NUM_COLS: usize = 2;
-        let mut cfg = DatabaseConfig::with_columns(NUM_COLS as u32);
+        let mut cfg = DatabaseConfig::with_columns(vec!["col0".to_string(), "col1".to_string()]);
         cfg.max_open_files = 123; // is capped by the OS fd limit (typically 1024)
         cfg.compaction.block_size = 323232;
         cfg.compaction.initial_file_size = 102030;
-        cfg.memory_budget = [(0, 30), (1, 300)].iter().cloned().collect();
+        cfg.memory_budget = [("col0".to_string(), 30), ("col1".to_string(), 300)]
+            .iter()
+            .cloned()
+            .collect();
 
         let db_path = TempDir::new("config_test").expect("the OS can create tmp dirs");
         let _db = Database::open(&cfg, db_path.path().to_str().unwrap()).expect("can open a db");
