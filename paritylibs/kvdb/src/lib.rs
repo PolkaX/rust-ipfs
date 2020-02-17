@@ -19,7 +19,7 @@
 use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::io;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 
 use lazy_static::lazy_static;
 
@@ -43,11 +43,12 @@ pub struct DBTransaction {
 }
 
 lazy_static! {
-    static ref CACHE: Mutex<HashMap<String, Arc<String>>> = Default::default();
+    // use `HashMap` rather than `HashSet` due to can't use `get(&str)` for `HashSet<Arc<String>>`
+    static ref CACHE: RwLock<HashMap<String, Arc<String>>> = Default::default();
 }
 
 pub fn init_cache<S: AsRef<str>, L: AsRef<[S]>>(cols: L) {
-    let mut cache = CACHE.lock().unwrap();
+    let mut cache = CACHE.write().unwrap();
     for c in cols.as_ref().iter() {
         let col = c.as_ref();
         cache.insert(col.to_owned(), Arc::new(col.to_owned()));
@@ -55,12 +56,13 @@ pub fn init_cache<S: AsRef<str>, L: AsRef<[S]>>(cols: L) {
 }
 
 fn column(col: &str) -> Arc<String> {
-    CACHE
-        .lock()
-        .unwrap()
-        .get(col)
-        .expect("col must be existed in CACHE")
-        .to_owned()
+    if let Some(s) = CACHE.read().unwrap().get(col) {
+        return s.to_owned();
+    }
+    // put new col name into cache. if col not in database column, would panic in database functions
+    let s: Arc<String> = Arc::new(col.to_owned());
+    CACHE.write().unwrap().insert(col.to_owned(), s.clone());
+    s
 }
 
 /// Database operation.
