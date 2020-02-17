@@ -19,7 +19,7 @@
 use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::io;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use lazy_static::lazy_static;
 
@@ -42,12 +42,30 @@ pub struct DBTransaction {
     pub ops: Vec<DBOp>,
 }
 
+struct UnsafeMutate<T>(T);
+unsafe impl<T> Send for UnsafeMutate<T> {}
+unsafe impl<T> Sync for UnsafeMutate<T> {}
+impl<T> UnsafeMutate<T> {
+    pub fn get_mut(&self) -> &mut T {
+        unsafe {
+            let c = self as *const UnsafeMutate<T> as *const T as *mut T;
+            &mut *c
+        }
+    }
+    pub fn get(&self) -> &T {
+        unsafe {
+            let c = self as *const UnsafeMutate<T> as *const T;
+            &*c
+        }
+    }
+}
+
 lazy_static! {
-    static ref CACHE: Mutex<HashMap<String, Arc<String>>> = Default::default();
+    static ref CACHE: UnsafeMutate<HashMap<String, Arc<String>>> = UnsafeMutate(Default::default());
 }
 
 pub fn init_cache<S: AsRef<str>, L: AsRef<[S]>>(cols: L) {
-    let mut cache = CACHE.lock().unwrap();
+    let cache = CACHE.get_mut();
     for c in cols.as_ref().iter() {
         let col = c.as_ref();
         cache.insert(col.to_owned(), Arc::new(col.to_owned()));
@@ -56,8 +74,7 @@ pub fn init_cache<S: AsRef<str>, L: AsRef<[S]>>(cols: L) {
 
 fn column(col: &str) -> Arc<String> {
     CACHE
-        .lock()
-        .unwrap()
+        .get()
         .get(col)
         .expect("col must be existed in CACHE")
         .to_owned()

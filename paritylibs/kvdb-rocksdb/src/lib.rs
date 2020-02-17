@@ -888,6 +888,7 @@ impl Drop for Database {
 mod tests {
     use super::*;
     use kvdb_shared_tests as st;
+    use serial_test::serial;
     use std::io::{self, Read};
     use tempdir::TempDir;
 
@@ -905,48 +906,56 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn get_fails_with_non_existing_column() -> io::Result<()> {
         let (db, _) = create(vec![])?;
         st::test_get_fails_with_non_existing_column(&db)
     }
 
     #[test]
+    #[serial]
     fn put_and_get() -> io::Result<()> {
         let (db, _) = create(vec![])?;
         st::test_put_and_get(&db)
     }
 
     #[test]
+    #[serial]
     fn delete_and_get() -> io::Result<()> {
         let (db, _) = create(vec![])?;
         st::test_delete_and_get(&db)
     }
 
     #[test]
+    #[serial]
     fn iter() -> io::Result<()> {
         let (db, _) = create(vec![])?;
         st::test_iter(&db)
     }
 
     #[test]
+    #[serial]
     fn iter_from_prefix() -> io::Result<()> {
         let (db, _) = create(vec![])?;
         st::test_iter_from_prefix(&db)
     }
 
     #[test]
+    #[serial]
     fn complex() -> io::Result<()> {
         let (db, _) = create(vec![])?;
         st::test_complex(&db)
     }
 
     #[test]
+    #[serial]
     fn stats() -> io::Result<()> {
         let (db, _) = create(vec!["0".to_string(), "1".to_string(), "2".to_string()])?;
         st::test_io_stats(&db)
     }
 
     #[test]
+    #[serial]
     fn mem_tables_size() {
         let tempdir = TempDir::new("").unwrap();
 
@@ -988,6 +997,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     #[cfg(target_os = "linux")]
     fn df_to_rotational() {
         use std::path::PathBuf;
@@ -1005,11 +1015,13 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn db_config_with_zero_columns() {
         let _cfg = DatabaseConfig::with_columns(vec![]);
     }
 
     #[test]
+    #[serial]
     #[should_panic]
     fn open_db_with_zero_columns() {
         let cfg = DatabaseConfig {
@@ -1020,6 +1032,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn add_columns() {
         let config_1 = DatabaseConfig::default();
         let config_5 = DatabaseConfig::with_columns(vec![
@@ -1051,6 +1064,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn remove_columns() {
         let config_1 = DatabaseConfig::with_columns(vec!["0".to_string()]);
         let config_5 = DatabaseConfig::with_columns(vec![
@@ -1083,6 +1097,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_num_keys() {
         let tempdir = TempDir::new("").unwrap();
         let config = DatabaseConfig::with_columns(vec!["0".to_string()]);
@@ -1105,6 +1120,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn default_memory_budget() {
         let c = DatabaseConfig::default();
         assert_eq!(c.columns.len(), 1);
@@ -1126,6 +1142,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn memory_budget() {
         let mut c =
             DatabaseConfig::with_columns(vec!["0".to_string(), "1".to_string(), "2".to_string()]);
@@ -1145,6 +1162,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn rocksdb_settings() {
         const NUM_COLS: usize = 2;
         let mut cfg = DatabaseConfig::with_columns(vec!["col0".to_string(), "col1".to_string()]);
