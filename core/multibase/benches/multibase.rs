@@ -2,6 +2,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::Rng;
+
 use rust_multibase::{decode, encode, Base};
 
 fn bench_encode(c: &mut Criterion) {
@@ -35,11 +36,20 @@ fn bench_decode(c: &mut Criterion) {
     let base58 = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     let base64 = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-    let mut base32_data = data.iter().map(|i| base32[i % 31]).collect::<Vec<u8>>();
+    let mut base32_data = data
+        .iter()
+        .map(|i| base32[i % 31] as char)
+        .collect::<String>();
     base32_data.insert(0, Base::Base32Upper.code());
-    let mut base58_data = data.iter().map(|i| base58[i % 57]).collect::<Vec<u8>>();
+    let mut base58_data = data
+        .iter()
+        .map(|i| base58[i % 57] as char)
+        .collect::<String>();
     base58_data.insert(0, Base::Base58Btc.code());
-    let mut base64_data = data.iter().map(|i| base64[i % 64]).collect::<Vec<u8>>();
+    let mut base64_data = data
+        .iter()
+        .map(|i| base64[i % 64] as char)
+        .collect::<String>();
     base64_data.insert(0, Base::Base64.code());
 
     let mut group = c.benchmark_group("decode");

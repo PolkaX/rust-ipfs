@@ -1,18 +1,17 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use rust_multibase::Base::*;
-use rust_multibase::{decode, encode, Base};
+use rust_multibase::{decode, encode, Base, Base::*};
 
 #[test]
 fn test_bases_code() {
-    let code: u8 = Base2.into();
-    assert_eq!(code, b'0');
-    assert_eq!(Base2.code(), b'0');
+    let code: char = Base2.into();
+    assert_eq!(code, '0');
+    assert_eq!(Base2.code(), '0');
 }
 
 #[test]
 fn test_bases_from_code() {
-    assert_eq!(Base::from(b'0').unwrap(), Base2);
+    assert_eq!(Base::from_code('0').unwrap(), Base2);
 }
 
 #[test]
@@ -37,6 +36,7 @@ fn test_all() {
         (Identity, "\0Decentralize everything!!!"),
         (Base2, "00100010001100101011000110110010101101110011101000111001001100001011011000110100101111010011001010010000001100101011101100110010101110010011110010111010001101000011010010110111001100111001000010010000100100001"),
         (Base8, "72106254331267164344605543227514510062566312711713506415133463441102204"),
+        (Base10, "9109908211473026300072608683330054595334719246534349983154512161"),
         (
             Base16Lower,
             "f446563656e7472616c697a652065766572797468696e67212121",
@@ -82,7 +82,7 @@ fn preserves_leading_zeroes() {
         (Identity, "\x00\x00\x00\x00yes mani !"),
         (Base2, "000000000000000000000000001111001011001010111001100100000011011010110000101101110011010010010000000100001"),
         (Base8, "700000000362625631006654133464440102"),
-        /* (Base10, "9000573277761329450583662625"),*/
+        (Base10, "9000573277761329450583662625"),
         (Base16Lower, "f000000796573206d616e692021"),
         (Base16Upper, "F000000796573206D616E692021"),
         (Base32Lower, "baaaaa6lfomqg2yloneqcc"),
