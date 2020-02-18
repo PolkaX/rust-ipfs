@@ -3,7 +3,7 @@
 use super::*;
 use crate::query::filter::*;
 
-fn test_key_filter(filter: &impl Filter, keys: &[str], expect: &[Bytes]) {}
+fn test_key_filter(filter: &impl Filter, keys: &[str], expect: &[Vec<u8>]) {}
 
 #[test]
 fn test_filter_key_compare() {}

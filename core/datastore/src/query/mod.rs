@@ -8,9 +8,6 @@ pub mod filter;
 pub mod order;
 
 use std::fmt;
-use std::future::Future;
-
-use bytes::Bytes;
 
 use crate::error::*;
 use filter::Filter;
@@ -24,7 +21,7 @@ pub use sync_results::{SyncResult, SyncResults};
 #[derive(Default, Clone)]
 pub struct Entry {
     pub key: String,
-    pub value: Bytes,
+    pub value: Vec<u8>,
     pub size: usize,
     // expiration
 }

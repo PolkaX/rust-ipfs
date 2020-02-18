@@ -1,6 +1,3 @@
-use std::collections::HashSet;
-
-use bytes::Bytes;
 use datastore::{key::Key, Batch, DSError, Read, Txn, Write};
 use kvdb::{DBOp, DBTransaction};
 
@@ -33,7 +30,7 @@ impl<'a> Transaction<'a> {
 }
 
 impl<'a> Read for Transaction<'a> {
-    fn get(&self, key: &Key) -> DSResult<Bytes> {
+    fn get(&self, key: &Key) -> DSResult<Vec<u8>> {
         self.inner_get(key).map(|b| b.to_vec().into())
     }
 
@@ -52,7 +49,7 @@ impl<'a> Read for Transaction<'a> {
 }
 
 impl<'a> Write for Transaction<'a> {
-    fn put(&mut self, key: Key, value: Bytes) -> DSResult<()> {
+    fn put(&mut self, key: Key, value: Vec<u8>) -> DSResult<()> {
         let (prefix, k) = pre_process_key(&self.db.cols, &key);
         self.inner.put(prefix, k.as_bytes(), &value);
         Ok(())
@@ -66,10 +63,8 @@ impl<'a> Write for Transaction<'a> {
 }
 
 impl<'a> Txn for Transaction<'a> {
-    fn commit(&mut self) -> DSResult<()> {
-        let mut commit = DBTransaction::with_capacity(0);
-        std::mem::swap(&mut self.inner, &mut commit);
-        self.db.db.write(commit)?;
+    fn commit(self) -> DSResult<()> {
+        self.db.db.write(self.inner)?;
         Ok(())
     }
 
@@ -79,7 +74,7 @@ impl<'a> Txn for Transaction<'a> {
 }
 
 impl<'a> Batch for Transaction<'a> {
-    fn commit(&mut self) -> DSResult<()> {
+    fn commit(self) -> DSResult<()> {
         Txn::commit(self)
     }
 }

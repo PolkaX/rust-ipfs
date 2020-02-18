@@ -178,7 +178,7 @@ fn test_less() {
 
 struct Case {
     key: Key,
-    data: bytes::Bytes,
+    data: Vec<u8>,
     err: String,
 }
 

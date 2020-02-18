@@ -4,7 +4,6 @@
 mod async_results;
 mod sync_results;
 
-use bytes::Bytes;
 use std::cmp::Ordering;
 
 use crate::datastore::{Datastore as DatastoreT, Read, Write};
@@ -186,7 +185,7 @@ impl Iterator for QuerySet {
 */
 /*
 impl Read for Datastore {
-    fn get(&self, key: &Key) -> Result<Bytes, Error> {
+    fn get(&self, key: &Key) -> Result< Vec<u8>, Error> {
         unimplemented!()
     }
 
@@ -199,7 +198,7 @@ impl Read for Datastore {
     }
 }
 impl Write for Datastore {
-    fn put(&mut self, key: Key, value: Bytes) -> Result<(), Error> {
+    fn put(&mut self, key: Key, value:  Vec<u8>) -> Result<(), Error> {
         unimplemented!()
     }
 

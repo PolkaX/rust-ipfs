@@ -2,14 +2,13 @@
 
 mod transforms;
 
-use crate::datastore::{Batch, Batching, Datastore as DatastoreT, Read, SyncQuery, Write};
-use crate::key::Key;
-use crate::DSError;
-use bytes::Bytes;
-pub use transforms::{KeyTransform, PrefixTransform};
-
-use crate::error::*;
 use std::ops::{Deref, DerefMut};
+
+use crate::datastore::{Batch, Batching, Datastore as DatastoreT, Read, Write};
+use crate::error::*;
+use crate::key::Key;
+
+pub use transforms::{KeyTransform, PrefixTransform};
 
 pub fn wrap<D: DatastoreT, K: KeyTransform>(child: D, key_transform: K) -> Datastore<D, K> {
     Datastore {
@@ -38,7 +37,7 @@ impl<D: DatastoreT, K: KeyTransform> DerefMut for Datastore<D, K> {
 }
 
 impl<D: DatastoreT, K: KeyTransform> Write for Datastore<D, K> {
-    fn put(&mut self, key: Key, value: Bytes) -> Result<()> {
+    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()> {
         self.child.put(self.key_transform.convert_key(key), value)
     }
 
@@ -48,7 +47,7 @@ impl<D: DatastoreT, K: KeyTransform> Write for Datastore<D, K> {
 }
 
 impl<D: DatastoreT, K: KeyTransform> Read for Datastore<D, K> {
-    fn get(&self, key: &Key) -> Result<Bytes> {
+    fn get(&self, key: &Key) -> Result<Vec<u8>> {
         self.child.get(&self.key_transform.convert_key(key))
     }
 
@@ -85,7 +84,7 @@ pub struct TransformBatch<B: Batch, K: KeyTransform> {
 }
 
 impl<B: Batch, K: KeyTransform> Write for TransformBatch<B, K> {
-    fn put(&mut self, key: Key, value: Bytes) -> Result<()> {
+    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()> {
         self.child_batch.put(self.transform.convert_key(key), value)
     }
 
@@ -95,7 +94,7 @@ impl<B: Batch, K: KeyTransform> Write for TransformBatch<B, K> {
 }
 
 impl<B: Batch, K: KeyTransform> Batch for TransformBatch<B, K> {
-    fn commit(&mut self) -> Result<()> {
+    fn commit(self) -> Result<()> {
         self.child_batch.commit()
     }
 }

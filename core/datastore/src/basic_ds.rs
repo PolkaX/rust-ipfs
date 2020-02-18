@@ -1,18 +1,16 @@
 use std::collections::BTreeMap;
 
-use bytes::Bytes;
-
 use crate::datastore::{Read, Write};
 use crate::error::*;
 use crate::key::Key;
 
 #[derive(Default)]
 pub struct MapDatastore {
-    values: BTreeMap<Key, Bytes>,
+    values: BTreeMap<Key, Vec<u8>>,
 }
 
 impl Write for MapDatastore {
-    fn put(&mut self, key: Key, value: Bytes) -> Result<()> {
+    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()> {
         self.values.insert(key, value);
         Ok(())
     }
@@ -24,7 +22,7 @@ impl Write for MapDatastore {
 }
 
 impl Read for MapDatastore {
-    fn get(&self, key: &Key) -> Result<Bytes> {
+    fn get(&self, key: &Key) -> Result<Vec<u8>> {
         // TODO
         self.values
             .get(key)

@@ -3,8 +3,6 @@
 use std::cmp::Ordering;
 use std::fmt;
 
-use bytes::Bytes;
-
 use super::Entry;
 
 pub trait Filter: fmt::Debug + Sync + Send {
@@ -37,7 +35,7 @@ impl<'a> fmt::Debug for FilterValueCompare<'a> {
 
 impl<'a> Filter for FilterValueCompare<'a> {
     fn filter(&self, e: &Entry) -> bool {
-        let ordering = e.value.as_ref().cmp(self.value);
+        let ordering = e.value.as_slice().cmp(self.value);
         match self.op {
             EQUAL => ordering == Ordering::Equal,
             NOT_EQUAL => ordering != Ordering::Equal,

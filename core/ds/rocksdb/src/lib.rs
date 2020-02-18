@@ -8,8 +8,6 @@ use std::iter::FromIterator;
 use std::result;
 use std::sync::Arc;
 
-use bytes::Bytes;
-
 use datastore::{key::Key, query, Batching, Datastore, Read, SyncQuery, TxnDatastore, Write};
 use error::*;
 use kvdb::DBTransaction;
@@ -80,7 +78,7 @@ fn inner_get(db: &RocksDB, key: &Key) -> DSResult<Vec<u8>> {
 }
 
 impl Read for RocksDB {
-    fn get(&self, key: &Key) -> DSResult<Bytes> {
+    fn get(&self, key: &Key) -> DSResult<Vec<u8>> {
         inner_get(self, key).map(|v| v.into())
     }
 
@@ -114,7 +112,7 @@ where
 }
 
 impl Write for RocksDB {
-    fn put(&mut self, key: Key, value: Bytes) -> DSResult<()> {
+    fn put(&mut self, key: Key, value: Vec<u8>) -> DSResult<()> {
         inner_write(self, &key, |tx, col, real_key| {
             tx.put(col, real_key.as_bytes(), &value);
         })

@@ -4,6 +4,4 @@ mod key_test;
 mod keytransform_test;
 mod query;
 
-pub use bytes::Bytes;
-
 use super::*;

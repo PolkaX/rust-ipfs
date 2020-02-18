@@ -1,6 +1,5 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use bytes::Bytes;
 use std::time::Duration;
 
 use crate::error::*;
@@ -11,13 +10,13 @@ use crate::query::{self, SyncResults};
 
 /// Write is the write-side of the Datastore interface.
 pub trait Write {
-    fn put(&mut self, key: Key, value: Bytes) -> Result<()>;
+    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()>;
     fn delete(&mut self, key: &Key) -> Result<()>;
 }
 
 /// Read is the read-side of the Datastore interface.
 pub trait Read {
-    fn get(&self, key: &Key) -> Result<Bytes>;
+    fn get(&self, key: &Key) -> Result<Vec<u8>>;
     fn has(&self, key: &Key) -> Result<bool>;
     fn get_size(&self, key: &Key) -> Result<usize>;
 }
@@ -48,13 +47,13 @@ impl<T: Datastore + TTL> TTLDatastore for T {}
 
 // TTL encapulates the methods that deal with entries with time-to-live.
 pub trait TTL {
-    fn put_with_ttl(&mut self, key: Key, value: Bytes, ttl: Duration) -> Result<()>;
+    fn put_with_ttl(&mut self, key: Key, value: Vec<u8>, ttl: Duration) -> Result<()>;
     fn set_ttl(&mut self, key: Key, ttl: Duration) -> Result<()>;
     fn get_expiration(&self, key: &Key) -> Result<Duration>;
 }
 
 pub trait Txn: Write + Read {
-    fn commit(&mut self) -> Result<()>;
+    fn commit(self) -> Result<()>;
 
     fn discard(&mut self);
 }
@@ -65,7 +64,7 @@ pub trait TxnDatastore<'a>: Datastore {
 }
 
 pub trait Batch: Write {
-    fn commit(&mut self) -> Result<()>;
+    fn commit(self) -> Result<()>;
 }
 
 pub trait Batching<'a>: Datastore {
