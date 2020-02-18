@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 thiserror = "1.0"
 path-clean = "0.1"
+parking_lot = "0.10.0"
 async-std = { version="1.5", features=["unstable"], optional = true}
 async-trait = { version = "0.1", optional = true }
 bytes = { version = "0.5", features = ["serde"] }

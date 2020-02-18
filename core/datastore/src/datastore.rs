@@ -52,28 +52,29 @@ pub trait TTL {
     fn get_expiration(&self, key: &Key) -> Result<Duration>;
 }
 
-pub trait Txn: Write + Read {
-    fn commit(self) -> Result<()>;
+pub trait CheckedDatastore: Datastore {
+    fn check(&self) -> Result<()>;
+}
 
+pub trait Batch: Write {}
+
+impl<T: Write> Batch for T {}
+
+pub trait Batching: Datastore {
+    type Txn: Batch;
+    fn batch(&self) -> Result<Self::Txn>;
+    fn commit(&mut self, txn: Self::Txn) -> Result<()>;
+}
+
+pub trait Txn: Read + Batch {
     fn discard(&mut self);
 }
 
-pub trait TxnDatastore<'a>: Datastore {
-    type Txn: Txn;
-    fn new_transaction(&'a self, read_only: bool) -> Result<Self::Txn>;
-}
-
-pub trait Batch: Write {
-    fn commit(self) -> Result<()>;
-}
-
-pub trait Batching<'a>: Datastore {
-    type Batch: Batch;
-    fn batch(&'a self) -> Result<Self::Batch>;
-}
-
-pub trait CheckedDatastore: Datastore {
-    fn check(&self) -> Result<()>;
+pub trait TxnDatastore: Batching
+where
+    Self::Txn: Txn,
+{
+    fn new_transaction(&self, read_only: bool) -> Result<Self::Txn>;
 }
 
 pub trait ScrubbedDatastore: Datastore {

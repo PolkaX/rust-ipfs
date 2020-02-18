@@ -18,8 +18,11 @@ pub use crate::tx::Transaction;
 
 pub type DSResult<T> = result::Result<T, datastore::DSError>;
 
-fn pre_process_key<'a>(cols: &'a HashSet<String>, key: &'a Key) -> (&'a str, &'a str) {
+fn pre_process_key(cols: *const HashSet<String>, key: &Key) -> (&str, &str) {
     let (prefix, k) = key.split_prefix();
+    // it's safe for if db is dropped, the process should come to end.
+    // the cols's lifetime is same as db.
+    let cols = unsafe { &*cols };
     let prefix = prefix
         .map(|p| {
             if cols.contains(p) {
@@ -42,9 +45,6 @@ pub struct RocksDB {
     inner: Arc<Inner>,
 }
 
-unsafe impl Send for RocksDB {}
-unsafe impl Sync for RocksDB {}
-
 impl RocksDB {
     pub fn new(path: &str, config: &DatabaseConfig) -> Result<Self> {
         let db = RocksDatabase::open(config, path)?;
@@ -64,7 +64,7 @@ impl RocksDB {
     pub fn get_mut(&self) -> &mut Self {
         // it's safe, for RocksDatabase is thread safe inner
         unsafe {
-            let db = self as *const RocksDB as *const RocksDB as *mut RocksDB;
+            let db = self as *const RocksDB as *mut RocksDB;
             &mut *db
         }
     }
@@ -132,22 +132,29 @@ impl Datastore for RocksDB {
     }
 }
 
-impl<'a> TxnDatastore<'a> for RocksDB {
-    type Txn = Transaction<'a>;
+impl Batching for RocksDB {
+    type Txn = Transaction;
 
-    fn new_transaction(&'a self, _read_only: bool) -> DSResult<Self::Txn> {
+    fn batch(&self) -> DSResult<Self::Txn> {
         let inner = self.inner.db.transaction();
-        let tx = Transaction::new(inner, self.inner.as_ref());
+        let cols = &self.inner.as_ref().cols as *const HashSet<String>;
+        // for cols is only readable, and lifetime is same as db, thus just pointer is enough
+        // to avoid atomic copy for Arc casting
+        let tx = Transaction::new(inner, cols);
         Ok(tx)
+    }
+
+    fn commit(&mut self, txn: Self::Txn) -> DSResult<()> {
+        self.inner.db.write(txn.inner)?;
+        Ok(())
     }
 }
 
-impl<'a> Batching<'a> for RocksDB {
-    type Batch = Transaction<'a>;
-
-    fn batch(&'a self) -> DSResult<Self::Batch> {
+impl TxnDatastore for RocksDB {
+    fn new_transaction(&self, _read_only: bool) -> DSResult<Self::Txn> {
         let inner = self.inner.db.transaction();
-        let tx = Transaction::new(inner, self.inner.as_ref());
+        let cols = &self.inner.as_ref().cols as *const HashSet<String>;
+        let tx = Transaction::new(inner, cols);
         Ok(tx)
     }
 }

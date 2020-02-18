@@ -10,6 +10,7 @@ pub mod key;
 pub mod keytransform;
 pub mod namespace;
 pub mod query;
+pub mod singleton;
 // TODO impl mount
 // pub mod mount;
 

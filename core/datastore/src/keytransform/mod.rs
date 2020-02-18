@@ -8,6 +8,7 @@ use crate::datastore::{Batch, Batching, Datastore as DatastoreT, Read, Write};
 use crate::error::*;
 use crate::key::Key;
 
+use crate::Txn;
 pub use transforms::{KeyTransform, PrefixTransform};
 
 pub fn wrap<D: DatastoreT, K: KeyTransform>(child: D, key_transform: K) -> Datastore<D, K> {
@@ -67,14 +68,18 @@ impl<D: DatastoreT, K: KeyTransform> DatastoreT for Datastore<D, K> {
     }
 }
 
-impl<'a, D: Batching<'a>, K: KeyTransform> Batching<'a> for Datastore<D, K> {
-    type Batch = TransformBatch<D::Batch, K>;
-    fn batch(&'a self) -> Result<Self::Batch> {
+impl<D: Batching, K: KeyTransform> Batching for Datastore<D, K> {
+    type Txn = TransformBatch<D::Txn, K>;
+    fn batch(&self) -> Result<Self::Txn> {
         let child_batch = self.child.batch()?;
         Ok(TransformBatch {
             child_batch,
             transform: self.key_transform.clone(),
         })
+    }
+
+    fn commit(&mut self, txn: Self::Txn) -> Result<()> {
+        self.child.commit(txn.child_batch)
     }
 }
 
@@ -93,8 +98,21 @@ impl<B: Batch, K: KeyTransform> Write for TransformBatch<B, K> {
     }
 }
 
-impl<B: Batch, K: KeyTransform> Batch for TransformBatch<B, K> {
-    fn commit(self) -> Result<()> {
-        self.child_batch.commit()
+impl<B: Read + Batch, K: KeyTransform> Read for TransformBatch<B, K> {
+    fn get(&self, key: &Key) -> Result<Vec<u8>> {
+        self.child_batch.get(key)
+    }
+
+    fn has(&self, key: &Key) -> Result<bool> {
+        self.child_batch.has(key)
+    }
+
+    fn get_size(&self, key: &Key) -> Result<usize> {
+        self.child_batch.get_size(key)
+    }
+}
+impl<B: Txn, K: KeyTransform> Txn for TransformBatch<B, K> {
+    fn discard(&mut self) {
+        self.child_batch.discard()
     }
 }
