@@ -33,10 +33,11 @@ use std::time::{Duration, Instant};
 
 use alloc_counter::{count_alloc, AllocCounterSystem};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use ethereum_types::H256;
 use rand::{distributions::Uniform, seq::SliceRandom, Rng};
 
-use kvdb_rocksdb::{Database, DatabaseConfig};
+use kvdb_rocksdb::{Database, DatabaseConfig, DEFAULT_COLUMN_NAME};
+
+type H256 = [u8; 32];
 
 #[global_allocator]
 static A: AllocCounterSystem = AllocCounterSystem;
@@ -48,7 +49,7 @@ criterion_main!(benches);
 /// family and default options. Needs manual cleanup.
 fn open_db() -> Database {
     let tempdir_str = "./benches/_rocksdb_bench_get";
-    let cfg = DatabaseConfig::with_columns(1);
+    let cfg = DatabaseConfig::with_columns(vec!["1".to_string()]);
     let db = Database::open(&cfg, tempdir_str).expect("rocksdb works");
     db
 }
@@ -72,10 +73,16 @@ fn n_random_bytes(n: usize) -> Vec<u8> {
 /// lexicographically in the DB, and the benchmark keys are random bytes making the needles are
 /// effectively random points in the key set.
 fn populate(db: &Database) -> io::Result<Vec<H256>> {
+    let random = || -> H256 {
+        use rand::distributions::Distribution;
+        let mut rng = rand::rngs::OsRng;
+        rand::distributions::Standard.sample(&mut rng)
+    };
+
     let mut needles = Vec::with_capacity(NEEDLES);
     let mut batch = db.transaction();
     for i in 0..NEEDLES * NEEDLES_TO_HAYSTACK_RATIO {
-        let key = H256::random();
+        let key = random();
         if i % NEEDLES_TO_HAYSTACK_RATIO == 0 {
             needles.push(key.clone());
             if i % 100_000 == 0 && i > 0 {
@@ -83,7 +90,7 @@ fn populate(db: &Database) -> io::Result<Vec<H256>> {
             }
         }
         // In ethereum keys are mostly 32 bytes and payloads ~140bytes.
-        batch.put(0, &key.as_bytes(), &n_random_bytes(140));
+        batch.put(DEFAULT_COLUMN_NAME, &key.as_ref(), &n_random_bytes(140));
     }
     db.write(batch)?;
     // Clear the overlay
@@ -110,7 +117,7 @@ fn get(c: &mut Criterion) {
                     let needle = needles
                         .choose(&mut rand::thread_rng())
                         .expect("needles is not empty");
-                    black_box(db.get(0, needle.as_bytes()).unwrap());
+                    black_box(db.get(DEFAULT_COLUMN_NAME, needle.as_ref()).unwrap());
                 }
                 elapsed = start.elapsed();
             });
@@ -141,7 +148,10 @@ fn get(c: &mut Criterion) {
                     let needle = needles
                         .choose(&mut rand::thread_rng())
                         .expect("needles is not empty");
-                    black_box(db.get_by_prefix(0, &needle.as_bytes()[..8]).unwrap());
+                    black_box(
+                        db.get_by_prefix(DEFAULT_COLUMN_NAME, &needle.as_ref()[..8])
+                            .unwrap(),
+                    );
                 }
                 elapsed = start.elapsed();
             });
@@ -172,7 +182,7 @@ fn iter(c: &mut Criterion) {
             let (alloc_stats, _) = count_alloc(|| {
                 let start = Instant::now();
                 for _ in 0..iterations {
-                    black_box(db.iter(0).take(1000).collect::<Vec<_>>());
+                    black_box(db.iter(DEFAULT_COLUMN_NAME).take(1000).collect::<Vec<_>>());
                 }
                 elapsed = start.elapsed();
             });
@@ -199,7 +209,7 @@ fn iter(c: &mut Criterion) {
             let (alloc_stats, _) = count_alloc(|| {
                 let start = Instant::now();
                 for _ in 0..iterations {
-                    black_box(db.iter(0).next().unwrap());
+                    black_box(db.iter(DEFAULT_COLUMN_NAME).next().unwrap());
                 }
                 elapsed = start.elapsed();
             });
