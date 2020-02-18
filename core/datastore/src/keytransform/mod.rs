@@ -68,14 +68,14 @@ impl<D: DatastoreT, K: KeyTransform> DatastoreT for Datastore<D, K> {
     }
 }
 
-impl<D: Batching, K: KeyTransform> Batching for Datastore<D, K> {
+impl<'a, D: Batching<'a>, K: KeyTransform> Batching<'a> for Datastore<D, K> {
     type Batch = TransformBatch<D::Batch, K>;
-    fn batch(&self) -> Self::Batch {
-        let child_batch = self.child.batch();
-        TransformBatch {
+    fn batch(&'a self) -> Result<Self::Batch> {
+        let child_batch = self.child.batch()?;
+        Ok(TransformBatch {
             child_batch,
             transform: self.key_transform.clone(),
-        }
+        })
     }
 }
 

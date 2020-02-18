@@ -24,7 +24,4 @@ pub enum AmtIpldError {
 
     #[error("no node found at (sub)index: {0}")]
     NoNodeForIndex(usize),
-
-    #[error("tmp")]
-    Tmp,
 }

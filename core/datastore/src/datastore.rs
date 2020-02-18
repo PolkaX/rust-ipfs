@@ -59,18 +59,18 @@ pub trait Txn: Write + Read {
     fn discard(&mut self);
 }
 
-pub trait TxnDatastore: Datastore {
+pub trait TxnDatastore<'a>: Datastore {
     type Txn: Txn;
-    fn new_transaction(&self, read_only: bool) -> Self::Txn;
+    fn new_transaction(&'a self, read_only: bool) -> Result<Self::Txn>;
 }
 
 pub trait Batch: Write {
     fn commit(&mut self) -> Result<()>;
 }
 
-pub trait Batching: Datastore {
+pub trait Batching<'a>: Datastore {
     type Batch: Batch;
-    fn batch(&self) -> Self::Batch;
+    fn batch(&'a self) -> Result<Self::Batch>;
 }
 
 pub trait CheckedDatastore: Datastore {

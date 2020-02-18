@@ -110,7 +110,7 @@ impl Key {
         self.0.split(LEFT_SLASH_STR).skip(1).collect::<Vec<_>>()
     }
 
-    pub fn split_prefix(&self) -> (Option<(&str)>, &str) {
+    pub fn split_prefix(&self) -> (Option<&str>, &str) {
         // key first char must be "/", skip check it
         let skip = 1;
         if let Some(i) = &self.0[skip..].find(LEFT_SLASH_STR) {

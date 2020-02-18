@@ -1,0 +1,85 @@
+use std::collections::HashSet;
+
+use bytes::Bytes;
+use datastore::{key::Key, Batch, DSError, Read, Txn, Write};
+use kvdb::{DBOp, DBTransaction};
+
+use crate::{pre_process_key, DSResult, Inner};
+
+pub struct Transaction<'a> {
+    pub inner: DBTransaction,
+    db: &'a Inner,
+}
+
+impl<'a> Transaction<'a> {
+    pub(crate) fn new(inner: DBTransaction, db: &'a Inner) -> Self {
+        Transaction { inner, db }
+    }
+    fn inner_get(&self, k: &Key) -> DSResult<&[u8]> {
+        for op in self.inner.ops.iter() {
+            if let DBOp::Insert { col, key, value } = op {
+                let (prefix, k) = pre_process_key(&self.db.cols, k);
+                // not fit col name
+                if prefix != col.as_str() {
+                    continue;
+                }
+                if key.as_slice() == k.as_bytes() {
+                    return Ok(value);
+                }
+            }
+        }
+        Err(DSError::NotFound(k.to_string()))
+    }
+}
+
+impl<'a> Read for Transaction<'a> {
+    fn get(&self, key: &Key) -> DSResult<Bytes> {
+        self.inner_get(key).map(|b| b.to_vec().into())
+    }
+
+    fn has(&self, key: &Key) -> DSResult<bool> {
+        let r = self.inner_get(key);
+        match r {
+            Ok(_) => Ok(true),
+            Err(DSError::NotFound(_)) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn get_size(&self, key: &Key) -> DSResult<usize> {
+        self.inner_get(key).map(|b| b.len())
+    }
+}
+
+impl<'a> Write for Transaction<'a> {
+    fn put(&mut self, key: Key, value: Bytes) -> DSResult<()> {
+        let (prefix, k) = pre_process_key(&self.db.cols, &key);
+        self.inner.put(prefix, k.as_bytes(), &value);
+        Ok(())
+    }
+
+    fn delete(&mut self, key: &Key) -> DSResult<()> {
+        let (prefix, k) = pre_process_key(&self.db.cols, &key);
+        self.inner.delete(prefix, k.as_bytes());
+        Ok(())
+    }
+}
+
+impl<'a> Txn for Transaction<'a> {
+    fn commit(&mut self) -> DSResult<()> {
+        let mut commit = DBTransaction::with_capacity(0);
+        std::mem::swap(&mut self.inner, &mut commit);
+        self.db.db.write(commit)?;
+        Ok(())
+    }
+
+    fn discard(&mut self) {
+        self.inner.ops.clear()
+    }
+}
+
+impl<'a> Batch for Transaction<'a> {
+    fn commit(&mut self) -> DSResult<()> {
+        Txn::commit(self)
+    }
+}
