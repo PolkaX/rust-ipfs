@@ -10,9 +10,9 @@ description = "Implementation of the multibase format"
 keywords = ["ipfs", "multiformat", "multibase"]
 
 [dependencies]
+base-x = "0.2"
 data-encoding = "2.1"
 lazy_static = "1.4"
-bs58 = "0.3"
 
 [dev-dependencies]
 criterion = "0.3"
