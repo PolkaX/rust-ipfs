@@ -10,8 +10,8 @@ use crate::query::{self, SyncResults};
 
 /// Write is the write-side of the Datastore interface.
 pub trait Write {
-    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()>;
-    fn delete(&mut self, key: &Key) -> Result<()>;
+    fn put(&self, key: Key, value: Vec<u8>) -> Result<()>;
+    fn delete(&self, key: &Key) -> Result<()>;
 }
 
 /// Read is the read-side of the Datastore interface.
@@ -36,7 +36,7 @@ pub trait Datastore: Write + Read {
     /// returns, even if the program crashes. If Put/Delete operations already
     /// satisfy these requirements then Sync may be a no-op.
     /// If the prefix fails to Sync this method returns an error.
-    fn sync(&mut self, prefix: &Key) -> Result<()>;
+    fn sync(&self, prefix: &Key) -> Result<()>;
 }
 
 // TTLDatastore is an interface that should be implemented by datastores that
@@ -47,8 +47,8 @@ impl<T: Datastore + TTL> TTLDatastore for T {}
 
 // TTL encapulates the methods that deal with entries with time-to-live.
 pub trait TTL {
-    fn put_with_ttl(&mut self, key: Key, value: Vec<u8>, ttl: Duration) -> Result<()>;
-    fn set_ttl(&mut self, key: Key, ttl: Duration) -> Result<()>;
+    fn put_with_ttl(&self, key: Key, value: Vec<u8>, ttl: Duration) -> Result<()>;
+    fn set_ttl(&self, key: Key, ttl: Duration) -> Result<()>;
     fn get_expiration(&self, key: &Key) -> Result<Duration>;
 }
 
@@ -56,14 +56,15 @@ pub trait CheckedDatastore: Datastore {
     fn check(&self) -> Result<()>;
 }
 
-pub trait Batch: Write {}
-
-impl<T: Write> Batch for T {}
+pub trait Batch {
+    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()>;
+    fn delete(&mut self, key: &Key) -> Result<()>;
+}
 
 pub trait Batching: Datastore {
     type Txn: Batch;
     fn batch(&self) -> Result<Self::Txn>;
-    fn commit(&mut self, txn: Self::Txn) -> Result<()>;
+    fn commit(&self, txn: Self::Txn) -> Result<()>;
 }
 
 pub trait Txn: Read + Batch {
@@ -82,7 +83,7 @@ pub trait ScrubbedDatastore: Datastore {
 }
 
 pub trait GCDatastore: Datastore {
-    fn collect_garbage(&mut self) -> Result<()>;
+    fn collect_garbage(&self) -> Result<()>;
 }
 
 pub trait PersistentDatastore: Datastore {

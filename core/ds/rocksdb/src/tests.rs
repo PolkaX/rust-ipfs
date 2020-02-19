@@ -40,7 +40,6 @@ fn new_db() -> (RocksDB, TempDir) {
 
 // immutable db is also ok
 fn add_test_cases(db: &RocksDB, testcase: &HashMap<&'static str, &'static str>) {
-    let db = db.get_mut();
     for (k, v) in testcase.iter() {
         let k = Key::new(k);
         db.put(k, v.as_bytes().into()).unwrap();
@@ -104,7 +103,7 @@ fn test_delete() {
     let has = db.has(&key).unwrap();
     assert!(has);
 
-    db.get_mut().delete(&key).unwrap();
+    db.delete(&key).unwrap();
 
     let has = db.has(&key).unwrap();
     assert!(!has);
@@ -115,7 +114,7 @@ fn test_get_empty() {
     let (db, _) = new_db();
     add_test_cases(&db, &testcase());
     let k = Key::new("/a");
-    db.get_mut().put(k.clone(), "".into()).unwrap();
+    db.put(k.clone(), "".into()).unwrap();
 
     let v = db.get(&k).unwrap();
     assert!(v.is_empty());
@@ -124,11 +123,11 @@ fn test_get_empty() {
 #[test]
 fn test_batching() {
     let (db, _) = new_db();
-    let b = db.batch().unwrap();
+    let mut b = db.batch().unwrap();
     for (k, v) in testcase() {
-        db.get_mut().put(Key::new(k), v.into()).unwrap();
+        b.put(Key::new(k), v.into()).unwrap();
     }
-    Batch::commit(b).unwrap();
+    db.commit(b).unwrap();
 
     for (k, v) in testcase() {
         let val = db.get(&Key::new(k)).unwrap();
@@ -139,7 +138,7 @@ fn test_batching() {
     let mut b = db.batch().unwrap();
     b.delete(&Key::new("/a/b")).unwrap();
     b.delete(&Key::new("/a/b/c")).unwrap();
-    Batch::commit(b).unwrap();
+    db.commit(b).unwrap();
     // todo query
 }
 
@@ -148,7 +147,7 @@ fn test_basic_put_get() {
     let (db, _) = new_db();
     let k = Key::new("foo");
     let v = "Hello Datastore!";
-    db.get_mut().put(k.clone(), v.into()).unwrap();
+    db.put(k.clone(), v.into()).unwrap();
     let has = db.has(&k).unwrap();
     assert!(has);
 
@@ -158,7 +157,7 @@ fn test_basic_put_get() {
     let has = db.has(&k).unwrap();
     assert!(has);
 
-    db.get_mut().delete(&k).unwrap();
+    db.delete(&k).unwrap();
     let has = db.has(&k).unwrap();
     assert!(!has);
 }
@@ -190,9 +189,7 @@ fn test_many_keys_and_query() {
     }
 
     for (i, k) in keys.iter().enumerate() {
-        db.get_mut()
-            .put(k.clone(), values[i].as_ref().into())
-            .unwrap();
+        db.put(k.clone(), values[i].as_ref().into()).unwrap();
     }
 
     for (i, k) in keys.iter().enumerate() {
@@ -214,10 +211,10 @@ fn test_txn_discard() {
     let mut txn = db.new_transaction(false).unwrap();
     let key = Key::new("/test/thing");
     txn.put(key.clone(), [1_u8, 2, 3].as_ref().into()).unwrap();
-    Txn::discard(&mut txn);
+    txn.discard();
     let r = txn.get(&key);
     matches!(r, Err(datastore::DSError::NotFound(_)));
-    Txn::commit(txn).unwrap();
+    db.commit(txn).unwrap();
 
     let r = db.get(&key);
     matches!(r, Err(datastore::DSError::NotFound(_)));
@@ -232,7 +229,7 @@ fn test_txn_commit() {
     let mut txn = db.new_transaction(false).unwrap();
     let key = Key::new("/test/thing");
     txn.put(key.clone(), [1_u8, 2, 3].as_ref().into()).unwrap();
-    Txn::commit(txn).unwrap();
+    db.commit(txn).unwrap();
 
     let has = db.has(&key).unwrap();
     assert!(has)
@@ -251,7 +248,7 @@ fn test_txn_batch() {
         txn.put(key, random_bytes.as_ref().into()).unwrap();
     }
 
-    Txn::commit(txn).unwrap();
+    db.commit(txn).unwrap();
 
     for (key, bytes) in data {
         let retrieved = db.get(&key).unwrap();

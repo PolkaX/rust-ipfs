@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use datastore::{key::Key, DSError, Read, Txn, Write};
+use datastore::{key::Key, Batch, DSError, Read, Txn};
 use kvdb::{DBOp, DBTransaction};
 
 use crate::{pre_process_key, DSResult};
@@ -50,7 +50,7 @@ impl Read for Transaction {
     }
 }
 
-impl Write for Transaction {
+impl Batch for Transaction {
     fn put(&mut self, key: Key, value: Vec<u8>) -> DSResult<()> {
         let (prefix, k) = pre_process_key(self.cols, &key);
         self.inner.put(prefix, k.as_bytes(), &value);

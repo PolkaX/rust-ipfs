@@ -9,6 +9,7 @@ use std::result;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_cbor::Value;
 
+use blockstore::BlockstoreError;
 use cid::{Cid, Codec, Hash as MHashEnum, Prefix};
 
 use crate::node::{create_root, Item, Node, PartAmt};
@@ -26,8 +27,8 @@ impl Blocks for DB {
             .db
             .borrow()
             .get(&cid.to_bytes())
-            .ok_or(AmtIpldError::Tmp)
-            .and_then(|v| serde_cbor::from_slice(v).map_err(|_| AmtIpldError::Tmp))?;
+            .ok_or(BlockstoreError::NotFound(cid.clone()).into())
+            .and_then(|v| serde_cbor::from_slice(v).map_err(AmtIpldError::Cbor))?;
 
         Ok(o)
     }

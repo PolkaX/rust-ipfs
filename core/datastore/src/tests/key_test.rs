@@ -1,6 +1,7 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use super::*;
+use crate::key::{namespace_type, namespace_value, Key};
 
 #[test]
 fn test_namespace_type() {
@@ -199,7 +200,7 @@ fn test_json() {
 
     for c in cases {
         let out = serde_json::to_string(&c.key).unwrap();
-        assert_eq!(out.as_bytes(), c.data.as_ref());
+        assert_eq!(out.as_bytes(), c.data.as_slice());
 
         let k: Key = serde_json::from_str(&out).unwrap();
         assert_eq!(k, c.key);

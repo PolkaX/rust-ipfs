@@ -5,28 +5,55 @@ use crate::singleton::SingletonDS;
 use crate::datastore::{Read, Write};
 use crate::error::*;
 use crate::key::Key;
-use crate::{Datastore, Txn};
+use crate::{Batch, Datastore, Txn};
+use std::ops::{Deref, DerefMut};
 
-pub type InnerDB = HashMap<Key, Vec<u8>>;
+#[derive(Debug, Default)]
+pub struct InnerDB(HashMap<Key, Vec<u8>>);
+
 pub type MapDatastore = SingletonDS<InnerDB>;
-
 pub type BasicTxn = HashMap<Key, Option<Vec<u8>>>;
 
+impl Deref for InnerDB {
+    type Target = HashMap<Key, Vec<u8>>;
+
+    fn deref(&self) -> &Self::Target {
+        &(self.0)
+    }
+}
+
+impl DerefMut for InnerDB {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl InnerDB {
+    // do not need `RefCell` for in single thread, outside would not hold any ref for `HashMap`
+    pub fn be_mutable(&self) -> &mut InnerDB {
+        unsafe {
+            let db = self as *const InnerDB as *mut InnerDB;
+            &mut *db
+        }
+    }
+}
+
 impl Write for InnerDB {
-    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()> {
-        self.insert(key, value);
+    fn put(&self, key: Key, value: Vec<u8>) -> Result<()> {
+        self.be_mutable().insert(key, value);
         Ok(())
     }
 
-    fn delete(&mut self, key: &Key) -> Result<()> {
-        self.remove(key);
+    fn delete(&self, key: &Key) -> Result<()> {
+        self.be_mutable().remove(key);
         Ok(())
     }
 }
 
 impl Read for InnerDB {
     fn get(&self, key: &Key) -> Result<Vec<u8>> {
-        self.get(key)
+        (&**self)
+            .get(key)
             .map(|v| v.to_owned())
             .ok_or(DSError::NotFound(key.to_string()))
     }
@@ -36,20 +63,21 @@ impl Read for InnerDB {
     }
 
     fn get_size(&self, key: &Key) -> Result<usize> {
-        self.get(key)
+        (&**self)
+            .get(key)
             .map(|v| v.len())
             .ok_or(DSError::NotFound(key.to_string()))
     }
 }
 
 impl Datastore for InnerDB {
-    fn sync(&mut self, _prefix: &Key) -> Result<()> {
+    fn sync(&self, _prefix: &Key) -> Result<()> {
         // do nothing
         Ok(())
     }
 }
 
-impl Write for BasicTxn {
+impl Batch for BasicTxn {
     fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()> {
         self.insert(key, Some(value));
         Ok(())

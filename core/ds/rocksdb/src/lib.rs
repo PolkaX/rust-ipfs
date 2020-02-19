@@ -60,14 +60,6 @@ impl RocksDB {
     pub fn new_with_default(path: &str) -> Result<Self> {
         Self::new(path, &Default::default())
     }
-
-    pub fn get_mut(&self) -> &mut Self {
-        // it's safe, for RocksDatabase is thread safe inner
-        unsafe {
-            let db = self as *const RocksDB as *mut RocksDB;
-            &mut *db
-        }
-    }
 }
 
 #[inline]
@@ -100,7 +92,7 @@ impl SyncQuery for RocksDB {
 }
 
 #[inline]
-fn inner_write<F>(db: &mut RocksDB, key: &Key, f: F) -> DSResult<()>
+fn inner_write<F>(db: &RocksDB, key: &Key, f: F) -> DSResult<()>
 where
     F: Fn(&mut DBTransaction, &str, &str),
 {
@@ -112,13 +104,13 @@ where
 }
 
 impl Write for RocksDB {
-    fn put(&mut self, key: Key, value: Vec<u8>) -> DSResult<()> {
+    fn put(&self, key: Key, value: Vec<u8>) -> DSResult<()> {
         inner_write(self, &key, |tx, col, real_key| {
             tx.put(col, real_key.as_bytes(), &value);
         })
     }
 
-    fn delete(&mut self, key: &Key) -> DSResult<()> {
+    fn delete(&self, key: &Key) -> DSResult<()> {
         inner_write(self, &key, |tx, col, real_key| {
             tx.delete(col, real_key.as_bytes());
         })
@@ -126,7 +118,7 @@ impl Write for RocksDB {
 }
 
 impl Datastore for RocksDB {
-    fn sync(&mut self, _prefix: &Key) -> DSResult<()> {
+    fn sync(&self, _prefix: &Key) -> DSResult<()> {
         self.inner.db.flush()?;
         Ok(())
     }
@@ -144,7 +136,7 @@ impl Batching for RocksDB {
         Ok(tx)
     }
 
-    fn commit(&mut self, txn: Self::Txn) -> DSResult<()> {
+    fn commit(&self, txn: Self::Txn) -> DSResult<()> {
         self.inner.db.write(txn.inner)?;
         Ok(())
     }

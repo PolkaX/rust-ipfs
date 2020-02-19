@@ -38,11 +38,11 @@ impl<D: DatastoreT, K: KeyTransform> DerefMut for Datastore<D, K> {
 }
 
 impl<D: DatastoreT, K: KeyTransform> Write for Datastore<D, K> {
-    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()> {
+    fn put(&self, key: Key, value: Vec<u8>) -> Result<()> {
         self.child.put(self.key_transform.convert_key(key), value)
     }
 
-    fn delete(&mut self, key: &Key) -> Result<()> {
+    fn delete(&self, key: &Key) -> Result<()> {
         self.child.delete(&self.key_transform.convert_key(key))
     }
 }
@@ -63,7 +63,7 @@ impl<D: DatastoreT, K: KeyTransform> Read for Datastore<D, K> {
 // TODO query
 
 impl<D: DatastoreT, K: KeyTransform> DatastoreT for Datastore<D, K> {
-    fn sync(&mut self, prefix: &Key) -> Result<()> {
+    fn sync(&self, prefix: &Key) -> Result<()> {
         self.child.sync(&self.key_transform.convert_key(prefix))
     }
 }
@@ -78,7 +78,7 @@ impl<D: Batching, K: KeyTransform> Batching for Datastore<D, K> {
         })
     }
 
-    fn commit(&mut self, txn: Self::Txn) -> Result<()> {
+    fn commit(&self, txn: Self::Txn) -> Result<()> {
         self.child.commit(txn.child_batch)
     }
 }
@@ -88,7 +88,7 @@ pub struct TransformBatch<B: Batch, K: KeyTransform> {
     transform: K,
 }
 
-impl<B: Batch, K: KeyTransform> Write for TransformBatch<B, K> {
+impl<B: Batch, K: KeyTransform> Batch for TransformBatch<B, K> {
     fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()> {
         self.child_batch.put(self.transform.convert_key(key), value)
     }

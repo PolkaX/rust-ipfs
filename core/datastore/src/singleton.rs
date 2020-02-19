@@ -5,18 +5,11 @@ use crate::error::*;
 use crate::key::Key;
 use crate::{Batching, Datastore, Read, Txn, TxnDatastore, Write};
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct SingletonDS<T: Datastore> {
     inner: Arc<RwLock<T>>,
 }
-impl<T: Datastore> SingletonDS<T> {
-    pub fn get_mut(&self) -> &mut SingletonDS<T> {
-        unsafe {
-            let db = self as *const SingletonDS<T> as *mut SingletonDS<T>;
-            &mut *db
-        }
-    }
-}
+impl<T: Datastore> SingletonDS<T> {}
 
 impl<T: Datastore> SingletonDS<T> {
     pub fn new(db: T) -> Self {
@@ -33,11 +26,11 @@ impl<T: Datastore> SingletonDS<T> {
 }
 
 impl<T: Datastore> Write for SingletonDS<T> {
-    fn put(&mut self, key: Key, value: Vec<u8>) -> Result<()> {
+    fn put(&self, key: Key, value: Vec<u8>) -> Result<()> {
         self.write().put(key, value)
     }
 
-    fn delete(&mut self, key: &Key) -> Result<()> {
+    fn delete(&self, key: &Key) -> Result<()> {
         self.write().delete(key)
     }
 }
@@ -55,7 +48,7 @@ impl<T: Datastore> Read for SingletonDS<T> {
     }
 }
 impl<T: Datastore> Datastore for SingletonDS<T> {
-    fn sync(&mut self, prefix: &Key) -> Result<()> {
+    fn sync(&self, prefix: &Key) -> Result<()> {
         self.write().sync(prefix)
     }
 }
@@ -67,7 +60,7 @@ impl<T: Batching> Batching for SingletonDS<T> {
         self.read().batch()
     }
 
-    fn commit(&mut self, txn: Self::Txn) -> Result<()> {
+    fn commit(&self, txn: Self::Txn) -> Result<()> {
         self.write().commit(txn)
     }
 }

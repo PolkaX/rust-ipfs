@@ -198,11 +198,11 @@ impl Read for Datastore {
     }
 }
 impl Write for Datastore {
-    fn put(&mut self, key: Key, value:  Vec<u8>) -> Result<(), Error> {
+    fn put(&self, key: Key, value:  Vec<u8>) -> Result<(), Error> {
         unimplemented!()
     }
 
-    fn delete(&mut self, key: &Key) -> Result<(), Error> {
+    fn delete(&self, key: &Key) -> Result<(), Error> {
         unimplemented!()
     }
 }
