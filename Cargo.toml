@@ -6,7 +6,6 @@ members = [
     "core/datastore",
     "core/ds/rocksdb",
     "core/hamt-ipld",
-    "core/hamt-ipld2",
     "core/ipfs/blockstore",
     "core/ipld/cbor",
     "core/ipld/format",
