@@ -1,3 +1,5 @@
+#![allow(clippy::or_fun_call)]
+
 mod error;
 #[cfg(test)]
 mod tests;
@@ -71,7 +73,7 @@ fn inner_get(db: &RocksDB, key: &Key) -> DSResult<Vec<u8>> {
 
 impl Read for RocksDB {
     fn get(&self, key: &Key) -> DSResult<Vec<u8>> {
-        inner_get(self, key).map(|v| v.into())
+        inner_get(self, key).map(|v| v)
     }
 
     fn has(&self, key: &Key) -> DSResult<bool> {

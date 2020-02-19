@@ -26,9 +26,9 @@ fn test_namespace_value() {
 
 fn sub_test_key(s: &str) {
     let fixed = path_clean::clean(&format!("/{}", s));
-    let namespaces: Vec<String> = fixed.split("/").skip(1).map(|s| s.to_string()).collect();
+    let namespaces: Vec<String> = fixed.split('/').skip(1).map(|s| s.to_string()).collect();
     let last_namespace = namespaces.last().map(|s| s.to_owned()).unwrap();
-    let lnparts: Vec<String> = last_namespace.split(":").map(|s| s.to_string()).collect();
+    let lnparts: Vec<String> = last_namespace.split(':').map(|s| s.to_string()).collect();
     let ktype = if lnparts.len() > 1 {
         lnparts[..lnparts.len() - 1].join(":")
     } else {
@@ -42,11 +42,11 @@ fn sub_test_key(s: &str) {
     let c = kparent.clone() + "/" + &ktype;
     let kpath = path_clean::clean(&c);
     let kinstance = fixed.clone() + ":" + "inst";
-    println!("Testing: {}", Key::new(s.clone()));
+    println!("Testing: {}", Key::new(s.to_owned()));
 
     assert_eq!(Key::new(s).as_str(), fixed.as_str());
-    assert_eq!(Key::new(s), Key::new(s.clone()));
-    assert_eq!(Key::new(s).as_str(), Key::new(s.clone()).as_str());
+    assert_eq!(Key::new(s), Key::new(s.to_owned()));
+    assert_eq!(Key::new(s).as_str(), Key::new(s.to_owned()).as_str());
     assert_eq!(Key::new(s).name(), kname.as_str());
     assert_eq!(Key::new(s).type_(), ktype.as_str());
     assert_eq!(Key::new(s).path().as_str(), kpath.as_str());
@@ -186,11 +186,11 @@ fn test_json() {
     let cases = vec![
         Case {
             key: Key::new("/a/b/c"),
-            data: r#""/a/b/c""#.as_bytes().into(),
+            data: br#""/a/b/c""#.to_vec(),
         },
         Case {
             key: Key::new(r#"/shouldescapekey"/with/quote"#),
-            data: r#""/shouldescapekey\"/with/quote""#.as_bytes().into(),
+            data: br#""/shouldescapekey\"/with/quote""#.to_vec(),
         },
     ];
 

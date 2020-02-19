@@ -13,11 +13,12 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Parity.  If not, see <http://www.gnu.org/licenses/>.
+#![allow(clippy::type_complexity, clippy::or_fun_call, clippy::identity_op)]
 
 mod iter;
 mod stats;
 
-use std::{cmp, collections::HashMap, convert::identity, error, fs, io, mem, path::Path, result};
+use std::{cmp, collections::HashMap, error, fs, io, mem, path::Path, result};
 
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use rocksdb::{
@@ -59,7 +60,7 @@ pub const DB_DEFAULT_COLUMN_MEMORY_BUDGET_MB: MiB = 128;
 /// The default memory budget in MiB.
 pub const DB_DEFAULT_MEMORY_BUDGET_MB: MiB = 512;
 
-pub const DEFAULT_COLUMN_NAME: &'static str = "default";
+pub const DEFAULT_COLUMN_NAME: &str = "default";
 
 enum KeyState {
     Insert(DBValue),
@@ -390,7 +391,7 @@ impl Database {
     /// The number of `config.columns` must not be zero.
     pub fn open(config: &DatabaseConfig, path: &str) -> io::Result<Database> {
         assert!(
-            config.columns.len() > 0,
+            !config.columns.is_empty(),
             "the number of columns must not be zero"
         );
         assert!(
@@ -580,11 +581,11 @@ impl Database {
                     let cf = cfs.cf(op.col());
 
                     match op {
-                        DBOp::Insert { col: _, key, value } => {
+                        DBOp::Insert { col: _col, key, value } => {
                             stats_total_bytes += key.len() + value.len();
                             batch.put_cf(cf, &key, &value).map_err(other_io_err)?
                         }
-                        DBOp::Delete { col: _, key } => {
+                        DBOp::Delete { col: _col, key } => {
                             // We count deletes as writes.
                             stats_total_bytes += key.len();
                             batch.delete_cf(cf, &key).map_err(other_io_err)?
@@ -674,7 +675,7 @@ impl Database {
         } else {
             None
         };
-        optional.into_iter().flat_map(identity)
+        optional.into_iter().flatten()
     }
 
     /// Get database iterator from prefix for flushed data.
@@ -698,7 +699,7 @@ impl Database {
         // see https://github.com/facebook/rocksdb/wiki/Prefix-Seek-API-Changes
         optional
             .into_iter()
-            .flat_map(identity)
+            .flatten()
             .take_while(move |(k, _)| k.starts_with(prefix))
     }
 
@@ -798,7 +799,7 @@ impl Database {
                 let name = col.to_string();
                 if !column_names.contains(&name) {
                     let col_config = self.config.column_config(&self.block_opts, &name);
-                    let _ = db.create_cf(&name, &col_config).map_err(other_io_err)?;
+                    db.create_cf(&name, &col_config).map_err(other_io_err)?;
 
                     self.overlay
                         .write()
@@ -840,7 +841,7 @@ impl KeyValueDB for Database {
 
     fn iter<'a>(&'a self, col: &str) -> Box<dyn Iterator<Item = KeyValuePair> + 'a> {
         let unboxed = Database::iter(self, col);
-        Box::new(unboxed.into_iter())
+        Box::new(unboxed)
     }
 
     fn iter_from_prefix<'a>(
@@ -849,7 +850,7 @@ impl KeyValueDB for Database {
         prefix: &'a [u8],
     ) -> Box<dyn Iterator<Item = KeyValuePair> + 'a> {
         let unboxed = Database::iter_from_prefix(self, col, prefix);
-        Box::new(unboxed.into_iter())
+        Box::new(unboxed)
     }
 
     fn restore(&self, new_db: &str) -> io::Result<()> {
@@ -950,7 +951,7 @@ mod tests {
     fn mem_tables_size() {
         let tempdir = TempDir::new("").unwrap();
 
-        let mut columns: Vec<_> = (1..12).into_iter().map(|i| format!("col{}", i)).collect();
+        let mut columns: Vec<_> = (1..12).map(|i| format!("col{}", i)).collect();
         columns.push(DEFAULT_COLUMN_NAME.to_owned());
         let config = DatabaseConfig {
             max_open_files: 512,
@@ -976,14 +977,12 @@ mod tests {
 
         {
             let db = db.db.read();
-            db.as_ref().map(|db| {
-                assert!(
+            if let Some(db) = db.as_ref() { assert!(
                     db.static_property_or_warn(
                         DEFAULT_COLUMN_NAME,
                         "rocksdb.cur-size-all-mem-tables"
                     ) > 512
-                );
-            });
+                ); }
         }
     }
 
@@ -1149,8 +1148,8 @@ mod tests {
         const NUM_COLS: usize = 2;
         let mut cfg = DatabaseConfig::with_columns(vec!["col0".to_string(), "col1".to_string()]);
         cfg.max_open_files = 123; // is capped by the OS fd limit (typically 1024)
-        cfg.compaction.block_size = 323232;
-        cfg.compaction.initial_file_size = 102030;
+        cfg.compaction.block_size = 323_232;
+        cfg.compaction.initial_file_size = 102_030;
         cfg.memory_budget = [("col0".to_string(), 30), ("col1".to_string(), 300)]
             .iter()
             .cloned()
@@ -1188,27 +1187,24 @@ mod tests {
         // LRU cache for non-default columns is ⅓ of memory budget (including default column)
         let lru_size = (330 * MB) / 3;
         let needle = format!("block_cache_options:\n    capacity : {}", lru_size);
-        let lru = settings.match_indices(&needle).collect::<Vec<_>>().len();
+        let lru = settings.match_indices(&needle).count();
         assert_eq!(lru, NUM_COLS);
 
         // Index/filters share cache
         let include_indexes = settings
             .matches("cache_index_and_filter_blocks: 1")
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(include_indexes, NUM_COLS);
         // Pin index/filters on L0
         let pins = settings
             .matches("pin_l0_filter_and_index_blocks_in_cache: 1")
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(pins, NUM_COLS);
 
         // Check target file size, aka initial file size
         let l0_sizes = settings
             .matches("target_file_size_base: 102030")
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(l0_sizes, NUM_COLS);
         // The default column uses the default of 64Mb regardless of the setting.
         assert!(settings.contains("target_file_size_base: 67108864"));
@@ -1216,22 +1212,19 @@ mod tests {
         // Check compression settings
         let snappy_compression = settings
             .matches("Options.compression: Snappy")
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         // All columns use Snappy
         assert_eq!(snappy_compression, NUM_COLS + 1);
         // …even for L7
         let snappy_bottommost = settings
             .matches("Options.bottommost_compression: Disabled")
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(snappy_bottommost, NUM_COLS + 1);
 
         // 7 levels
         let levels = settings
             .matches("Options.num_levels: 7")
-            .collect::<Vec<_>>()
-            .len();
+            .count();
         assert_eq!(levels, NUM_COLS + 1);
 
         // Don't fsync every store

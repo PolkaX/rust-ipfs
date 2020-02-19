@@ -19,7 +19,7 @@
 use kvdb::{IoStatsKind, KeyValueDB};
 use std::io;
 
-const DEFAULT_COLUMN_NAME: &'static str = "default";
+const DEFAULT_COLUMN_NAME: &str = "default";
 
 /// A test for `KeyValueDB::get`.
 pub fn test_put_and_get(db: &dyn KeyValueDB) -> io::Result<()> {
@@ -81,7 +81,7 @@ pub fn test_iter(db: &dyn KeyValueDB) -> io::Result<()> {
     transaction.put(DEFAULT_COLUMN_NAME, key2, key2);
     db.write_buffered(transaction);
 
-    let contents: Vec<_> = db.iter(DEFAULT_COLUMN_NAME).into_iter().collect();
+    let contents: Vec<_> = db.iter(DEFAULT_COLUMN_NAME).collect();
     assert_eq!(contents.len(), 2);
     assert_eq!(&*contents[0].0, key1);
     assert_eq!(&*contents[0].1, key1);
@@ -107,7 +107,6 @@ pub fn test_iter_from_prefix(db: &dyn KeyValueDB) -> io::Result<()> {
     // empty prefix
     let contents: Vec<_> = db
         .iter_from_prefix(DEFAULT_COLUMN_NAME, b"")
-        .into_iter()
         .collect();
     assert_eq!(contents.len(), 4);
     assert_eq!(&*contents[0].0, key1);
@@ -118,7 +117,6 @@ pub fn test_iter_from_prefix(db: &dyn KeyValueDB) -> io::Result<()> {
     // prefix a
     let contents: Vec<_> = db
         .iter_from_prefix(DEFAULT_COLUMN_NAME, b"a")
-        .into_iter()
         .collect();
     assert_eq!(contents.len(), 3);
     assert_eq!(&*contents[0].0, key2);
@@ -128,7 +126,6 @@ pub fn test_iter_from_prefix(db: &dyn KeyValueDB) -> io::Result<()> {
     // prefix abc
     let contents: Vec<_> = db
         .iter_from_prefix(DEFAULT_COLUMN_NAME, b"abc")
-        .into_iter()
         .collect();
     assert_eq!(contents.len(), 2);
     assert_eq!(&*contents[0].0, key3);
@@ -137,14 +134,12 @@ pub fn test_iter_from_prefix(db: &dyn KeyValueDB) -> io::Result<()> {
     // prefix abcde
     let contents: Vec<_> = db
         .iter_from_prefix(DEFAULT_COLUMN_NAME, b"abcde")
-        .into_iter()
         .collect();
     assert_eq!(contents.len(), 0);
 
     // prefix 0
     let contents: Vec<_> = db
         .iter_from_prefix(DEFAULT_COLUMN_NAME, b"0")
-        .into_iter()
         .collect();
     assert_eq!(contents.len(), 1);
     assert_eq!(&*contents[0].0, key1);
@@ -214,7 +209,7 @@ pub fn test_complex(db: &dyn KeyValueDB) -> io::Result<()> {
 
     assert_eq!(&*db.get(DEFAULT_COLUMN_NAME, key1)?.unwrap(), b"cat");
 
-    let contents: Vec<_> = db.iter(DEFAULT_COLUMN_NAME).into_iter().collect();
+    let contents: Vec<_> = db.iter(DEFAULT_COLUMN_NAME).collect();
     assert_eq!(contents.len(), 5);
     assert_eq!(contents[0].0.to_vec(), key1.to_vec());
     assert_eq!(&*contents[0].1, b"cat");

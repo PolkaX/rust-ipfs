@@ -50,8 +50,7 @@ criterion_main!(benches);
 fn open_db() -> Database {
     let tempdir_str = "./benches/_rocksdb_bench_get";
     let cfg = DatabaseConfig::with_columns(vec!["1".to_string()]);
-    let db = Database::open(&cfg, tempdir_str).expect("rocksdb works");
-    db
+    Database::open(&cfg, tempdir_str).expect("rocksdb works")
 }
 
 /// Generate `n` random bytes +/- 20%.

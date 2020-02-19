@@ -1,4 +1,5 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
+#![allow(clippy::or_fun_call, clippy::mut_from_ref)]
 
 mod datastore;
 mod error;

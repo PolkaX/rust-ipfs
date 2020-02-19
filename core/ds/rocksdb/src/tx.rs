@@ -33,7 +33,7 @@ impl Transaction {
 
 impl Read for Transaction {
     fn get(&self, key: &Key) -> DSResult<Vec<u8>> {
-        self.inner_get(key).map(|b| b.to_vec().into())
+        self.inner_get(key).map(|b| b.to_vec())
     }
 
     fn has(&self, key: &Key) -> DSResult<bool> {

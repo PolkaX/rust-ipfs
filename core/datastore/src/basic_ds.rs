@@ -118,8 +118,7 @@ impl Read for BasicTxn {
         self.get(key)
             .ok_or(DSError::NotFound(key.to_string()))
             .and_then(|v| {
-                v.as_ref()
-                    .map(|v| v.clone())
+                v.as_ref().cloned()
                     .ok_or(DSError::NotFound(key.to_string()))
             })
     }

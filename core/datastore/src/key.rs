@@ -16,13 +16,13 @@ impl fmt::Display for Key {
     }
 }
 
-pub const LEFT_SLASH: u8 = '/' as u8;
-pub const LEFT_SLASH_STR: &'static str = "/";
+pub const LEFT_SLASH: u8 = b'/';
+pub const LEFT_SLASH_STR: &str = "/";
 
 /// ensure after clean, string is start with "/", and cleaned with the rule of "path_clean"
 pub fn clean<S: AsRef<str>>(s: S) -> String {
     let b = s.as_ref().as_bytes();
-    if b.len() == 0 {
+    if b.is_empty() {
         LEFT_SLASH_STR.to_string()
     } else if b[0] == LEFT_SLASH {
         path_clean::clean(s.as_ref())
@@ -71,7 +71,7 @@ impl Key {
     pub fn from_raw<T: AsRef<str>>(s: T) -> Self {
         // it's safe to use &[u8] to check, due to we only check char "/"
         let c_str: &[u8] = s.as_ref().as_bytes();
-        if c_str.len() == 0 {
+        if c_str.is_empty() {
             return Key(LEFT_SLASH_STR.to_string());
         }
 
