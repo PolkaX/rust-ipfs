@@ -4,8 +4,6 @@ use std::time::Duration;
 
 use crate::error::*;
 use crate::key::Key;
-#[cfg(feature = "async")]
-use crate::query::AsyncResult;
 use crate::query::{self, SyncResults};
 
 /// Write is the write-side of the Datastore interface.
