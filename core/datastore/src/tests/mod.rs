@@ -1,21 +1,20 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
+mod basic_ds_test;
+mod common;
 mod key_test;
 mod keytransform_test;
 mod query;
-mod basic_ds_test;
-mod common;
 
 use super::*;
 #[macro_export]
 macro_rules! random {
-        () => ({
-            use rand::distributions::Distribution;
-            let mut rng = rand::rngs::OsRng;
-            rand::distributions::Standard.sample(&mut rng)
-        });
-    }
-
+    () => {{
+        use rand::distributions::Distribution;
+        let mut rng = rand::rngs::OsRng;
+        rand::distributions::Standard.sample(&mut rng)
+    }};
+}
 
 fn basic_sub_tests<D: Datastore>(ds: &D) {
     common::test_basic_put_get(ds);

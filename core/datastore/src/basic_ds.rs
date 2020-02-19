@@ -5,7 +5,7 @@ use crate::singleton::SingletonDS;
 use crate::datastore::{Read, Write};
 use crate::error::*;
 use crate::key::Key;
-use crate::{Batch, Datastore, Txn, Batching, TxnDatastore};
+use crate::{Batch, Batching, Datastore, Txn, TxnDatastore};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Default)]
@@ -118,7 +118,8 @@ impl Read for BasicTxn {
         self.get(key)
             .ok_or(DSError::NotFound(key.to_string()))
             .and_then(|v| {
-                v.as_ref().cloned()
+                v.as_ref()
+                    .cloned()
                     .ok_or(DSError::NotFound(key.to_string()))
             })
     }

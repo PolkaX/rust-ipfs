@@ -1,8 +1,8 @@
 use matches::matches;
 
 use super::*;
-use crate::{Datastore, Batching};
 use crate::key::Key;
+use crate::{Batching, Datastore};
 
 pub fn test_basic_put_get<D: Datastore>(ds: &D) {
     let k = Key::new("foo");
@@ -84,13 +84,13 @@ pub fn test_batch<D: Batching>(ds: &D) {
     }
 
     for k in keys.iter() {
-        let r= ds.get(k);
+        let r = ds.get(k);
         matches!(r, Err(DSError::NotFound(_)));
     }
 
     ds.commit(batch).unwrap();
-    for (i,k) in keys.iter().enumerate() {
-        let r= ds.get(k).unwrap();
+    for (i, k) in keys.iter().enumerate() {
+        let r = ds.get(k).unwrap();
         assert_eq!(r.as_slice(), blocks[i].as_ref())
     }
 }
@@ -113,7 +113,7 @@ pub fn test_batch_delete<D: Batching>(ds: &D) {
     ds.commit(batch).unwrap();
 
     for k in keys.iter() {
-        let r= ds.get(k);
+        let r = ds.get(k);
         matches!(r, Err(DSError::NotFound(_)));
     }
 }

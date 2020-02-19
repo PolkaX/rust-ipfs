@@ -6,12 +6,12 @@ mod error;
 #[cfg(test)]
 mod tests;
 
+pub mod basic_ds;
 pub mod key;
 pub mod keytransform;
 pub mod namespace;
 pub mod query;
 pub mod singleton;
-pub mod basic_ds;
 // TODO impl mount
 // pub mod mount;
 

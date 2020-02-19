@@ -105,9 +105,7 @@ pub fn test_iter_from_prefix(db: &dyn KeyValueDB) -> io::Result<()> {
     db.write(batch)?;
 
     // empty prefix
-    let contents: Vec<_> = db
-        .iter_from_prefix(DEFAULT_COLUMN_NAME, b"")
-        .collect();
+    let contents: Vec<_> = db.iter_from_prefix(DEFAULT_COLUMN_NAME, b"").collect();
     assert_eq!(contents.len(), 4);
     assert_eq!(&*contents[0].0, key1);
     assert_eq!(&*contents[1].0, key2);
@@ -115,32 +113,24 @@ pub fn test_iter_from_prefix(db: &dyn KeyValueDB) -> io::Result<()> {
     assert_eq!(&*contents[3].0, key4);
 
     // prefix a
-    let contents: Vec<_> = db
-        .iter_from_prefix(DEFAULT_COLUMN_NAME, b"a")
-        .collect();
+    let contents: Vec<_> = db.iter_from_prefix(DEFAULT_COLUMN_NAME, b"a").collect();
     assert_eq!(contents.len(), 3);
     assert_eq!(&*contents[0].0, key2);
     assert_eq!(&*contents[1].0, key3);
     assert_eq!(&*contents[2].0, key4);
 
     // prefix abc
-    let contents: Vec<_> = db
-        .iter_from_prefix(DEFAULT_COLUMN_NAME, b"abc")
-        .collect();
+    let contents: Vec<_> = db.iter_from_prefix(DEFAULT_COLUMN_NAME, b"abc").collect();
     assert_eq!(contents.len(), 2);
     assert_eq!(&*contents[0].0, key3);
     assert_eq!(&*contents[1].0, key4);
 
     // prefix abcde
-    let contents: Vec<_> = db
-        .iter_from_prefix(DEFAULT_COLUMN_NAME, b"abcde")
-        .collect();
+    let contents: Vec<_> = db.iter_from_prefix(DEFAULT_COLUMN_NAME, b"abcde").collect();
     assert_eq!(contents.len(), 0);
 
     // prefix 0
-    let contents: Vec<_> = db
-        .iter_from_prefix(DEFAULT_COLUMN_NAME, b"0")
-        .collect();
+    let contents: Vec<_> = db.iter_from_prefix(DEFAULT_COLUMN_NAME, b"0").collect();
     assert_eq!(contents.len(), 1);
     assert_eq!(&*contents[0].0, key1);
     Ok(())

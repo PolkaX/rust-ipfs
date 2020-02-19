@@ -581,7 +581,11 @@ impl Database {
                     let cf = cfs.cf(op.col());
 
                     match op {
-                        DBOp::Insert { col: _col, key, value } => {
+                        DBOp::Insert {
+                            col: _col,
+                            key,
+                            value,
+                        } => {
                             stats_total_bytes += key.len() + value.len();
                             batch.put_cf(cf, &key, &value).map_err(other_io_err)?
                         }
@@ -977,12 +981,14 @@ mod tests {
 
         {
             let db = db.db.read();
-            if let Some(db) = db.as_ref() { assert!(
+            if let Some(db) = db.as_ref() {
+                assert!(
                     db.static_property_or_warn(
                         DEFAULT_COLUMN_NAME,
                         "rocksdb.cur-size-all-mem-tables"
                     ) > 512
-                ); }
+                );
+            }
         }
     }
 
@@ -1191,9 +1197,7 @@ mod tests {
         assert_eq!(lru, NUM_COLS);
 
         // Index/filters share cache
-        let include_indexes = settings
-            .matches("cache_index_and_filter_blocks: 1")
-            .count();
+        let include_indexes = settings.matches("cache_index_and_filter_blocks: 1").count();
         assert_eq!(include_indexes, NUM_COLS);
         // Pin index/filters on L0
         let pins = settings
@@ -1202,17 +1206,13 @@ mod tests {
         assert_eq!(pins, NUM_COLS);
 
         // Check target file size, aka initial file size
-        let l0_sizes = settings
-            .matches("target_file_size_base: 102030")
-            .count();
+        let l0_sizes = settings.matches("target_file_size_base: 102030").count();
         assert_eq!(l0_sizes, NUM_COLS);
         // The default column uses the default of 64Mb regardless of the setting.
         assert!(settings.contains("target_file_size_base: 67108864"));
 
         // Check compression settings
-        let snappy_compression = settings
-            .matches("Options.compression: Snappy")
-            .count();
+        let snappy_compression = settings.matches("Options.compression: Snappy").count();
         // All columns use Snappy
         assert_eq!(snappy_compression, NUM_COLS + 1);
         // …even for L7
@@ -1222,9 +1222,7 @@ mod tests {
         assert_eq!(snappy_bottommost, NUM_COLS + 1);
 
         // 7 levels
-        let levels = settings
-            .matches("Options.num_levels: 7")
-            .count();
+        let levels = settings.matches("Options.num_levels: 7").count();
         assert_eq!(levels, NUM_COLS + 1);
 
         // Don't fsync every store
