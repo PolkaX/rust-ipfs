@@ -25,16 +25,15 @@ fn pre_process_key(cols: *const HashSet<String>, key: &Key) -> (&str, &str) {
     // it's safe for if db is dropped, the process should come to end.
     // the cols's lifetime is same as db.
     let cols = unsafe { &*cols };
-    let prefix = prefix
+    prefix
         .map(|p| {
             if cols.contains(p) {
-                p
+                (p, k)
             } else {
-                DEFAULT_COLUMN_NAME
+                (DEFAULT_COLUMN_NAME, key.as_str())
             }
         })
-        .unwrap_or(DEFAULT_COLUMN_NAME);
-    (prefix, k)
+        .unwrap_or((DEFAULT_COLUMN_NAME, key.as_str()))
 }
 
 pub(crate) struct Inner {
