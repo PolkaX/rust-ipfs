@@ -3,6 +3,8 @@ members = [
     "core/amt-ipld",
     "core/block-format",
     "core/cid",
+    "core/datastore",
+    "core/ds/rocksdb",
     "core/hamt-ipld",
     "core/hamt-ipld2",
     "core/ipfs/blockstore",
@@ -10,4 +12,7 @@ members = [
     "core/ipld/format",
     "core/multibase",
     "core/util",
+    "paritylibs/kvdb",
+    "paritylibs/kvdb-rocksdb",
+    "paritylibs/kvdb-shared-tests",
 ]
