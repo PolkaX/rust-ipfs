@@ -5,7 +5,7 @@ use crate::singleton::SingletonDS;
 use crate::datastore::{Read, Write};
 use crate::error::*;
 use crate::key::Key;
-use crate::{Batch, Datastore, Txn};
+use crate::{Batch, Datastore, Txn, Batching, TxnDatastore};
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Default)]
@@ -74,6 +74,30 @@ impl Datastore for InnerDB {
     fn sync(&self, _prefix: &Key) -> Result<()> {
         // do nothing
         Ok(())
+    }
+}
+
+impl Batching for InnerDB {
+    type Txn = BasicTxn;
+
+    fn batch(&self) -> Result<Self::Txn> {
+        Ok(BasicTxn::default())
+    }
+
+    fn commit(&self, txn: Self::Txn) -> Result<()> {
+        for (k, v) in txn {
+            match v {
+                Some(d) => self.put(k, d)?,
+                None => self.delete(&k)?,
+            }
+        }
+        Ok(())
+    }
+}
+
+impl TxnDatastore for InnerDB {
+    fn new_transaction(&self, _read_only: bool) -> Result<Self::Txn> {
+        self.batch()
     }
 }
 

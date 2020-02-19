@@ -1,6 +1,5 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use super::*;
 use crate::key::{namespace_type, namespace_value, Key};
 
 #[test]
@@ -180,7 +179,6 @@ fn test_less() {
 struct Case {
     key: Key,
     data: Vec<u8>,
-    err: String,
 }
 
 #[test]
@@ -189,12 +187,10 @@ fn test_json() {
         Case {
             key: Key::new("/a/b/c"),
             data: r#""/a/b/c""#.as_bytes().into(),
-            err: "".to_string(),
         },
         Case {
             key: Key::new(r#"/shouldescapekey"/with/quote"#),
             data: r#""/shouldescapekey\"/with/quote""#.as_bytes().into(),
-            err: "".to_string(),
         },
     ];
 
