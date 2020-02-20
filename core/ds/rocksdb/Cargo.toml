@@ -1,5 +1,5 @@
 [package]
-name = "rocksdb"
+name = "rust-ds-rocksdb"
 version = "0.1.0"
 authors = ["Aten <jincxmain@gmail.com>"]
 edition = "2018"
