@@ -14,6 +14,7 @@ bytes = { version = "0.5", features = ["serde"] }
 either = { version = "1.5", features = ["serde"] }
 multihash = { package = "parity-multihash", version = "0.2.2" }
 num-bigint = { version = "0.2", optional = true }
+num-traits = { version = "0.2", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
 serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
@@ -31,7 +32,10 @@ hex-literal = "0.2.1"
 maplit = "1.0"
 
 [features]
-bigint = [ "num-bigint" ]
+bigint = [
+    "num-bigint",
+    "num-traits",
+]
 
 [[bench]]
 name = "benchmarks"
