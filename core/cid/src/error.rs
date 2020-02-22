@@ -34,6 +34,10 @@ pub enum CidError {
     #[cfg(feature = "serde_support")]
     #[error("CBOR serialized CIDs must have binary multibase prefix")]
     InvalidBinaryMultibasePrefix,
+
+    /// Other type error
+    #[error("other err: {0}")]
+    Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<std::io::Error> for CidError {

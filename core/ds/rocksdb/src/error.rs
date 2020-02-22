@@ -10,6 +10,6 @@ pub enum RocksDBError {
     #[error("datastore error: {0:?}")]
     DataStoreError(#[from] datastore::DSError),
 
-    #[error("")]
-    Other,
+    #[error("other err: {0}")]
+    Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }

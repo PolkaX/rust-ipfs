@@ -23,5 +23,5 @@ pub enum Error {
     InvalidFormatHAMT,
 
     #[error("other err: {0}")]
-    Other(#[from] Box<dyn std::error::Error + Send>),
+    Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }

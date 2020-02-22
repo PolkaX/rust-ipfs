@@ -14,4 +14,7 @@ pub enum BlockFormatError {
     /// Cid error.
     #[error("cid error: {0}")]
     CidError(#[from] CidError),
+    /// Other type error.
+    #[error("other err: {0}")]
+    Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
