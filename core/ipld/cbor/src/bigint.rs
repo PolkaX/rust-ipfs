@@ -55,9 +55,9 @@ impl CborBigInt {
         }
         if decimal.is_zero() {
             if sign == Sign::Minus {
-                format!("-{} {}", integer,SIZE_UNITS[i])
+                format!("-{} {}", integer, SIZE_UNITS[i])
             } else {
-                format!("{} {}",integer,SIZE_UNITS[i])
+                format!("{} {}", integer, SIZE_UNITS[i])
             }
         } else {
             let integer = integer.to_f64().unwrap();
