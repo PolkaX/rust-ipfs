@@ -140,4 +140,38 @@ mod tests {
         assert_lock(&path, lock_file1, false);
         assert_lock(&path, lock_file2, false);
     }
+
+    #[test]
+    fn test_thread_safe() {
+        use std::thread;
+
+        let lock_file = "my-test.lock";
+        let dir = TempDir::new("lock").unwrap();
+        let mut p = dir.path().to_path_buf();
+        p.push(lock_file);
+
+        // make sure we start clean
+        let _ = fs::remove_file(p.as_path());
+
+        let path = dir.path().to_path_buf();
+        for _ in 0..100 {
+            let path_d = path.clone();
+            let file_name = lock_file.to_string();
+            let child = thread::spawn(move || lock(&path_d, &file_name));
+
+            let current_ret = lock(&path, lock_file);
+
+            let res = child.join().unwrap();
+
+            assert!((current_ret.is_ok() && res.is_err()) || (current_ret.is_err() && res.is_ok()));
+
+            if let Ok(r) = current_ret {
+                unlock(r).unwrap();
+            }
+
+            if let Ok(r) = res {
+                unlock(r).unwrap();
+            }
+        }
+    }
 }
