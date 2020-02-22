@@ -5,7 +5,8 @@
 #![deny(missing_docs)]
 
 #[cfg(feature = "bigint")]
-mod bigint;
+/// re-export for bigint
+pub mod bigint;
 mod convert;
 mod error;
 mod node;
@@ -15,7 +16,7 @@ pub use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 pub use serde_cbor::Value;
 
 #[cfg(feature = "bigint")]
-pub use self::bigint::CborBigUint;
+pub use self::bigint::{CborBigInt, CborBigUint};
 pub use self::convert::{cbor_value_to_struct, struct_to_cbor_value};
 pub use self::convert::{convert_to_cborish_obj, convert_to_jsonish_obj};
 pub use self::convert::{hack_convert_float_to_int, hack_convert_int_to_float};
