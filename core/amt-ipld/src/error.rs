@@ -24,4 +24,7 @@ pub enum AmtIpldError {
 
     #[error("no node found at (sub)index: {0}")]
     NoNodeForIndex(usize),
+
+    #[error("other err: {0}")]
+    Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }

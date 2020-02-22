@@ -16,4 +16,7 @@ pub enum BlockstoreError {
     /// is different than expected.
     #[error("block in storage has different hash than requested")]
     HashMismatch,
+
+    #[error("other err: {0}")]
+    Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }

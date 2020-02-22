@@ -14,6 +14,6 @@ pub enum DSError {
     #[error("db io error: {0}")]
     DBIoErr(#[from] io::Error),
 
-    #[error("")]
-    Other,
+    #[error("other err: {0}")]
+    Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }

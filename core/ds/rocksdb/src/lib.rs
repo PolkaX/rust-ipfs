@@ -12,9 +12,10 @@ use std::sync::Arc;
 
 use datastore::{key::Key, query, Batching, Datastore, Read, SyncQuery, TxnDatastore, Write};
 use error::*;
-use kvdb::DBTransaction;
-use kvdb_rocksdb::DEFAULT_COLUMN_NAME;
-use kvdb_rocksdb::{Database as RocksDatabase, DatabaseConfig};
+// re-export
+pub use kvdb::DBTransaction;
+pub use kvdb_rocksdb::DEFAULT_COLUMN_NAME;
+pub use kvdb_rocksdb::{Database as RocksDatabase, DatabaseConfig};
 
 pub use crate::tx::Transaction;
 
@@ -60,6 +61,22 @@ impl RocksDB {
 
     pub fn new_with_default(path: &str) -> Result<Self> {
         Self::new(path, &Default::default())
+    }
+
+    /// # Safety
+    /// `add_col` should called before read/write database, please ensure don't call this
+    /// function when other thread read/write data
+    pub unsafe fn add_column(&self, col: &str) -> Result<()> {
+        if self.inner.cols.contains(col) {
+            return Ok(());
+        }
+        self.inner.db.add_column(col)?;
+        let cols = &self.inner.cols as *const HashSet<String> as *mut HashSet<String>;
+        let cols = &mut *cols;
+
+        // dangerous!!!
+        cols.insert(col.to_string());
+        Ok(())
     }
 }
 
