@@ -5,6 +5,7 @@ members = [
     "core/cid",
     "core/datastore",
     "core/ds/rocksdb",
+    "core/fs-lock",
     "core/hamt-ipld",
     "core/ipfs/blockstore",
     "core/ipld/cbor",
