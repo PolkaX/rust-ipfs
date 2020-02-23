@@ -16,7 +16,9 @@
 //! ```
 use crate::datastore::Datastore as DatastoreT;
 use crate::key::Key;
-use crate::keytransform::{self, Datastore, PrefixTransform};
+use crate::keytransform;
+// re-export
+pub use crate::keytransform::{Datastore, PrefixTransform};
 
 #[inline]
 pub fn prefix_transform(prefix: Key) -> PrefixTransform {
@@ -26,3 +28,5 @@ pub fn prefix_transform(prefix: Key) -> PrefixTransform {
 pub fn wrap<D: DatastoreT>(child: D, prefix: Key) -> Datastore<D, PrefixTransform> {
     keytransform::wrap(child, prefix_transform(prefix))
 }
+
+pub type NSDatastore<D> = Datastore<D, PrefixTransform>;
