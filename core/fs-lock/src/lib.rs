@@ -29,12 +29,24 @@ pub fn lock(path: &PathBuf, lock_file: &str) -> io::Result<fs::File> {
     Ok(f)
 }
 
-pub fn unlock(file: fs::File) -> io::Result<()> {
+/// Unlock the file. if file is not locked, just return Ok(()).
+/// Thus the file could be unlocked more than once.
+pub fn unlock(file: &fs::File) -> io::Result<()> {
     let _ = GLOBAL_LOCK.lock().unwrap();
-    test_locked(&file).and_then(|r| if r { file.unlock() } else { Ok(()) })
+    file.unlock()
 }
 
-fn test_locked(f: &fs::File) -> io::Result<bool> {
+pub fn locked(path: &PathBuf, lock_file: &str) -> io::Result<bool> {
+    debug!(target: LOG_TARGET, "Checking lock");
+    let mut path = path.to_owned();
+    path.push(lock_file);
+    if !path.exists() {
+        debug!(target: LOG_TARGET, "File doesn't exist: {:?}", path);
+        return Ok(false);
+    }
+
+    let _ = GLOBAL_LOCK.lock().unwrap();
+    let f = fs::OpenOptions::new().write(true).open(path.as_path())?;
     let r = f.try_lock_exclusive();
     match r {
         Ok(_) => {
@@ -54,20 +66,6 @@ fn test_locked(f: &fs::File) -> io::Result<bool> {
             }
         }
     }
-}
-
-pub fn locked(path: &PathBuf, lock_file: &str) -> io::Result<bool> {
-    debug!(target: LOG_TARGET, "Checking lock");
-    let mut path = path.to_owned();
-    path.push(lock_file);
-    if !path.exists() {
-        debug!(target: LOG_TARGET, "File doesn't exist: {:?}", path);
-        return Ok(false);
-    }
-
-    let _ = GLOBAL_LOCK.lock().unwrap();
-    let f = fs::OpenOptions::new().write(true).open(path.as_path())?;
-    test_locked(&f)
 }
 
 #[cfg(test)]
@@ -96,16 +94,16 @@ mod tests {
 
         let file = lock(&path, lock_file).unwrap();
 
-        assert_lock(&path, lock_file, true);
+        assert_eq!(locked(&path, lock_file).unwrap(), true);
 
-        unlock(file).unwrap();
+        unlock(&file).unwrap();
 
-        assert_lock(&path, lock_file, false);
+        assert_eq!(locked(&path, lock_file).unwrap(), false);
 
         // second round of locking
-        let file = lock(&path, lock_file).unwrap();
+        let file2 = lock(&path, lock_file).unwrap();
         assert_lock(&path, lock_file, true);
-        unlock(file).unwrap();
+        unlock(&file2).unwrap();
         assert_lock(&path, lock_file, false);
     }
 
@@ -130,12 +128,12 @@ mod tests {
         assert_lock(&path, lock_file1, true);
         assert_lock(&path, lock_file2, true);
 
-        unlock(file1).unwrap();
+        unlock(&file1).unwrap();
 
         assert_lock(&path, lock_file1, false);
         assert_lock(&path, lock_file2, true);
 
-        unlock(file2).unwrap();
+        unlock(&file2).unwrap();
 
         assert_lock(&path, lock_file1, false);
         assert_lock(&path, lock_file2, false);
@@ -166,11 +164,11 @@ mod tests {
             assert!((current_ret.is_ok() && res.is_err()) || (current_ret.is_err() && res.is_ok()));
 
             if let Ok(r) = current_ret {
-                unlock(r).unwrap();
+                unlock(&r).unwrap();
             }
 
             if let Ok(r) = res {
-                unlock(r).unwrap();
+                unlock(&r).unwrap();
             }
         }
     }
