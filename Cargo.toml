@@ -10,7 +10,6 @@ members = [
     "core/ipfs/blockstore",
     "core/ipld/cbor",
     "core/ipld/format",
-    "core/multibase",
     "core/util",
     "paritylibs/kvdb",
     "paritylibs/kvdb-rocksdb",

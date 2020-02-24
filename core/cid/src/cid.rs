@@ -62,7 +62,7 @@ impl Cid {
     }
 
     fn to_string_v0(&self) -> String {
-        multibase::encode_base58btc(self.hash.as_bytes())
+        Base::Base58Btc.encode(self.hash.as_bytes())
     }
 
     fn to_string_v1(&self, base: Base) -> String {

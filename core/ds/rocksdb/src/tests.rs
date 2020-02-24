@@ -2,7 +2,7 @@ use datastore::{key::Key, Batch, Txn};
 use matches::matches;
 use rand::{self, Rng};
 use std::collections::HashMap;
-use tempdir::TempDir;
+use tempfile::TempDir;
 
 use super::*;
 
@@ -33,7 +33,10 @@ fn testcase() -> HashMap<&'static str, &'static str> {
 }
 
 fn new_db() -> (RocksDB, TempDir) {
-    let tempdir = TempDir::new("rocksdb").unwrap();
+    let tempdir = tempfile::Builder::new()
+        .prefix("rocksdb")
+        .tempdir()
+        .unwrap();
     let db = RocksDB::new_with_default(tempdir.path().to_str().unwrap()).unwrap();
     (db, tempdir)
 }

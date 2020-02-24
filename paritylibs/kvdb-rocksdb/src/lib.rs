@@ -894,10 +894,10 @@ mod tests {
     use super::*;
     use kvdb_shared_tests as st;
     use std::io::{self, Read};
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
     fn create(columns: Vec<String>) -> io::Result<(Database, TempDir)> {
-        let tempdir = TempDir::new("")?;
+        let tempdir = tempfile::Builder::new().prefix("").tempdir().unwrap();
         let config = DatabaseConfig::with_columns(columns);
         Database::open(
             &config,
@@ -953,7 +953,7 @@ mod tests {
 
     #[test]
     fn mem_tables_size() {
-        let tempdir = TempDir::new("").unwrap();
+        let tempdir = tempfile::Builder::new().prefix("").tempdir().unwrap();
 
         let mut columns: Vec<_> = (1..12).map(|i| format!("col{}", i)).collect();
         columns.push(DEFAULT_COLUMN_NAME.to_owned());
@@ -1035,7 +1035,7 @@ mod tests {
             "5".to_string(),
         ]);
 
-        let tempdir = TempDir::new("").unwrap();
+        let tempdir = tempfile::Builder::new().prefix("").tempdir().unwrap();
 
         // open 1, add 5.
         {
@@ -1066,7 +1066,10 @@ mod tests {
             "4".to_owned(),
         ]);
 
-        let tempdir = TempDir::new("drop_columns").unwrap();
+        let tempdir = tempfile::Builder::new()
+            .prefix("drop_columns")
+            .tempdir()
+            .unwrap();
 
         // open 5, remove 4.
         {
@@ -1089,7 +1092,7 @@ mod tests {
 
     #[test]
     fn test_num_keys() {
-        let tempdir = TempDir::new("").unwrap();
+        let tempdir = tempfile::Builder::new().prefix("").tempdir().unwrap();
         let config = DatabaseConfig::with_columns(vec!["0".to_string()]);
         let db = Database::open(&config, tempdir.path().to_str().unwrap()).unwrap();
 
@@ -1161,7 +1164,10 @@ mod tests {
             .cloned()
             .collect();
 
-        let db_path = TempDir::new("config_test").expect("the OS can create tmp dirs");
+        let db_path = tempfile::Builder::new()
+            .prefix("config_test")
+            .tempdir()
+            .expect("the OS can create tmp dir");
         let _db = Database::open(&cfg, db_path.path().to_str().unwrap()).expect("can open a db");
         let mut rocksdb_log =
             std::fs::File::open(format!("{}/LOG", db_path.path().to_str().unwrap()))
