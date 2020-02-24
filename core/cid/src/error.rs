@@ -46,8 +46,8 @@ impl From<std::io::Error> for CidError {
     }
 }
 
-impl From<multibase::MultibaseError> for CidError {
-    fn from(e: multibase::MultibaseError) -> CidError {
+impl From<multibase::Error> for CidError {
+    fn from(e: multibase::Error) -> CidError {
         CidError::ParsingError(Box::new(e))
     }
 }

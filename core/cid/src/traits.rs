@@ -4,6 +4,7 @@ use std::io::Cursor;
 
 use integer_encoding::VarIntReader;
 
+use multibase::Base;
 use multihash::Multihash;
 
 use crate::cid::Cid;
@@ -111,7 +112,7 @@ impl ToCid for str {
         }
 
         if Version::is_v0_str(hash) {
-            multibase::decode_base58btc(hash)?.to_cid()
+            Base::Base58Btc.decode(hash)?.to_cid()
         } else {
             multibase::decode(hash)?.1.to_cid()
         }
