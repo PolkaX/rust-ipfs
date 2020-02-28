@@ -326,7 +326,7 @@ fn test_column_names() {
     for (index, s) in names.iter().enumerate() {
         // current database would be removed after this block
         let dir = TempDir::new("rocksdb").unwrap();
-        let config = DatabaseConfig::with_columns(vec![s.to_string()]);
+        let config = DatabaseConfig::with_columns(vec![(*s).to_string()]);
         let db = RocksDB::new(dir.path().to_str().unwrap(), &config);
 
         let db = if index == 0 || index == (len - 1) {
@@ -334,8 +334,7 @@ fn test_column_names() {
         } else {
             assert!(matches!(db, Err(RocksDBError::InvalidColumnName(_))));
             let config = DatabaseConfig::default();
-            let db = RocksDB::new(dir.path().to_str().unwrap(), &config).unwrap();
-            db
+            RocksDB::new(dir.path().to_str().unwrap(), &config).unwrap()
         };
         unsafe {
             if index == 0 {
