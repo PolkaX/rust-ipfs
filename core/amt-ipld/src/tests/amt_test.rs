@@ -244,7 +244,10 @@ fn test_insert_a_bunch() {
 
 fn assert_delete<B: Blocks>(root: &mut Amt<B>, k: u64) {
     root.delete(k).unwrap();
-    matches!(root.get::<String>(k), Err(AmtIpldError::NotFound(_k)));
+    assert!(matches!(
+        root.get::<String>(k),
+        Err(AmtIpldError::NotFound(_k))
+    ));
 }
 
 #[test]

@@ -10,7 +10,10 @@ use std::iter::FromIterator;
 use std::result;
 use std::sync::Arc;
 
-use datastore::{key::Key, query, Batching, Datastore, Read, SyncQuery, TxnDatastore, Write};
+use datastore::{
+    key::{self, Key},
+    query, Batching, Datastore, Read, SyncQuery, TxnDatastore, Write,
+};
 use error::*;
 // re-export
 pub use kvdb::DBTransaction;
@@ -47,12 +50,56 @@ pub struct RocksDB {
     inner: Arc<Inner>,
 }
 
+/// validate column name. a valid name should like "/blocks", start with "/" and only has one "/".
+/// column should not be empty
+#[inline]
+fn validate_column_name(col: &str, allow_default: bool) -> Result<()> {
+    if col == DEFAULT_COLUMN_NAME {
+        return if allow_default {
+            Ok(())
+        } else {
+            Err(RocksDBError::InvalidColumnName(format!(
+                "not allow [{}] in this operation",
+                DEFAULT_COLUMN_NAME
+            )))
+        };
+    }
+    let b = col.as_bytes();
+    // it means column name would not be empty, or just "/"
+    if b.len() < 2 {
+        return Err(RocksDBError::InvalidColumnName(format!(
+            "column name should at least more then two chars, col:[{}]",
+            col
+        )));
+    }
+    // should start with "/"
+    if b[0] != key::LEFT_SLASH {
+        return Err(RocksDBError::InvalidColumnName(format!(
+            "column name should start with '/', col:[{}]",
+            col
+        )));
+    }
+    // should not meet other "/", e.g. "/blocks/foo"
+    if (&b[1..]).iter().any(|c| *c == key::LEFT_SLASH) {
+        return Err(RocksDBError::InvalidColumnName(format!(
+            "column name could only has one '/' char, col:[{}]",
+            col
+        )));
+    }
+    Ok(())
+}
+
 impl RocksDB {
     pub fn new(path: &str, config: &DatabaseConfig) -> Result<Self> {
+        for col in config.columns.iter() {
+            validate_column_name(col.as_str(), true)?;
+        }
+
         let db = RocksDatabase::open(config, path)?;
+        let columns = db.columns();
         let inner = Inner {
             db,
-            cols: HashSet::from_iter(config.columns.iter().map(|s| s.to_owned())),
+            cols: HashSet::from_iter(columns.into_iter()),
         };
         Ok(RocksDB {
             inner: Arc::from(inner),
@@ -64,9 +111,11 @@ impl RocksDB {
     }
 
     /// # Safety
-    /// `add_col` should called before read/write database, please ensure don't call this
+    /// `add_column` should called before read/write database, please ensure don't call this
     /// function when other thread read/write data
     pub unsafe fn add_column(&self, col: &str) -> Result<()> {
+        validate_column_name(col, false)?;
+
         if self.inner.cols.contains(col) {
             return Ok(());
         }
@@ -76,6 +125,24 @@ impl RocksDB {
 
         // dangerous!!!
         cols.insert(col.to_string());
+        Ok(())
+    }
+
+    /// # Safety
+    /// `remove_column` should called before read/write database, please ensure don't call this
+    /// function when other thread read/write data
+    pub unsafe fn remove_column(&self, col: &str) -> Result<()> {
+        validate_column_name(col, false)?;
+
+        if !self.inner.cols.contains(col) {
+            return Ok(());
+        }
+        self.inner.db.remove_column(col)?;
+        let cols = &self.inner.cols as *const HashSet<String> as *mut HashSet<String>;
+        let cols = &mut *cols;
+
+        // dangerous!!!
+        cols.remove(col);
         Ok(())
     }
 }
