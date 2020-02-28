@@ -114,7 +114,7 @@ impl Key {
         // key first char must be "/", skip check it
         let skip = 1;
         if let Some(i) = &self.0[skip..].find(LEFT_SLASH_STR) {
-            let (a, b) = self.0.split_at(*i);
+            let (a, b) = self.0.split_at(*i + skip);
             (Some(a), b)
         } else {
             (None, &self)

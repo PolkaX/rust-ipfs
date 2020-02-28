@@ -255,3 +255,98 @@ fn test_txn_batch() {
         assert_eq!(retrieved.as_slice(), bytes.as_ref());
     }
 }
+
+#[test]
+fn test_add_and_remove_column() {
+    let dir = TempDir::new("rocksdb").unwrap();
+    unsafe {
+        let config = DatabaseConfig::with_columns(vec!["/1".to_owned()]);
+        let db = RocksDB::new(dir.path().to_str().unwrap(), &config).unwrap();
+        db.add_column("/1").unwrap();
+        db.put(Key::new("/1/123"), vec![]).unwrap();
+
+        let it = db.inner.db.iter("/1");
+        for i in it {
+            println!("{:?} {:?}", i.0, i.1);
+        }
+    }
+
+    unsafe {
+        let config = DatabaseConfig::default();
+        let db = RocksDB::new(dir.path().to_str().unwrap(), &config).unwrap();
+        db.add_column("/1").unwrap();
+        db.put(Key::new("/1/234"), vec![]).unwrap();
+    }
+
+    {
+        let config = DatabaseConfig::with_columns(vec!["/1".to_owned()]);
+        let db = RocksDB::new(dir.path().to_str().unwrap(), &config).unwrap();
+
+        let it = db.inner.db.iter("/1");
+        for i in it {
+            println!("{:?} {:?}", i.0, i.1);
+        }
+
+        let v: Vec<u8> = db.get(&Key::new("/1/123")).unwrap();
+        assert_eq!(v, vec![]);
+        let v: Vec<u8> = db.get(&Key::new("/1/234")).unwrap();
+        assert_eq!(v, vec![]);
+    }
+
+    {
+        let config = DatabaseConfig::with_columns(vec![]);
+        let db = RocksDB::new(dir.path().to_str().unwrap(), &config).unwrap();
+        let v = db.get(&Key::new("/1/123")).unwrap();
+        assert_eq!(v, vec![]);
+        let v = db.get(&Key::new("/1/234")).unwrap();
+        assert_eq!(v, vec![]);
+
+        unsafe { db.remove_column("/1").unwrap() };
+
+        let r = db.get(&Key::new("/1/123"));
+        assert!(matches!(r, Err(datastore::DSError::NotFound(_))));
+        let r = db.get(&Key::new("/1/234"));
+        assert!(matches!(r, Err(datastore::DSError::NotFound(_))));
+    }
+}
+
+#[test]
+fn test_column_names() {
+    let names = [
+        "/block",
+        "/",
+        "block",
+        "/block/foo",
+        "block/foo",
+        "/block/foo/bar",
+        "block/foo/bar",
+        DEFAULT_COLUMN_NAME,
+    ];
+    let len = names.len();
+    for (index, s) in names.iter().enumerate() {
+        // current database would be removed after this block
+        let dir = TempDir::new("rocksdb").unwrap();
+        let config = DatabaseConfig::with_columns(vec![s.to_string()]);
+        let db = RocksDB::new(dir.path().to_str().unwrap(), &config);
+
+        let db = if index == 0 || index == (len - 1) {
+            db.unwrap()
+        } else {
+            assert!(matches!(db, Err(RocksDBError::InvalidColumnName(_))));
+            let config = DatabaseConfig::default();
+            let db = RocksDB::new(dir.path().to_str().unwrap(), &config).unwrap();
+            db
+        };
+        unsafe {
+            if index == 0 {
+                db.remove_column(s).unwrap();
+                db.add_column(s).unwrap();
+            } else {
+                let r = db.remove_column(s);
+                assert!(matches!(r, Err(RocksDBError::InvalidColumnName(_))));
+                let r = db.add_column(s);
+                assert!(matches!(r, Err(RocksDBError::InvalidColumnName(_))));
+            }
+        }
+    }
+}

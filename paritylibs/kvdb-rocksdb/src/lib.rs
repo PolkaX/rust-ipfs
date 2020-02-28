@@ -18,7 +18,13 @@
 mod iter;
 mod stats;
 
-use std::{cmp, collections::HashMap, error, fs, io, mem, path::Path, result};
+use std::{
+    cmp,
+    collections::{HashMap, HashSet},
+    error, fs, io, mem,
+    path::Path,
+    result,
+};
 
 use parking_lot::{Mutex, MutexGuard, RwLock};
 use rocksdb::{
@@ -383,6 +389,7 @@ fn generate_block_based_options(config: &DatabaseConfig) -> BlockBasedOptions {
 
 impl Database {
     const CORRUPTION_FILE_NAME: &'static str = "CORRUPTED";
+    const CURRENT_FILE_NAME: &'static str = "CURRENT";
 
     /// Open database file. Creates if it does not exist.
     ///
@@ -410,8 +417,18 @@ impl Database {
             fs::remove_file(db_corrupted)?;
         }
 
-        let column_names: Vec<_> = config.columns.iter().map(|c| c.to_owned()).collect();
-        init_cache(&column_names);
+        let mut column_names: HashSet<_> = config.columns.iter().map(|c| c.to_owned()).collect();
+
+        let current = Path::new(path).join(Database::CURRENT_FILE_NAME);
+        if current.exists() {
+            // only current database exist would do follow thing
+            // add current database all column into column_names, and remove duplicated item
+            let v = DB::list_cf(&opts, path).unwrap();
+            column_names.extend(v.into_iter());
+        }
+
+        let slice: Vec<_> = column_names.iter().collect();
+        init_cache(&slice);
 
         let write_opts = WriteOptions::default();
         let mut read_opts = ReadOptions::default();
@@ -459,7 +476,10 @@ impl Database {
             .map(|s| (s.to_string(), HashMap::new()))
             .collect();
         Ok(Database {
-            db: RwLock::new(Some(DBAndColumns { db, column_names })),
+            db: RwLock::new(Some(DBAndColumns {
+                db,
+                column_names: column_names.into_iter().collect(),
+            })),
             config: config.clone(),
             overlay: RwLock::new(overlay),
             flushing: RwLock::new(flushing),
@@ -775,7 +795,7 @@ impl Database {
         }
     }
 
-    /// Remove the last column family in the database. The deletion is definitive.
+    /// Remove the column family in the database. The deletion is definitive.
     pub fn remove_column(&self, col: &str) -> io::Result<()> {
         match *self.db.write() {
             Some(DBAndColumns {
@@ -786,6 +806,9 @@ impl Database {
                 column_names.retain(|c| c.as_str() != col);
                 if pre_len != column_names.len() {
                     db.drop_cf(col).map_err(other_io_err)?;
+
+                    self.overlay.write().remove(col);
+                    self.flushing.write().remove(col);
                 }
                 Ok(())
             }
