@@ -1,13 +1,12 @@
 use std::fs;
 use std::io;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
-use lazy_static::lazy_static;
 // re-export it
 pub use fs2::FileExt;
-
+use lazy_static::lazy_static;
 use log::{debug, error};
-use std::path::PathBuf;
 
 pub const LOG_TARGET: &str = "lock";
 
@@ -71,7 +70,6 @@ pub fn locked(path: &PathBuf, lock_file: &str) -> io::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempdir::TempDir;
 
     fn assert_lock(path: &PathBuf, file: &str, expected: bool) {
         let is_locked = locked(path, file).unwrap();
@@ -81,7 +79,7 @@ mod tests {
     #[test]
     fn test_lock_simple() {
         let lock_file = "my-test.lock";
-        let dir = TempDir::new("lock").unwrap();
+        let dir = tempfile::Builder::new().prefix("lock").tempdir().unwrap();
 
         let mut p = dir.path().to_path_buf();
         p.push(lock_file);
@@ -111,7 +109,7 @@ mod tests {
     fn test_lock_multiple() {
         let lock_file1 = "test-1.lock";
         let lock_file2 = "test-2.lock";
-        let dir = TempDir::new("lock").unwrap();
+        let dir = tempfile::Builder::new().prefix("lock").tempdir().unwrap();
 
         // make sure we start clean
         let mut p = dir.path().to_path_buf();
@@ -144,7 +142,7 @@ mod tests {
         use std::thread;
 
         let lock_file = "my-test.lock";
-        let dir = TempDir::new("lock").unwrap();
+        let dir = tempfile::Builder::new().prefix("lock").tempdir().unwrap();
         let mut p = dir.path().to_path_buf();
         p.push(lock_file);
 
