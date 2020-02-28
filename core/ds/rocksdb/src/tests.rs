@@ -261,7 +261,10 @@ fn test_txn_batch() {
 
 #[test]
 fn test_add_and_remove_column() {
-    let dir = TempDir::new("rocksdb").unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("rocksdb")
+        .tempdir()
+        .unwrap();
     unsafe {
         let config = DatabaseConfig::with_columns(vec!["/1".to_owned()]);
         let db = RocksDB::new(dir.path().to_str().unwrap(), &config).unwrap();
@@ -328,7 +331,10 @@ fn test_column_names() {
     let len = names.len();
     for (index, s) in names.iter().enumerate() {
         // current database would be removed after this block
-        let dir = TempDir::new("rocksdb").unwrap();
+        let dir = tempfile::Builder::new()
+            .prefix("rocksdb")
+            .tempdir()
+            .unwrap();
         let config = DatabaseConfig::with_columns(vec![(*s).to_string()]);
         let db = RocksDB::new(dir.path().to_str().unwrap(), &config);
 
