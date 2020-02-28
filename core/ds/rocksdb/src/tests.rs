@@ -78,7 +78,7 @@ fn test_gat_size() {
     assert_eq!(size, m["/a/b/c"].len());
 
     let r = db.get_size(&Key::new("/a/b/c/d"));
-    matches!(r, Err(datastore::DSError::NotFound(_)));
+    assert!(matches!(r, Err(datastore::DSError::NotFound(_))));
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn test_not_exist_get() {
     assert!(!has);
 
     let r = db.get(&k);
-    matches!(r, Err(datastore::DSError::NotFound(_)));
+    assert!(matches!(r, Err(datastore::DSError::NotFound(_))));
 }
 
 #[test]
@@ -167,7 +167,7 @@ fn test_not_founds() {
     let (db, _) = new_db();
     let k = Key::new("notreal");
     let out = db.get(&k);
-    matches!(out, Err(datastore::DSError::NotFound(_)));
+    assert!(matches!(out, Err(datastore::DSError::NotFound(_))));
     let has = db.has(&k).unwrap();
     assert!(!has);
 }
@@ -213,11 +213,11 @@ fn test_txn_discard() {
     txn.put(key.clone(), [1_u8, 2, 3].as_ref().into()).unwrap();
     txn.discard();
     let r = txn.get(&key);
-    matches!(r, Err(datastore::DSError::NotFound(_)));
+    assert!(matches!(r, Err(datastore::DSError::NotFound(_))));
     db.commit(txn).unwrap();
 
     let r = db.get(&key);
-    matches!(r, Err(datastore::DSError::NotFound(_)));
+    assert!(matches!(r, Err(datastore::DSError::NotFound(_))));
     let has = db.has(&key).unwrap();
     assert!(!has);
 }

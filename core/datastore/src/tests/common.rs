@@ -29,19 +29,19 @@ pub fn test_basic_put_get<D: Datastore>(ds: &D) {
     assert!(!have);
 
     let r = ds.get_size(&k);
-    matches!(r, Err(DSError::NotFound(_)));
+    assert!(matches!(r, Err(DSError::NotFound(_))));
 }
 
 pub fn test_not_founds<D: Datastore>(ds: &D) {
     let badk = Key::new("notreal");
     let r = ds.get(&badk);
-    matches!(r, Err(DSError::NotFound(_)));
+    assert!(matches!(r, Err(DSError::NotFound(_))));
 
     let has = ds.has(&badk).unwrap();
     assert!(!has);
 
     let r = ds.get_size(&badk);
-    matches!(r, Err(DSError::NotFound(_)));
+    assert!(matches!(r, Err(DSError::NotFound(_))));
 }
 
 // TODO query limit
@@ -85,7 +85,7 @@ pub fn test_batch<D: Batching>(ds: &D) {
 
     for k in keys.iter() {
         let r = ds.get(k);
-        matches!(r, Err(DSError::NotFound(_)));
+        assert!(matches!(r, Err(DSError::NotFound(_))));
     }
 
     ds.commit(batch).unwrap();
@@ -114,7 +114,7 @@ pub fn test_batch_delete<D: Batching>(ds: &D) {
 
     for k in keys.iter() {
         let r = ds.get(k);
-        matches!(r, Err(DSError::NotFound(_)));
+        assert!(matches!(r, Err(DSError::NotFound(_))));
     }
 }
 
