@@ -16,7 +16,7 @@ multihash = { package = "parity-multihash", version = "0.2.2" }
 murmur3 = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
-serde_cbor = { git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack", features = ["tags"] }
+serde_cbor = { version = "0.11", features = ["tags"] }
 thiserror = "1.0"
 
 block-format = { package = "rust-block-format", path = "../block-format" }
