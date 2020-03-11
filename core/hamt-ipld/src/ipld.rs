@@ -2,7 +2,6 @@
 
 use block_format::Block as BlockT;
 use cid::{AsCidRef, Cid, Codec, HasCid};
-use multihash::Hash as MHashEnum;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::error::*;
@@ -37,7 +36,7 @@ impl<B: Blockstore> CborIpldStore for BasicCborIpldStore<B> {
     }
 
     fn put<T: Serialize + HasCid>(&mut self, v: T) -> Result<Cid> {
-        let mut hash_type = MHashEnum::Blake2b256;
+        let mut hash_type = multihash::Code::Blake2b256;
         let mut codec = Codec::DagCBOR;
 
         // if this type has cid, would use this cid config
@@ -45,7 +44,7 @@ impl<B: Blockstore> CborIpldStore for BasicCborIpldStore<B> {
             let perf = cid.prefix();
             hash_type = perf.mh_type;
             codec = perf.codec;
-            Some(cid.multihash())
+            Some(cid.hash().to_owned())
         } else {
             None
         };
@@ -56,7 +55,7 @@ impl<B: Blockstore> CborIpldStore for BasicCborIpldStore<B> {
 
         if let Some(hash) = exp_cid_hash {
             // if has expected cid, then this expected hash
-            assert_eq!(hash, cid.multihash());
+            assert_eq!(hash, cid.hash());
         }
 
         Ok(cid)

@@ -2,12 +2,10 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
-use std::result;
 
 use bigint::U256;
 use cid::Cid;
-use serde::de::{SeqAccess, Visitor};
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, ser, Deserialize, Serialize};
 
 use super::{Hamt, Item, Node, KVT};
 use crate::ipld::CborIpldStore;
@@ -36,10 +34,10 @@ where
     }
 }
 
-impl Serialize for Node {
-    fn serialize<S>(&self, serializer: S) -> result::Result<S::Ok, S::Error>
+impl ser::Serialize for Node {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: ser::Serializer,
     {
         let mut bitmap_bytes = [0_u8; std::mem::size_of::<U256>()]; // u256
         self.bitfield.to_big_endian(&mut bitmap_bytes);
@@ -54,21 +52,21 @@ impl Serialize for Node {
     }
 }
 
-impl<'de> Deserialize<'de> for Node {
-    fn deserialize<D>(deserializer: D) -> result::Result<Self, D::Error>
+impl<'de> de::Deserialize<'de> for Node {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: de::Deserializer<'de>,
     {
         struct TupleVisitor;
-        impl<'de> Visitor<'de> for TupleVisitor {
+        impl<'de> de::Visitor<'de> for TupleVisitor {
             type Value = (serde_bytes::ByteBuf, Vec<Item>);
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "tuple must be 2 item, bytes and Vec<Pointer>")
             }
-            fn visit_seq<A>(self, mut seq: A) -> result::Result<Self::Value, A::Error>
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
             where
-                A: SeqAccess<'de>,
+                A: de::SeqAccess<'de>,
             {
                 let first = seq
                     .next_element()?
@@ -98,15 +96,29 @@ impl<'de> Deserialize<'de> for Node {
     }
 }
 
-impl Serialize for Item {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+/*
+#[derive(Deserialize)]
+enum ItemRef {
+    #[serde(rename = "0")]
+    #[serde(deserialize_with = "cid::ipld_dag_cbor::deserialize")]
+    Link(Cid),
+    #[serde(rename = "1")]
+    KVs(Vec<KVT>),
+}
+*/
+
+#[derive(Serialize)]
+struct CborCid<'a>(#[serde(serialize_with = "cid::ipld_dag_cbor::serialize")] &'a Cid);
+
+impl ser::Serialize for Item {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: ser::Serializer,
     {
         match self {
             Item::Link(cid) => {
                 let mut m = BTreeMap::new();
-                m.insert("0", cid);
+                m.insert("0", CborCid(cid));
                 m.serialize(serializer)
             }
             Item::Leaf(kvs) => {
@@ -122,15 +134,16 @@ impl Serialize for Item {
 #[derive(Deserialize)]
 enum ItemRef {
     #[serde(rename = "0")]
+    #[serde(deserialize_with = "cid::ipld_dag_cbor::deserialize")]
     Link(Cid),
     #[serde(rename = "1")]
     KVs(Vec<KVT>),
 }
 
-impl<'de> Deserialize<'de> for Item {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+impl<'de> de::Deserialize<'de> for Item {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: de::Deserializer<'de>,
     {
         let item_ref = ItemRef::deserialize(deserializer)?;
         let i = match item_ref {
