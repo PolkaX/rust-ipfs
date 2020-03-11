@@ -1,7 +1,7 @@
 mod common;
 
 use block_format::{BasicBlock, Block};
-use cid::{Codec, Cid, Prefix, Version};
+use cid::{Cid, Codec, Prefix, Version};
 use rust_ipld_format::coding::{decode, register};
 use rust_ipld_format::{Node, Result};
 
