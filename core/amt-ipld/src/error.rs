@@ -11,7 +11,7 @@ pub enum AmtIpldError {
     Cbor(#[from] serde_cbor::Error),
 
     #[error("cid error: {0}")]
-    Cid(#[from] cid::CidError),
+    Cid(#[from] cid::Error),
 
     #[error("block format error: {0}")]
     BlockFormat(#[from] block_format::BlockFormatError),
