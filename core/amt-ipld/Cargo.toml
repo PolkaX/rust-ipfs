@@ -10,6 +10,7 @@ description = "Implementation of the ipld amt"
 keywords = ["ipfs", "ipld", "amt"]
 
 [dependencies]
+cid = { version = "0.4", features = ["ext"] }
 serde = "1.0"
 serde_bytes = "0.11"
 serde_cbor = { version = "0.11", features = ["tags"] }
@@ -17,10 +18,8 @@ thiserror = "1.0"
 
 block-format = { package = "rust-block-format", path = "../block-format" }
 blockstore = { package = "rust-ipfs-blockstore", path = "../ipfs/blockstore" }
-cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
 ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor" }
 
 [dev-dependencies]
 matches = "0.1"
 rand = "0.7"
-util = { package = "rust-ipfs-util", path = "../util" }

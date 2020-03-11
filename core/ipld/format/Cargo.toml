@@ -10,12 +10,12 @@ description = "Implementation of the ipld format"
 keywords = ["ipfs", "ipld", "format"]
 
 [dependencies]
+cid = { version = "0.4", features = ["ext"] }
 lazy_static = "1.4"
-multihash = { package = "parity-multihash", version = "0.2.2" }
+multihash = "0.10"
 thiserror = "1.0"
 
 block-format = { package = "rust-block-format", path = "../../block-format" }
-cid = { package = "rust-cid", path = "../../cid" }
 
 [dev-dependencies]
 bytes = "0.5"

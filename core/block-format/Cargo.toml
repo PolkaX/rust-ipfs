@@ -11,10 +11,6 @@ keywords = ["ipfs", "block-format"]
 
 [dependencies]
 bytes = { version = "0.5", features = ["serde"] }
+cid = { version = "0.4", features = ["ext"] }
+multihash = "0.10"
 thiserror = "1.0"
-
-cid = { package = "rust-cid", path = "../cid" }
-util = { package = "rust-ipfs-util", path = "../util" }
-
-[dev-dependencies]
-multihash = { package = "parity-multihash", version = "0.2.2" }

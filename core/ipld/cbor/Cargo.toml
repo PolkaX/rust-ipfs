@@ -11,8 +11,9 @@ keywords = ["ipfs", "ipld", "cbor"]
 
 [dependencies]
 bytes = { version = "0.5", features = ["serde"] }
+cid = { version = "0.4", features = ["ext"] }
 either = { version = "1.5", features = ["serde"] }
-multihash = { package = "parity-multihash", version = "0.2.2" }
+multihash = "0.10"
 num-bigint = { version = "0.2", optional = true }
 num-traits = { version = "0.2", optional = true }
 serde = { version = "1.0", features = ["derive"] }
@@ -23,11 +24,9 @@ thiserror = "1.0"
 
 ipld-format = { package = "rust-ipld-format", path = "../format" }
 block-format = { package = "rust-block-format", path = "../../block-format" }
-cid = { package = "rust-cid", path = "../../cid", features = ["serde_support"] }
 
 [dev-dependencies]
 criterion = "0.3"
-util = { package = "rust-ipfs-util", path = "../../util" }
 hex-literal = "0.2.1"
 maplit = "1.0"
 
