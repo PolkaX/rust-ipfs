@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use block_format::Block;
 use bytes::Bytes;
-use cid::{AsCidRef, Cid, Codec, Hash, Prefix, Version};
+use cid::{AsCidRef, Cid, Codec, Prefix, Version};
 
 use rust_ipld_format::{FormatError, Link, NavigableNode, Node, NodeStat, Resolver, Result};
 
@@ -16,11 +16,11 @@ impl Default for EmptyNode {
         let p = Prefix {
             version: Version::V1,
             codec: Codec::Raw,
-            mh_type: Hash::Identity,
+            mh_type: multihash::Code::Identity,
             mh_len: 0,
         };
         EmptyNode {
-            cid: p.sum(b"").unwrap(),
+            cid: Cid::new_from_prefix(&p, b""),
             data: Bytes::from_static(b""),
         }
     }
