@@ -15,5 +15,5 @@ members = [
 ]
 
 [replace]
-"cid:0.4.0" = { git = "https://github.com/PolkaX/rust-cid", branch = "ext" }
+"cid:0.4.0" = { git = "https://github.com/PolkaX/rust-cid", branch = "impl-serde" }
 "serde_cbor:0.11.1" = {  git = "https://github.com/PolkaX/cbor", branch = "f64ser-hack" }

@@ -11,7 +11,7 @@ keywords = ["ipfs", "ipld", "cbor"]
 
 [dependencies]
 bytes = { version = "0.5", features = ["serde"] }
-cid = { version = "0.4", features = ["ext"] }
+cid = { version = "0.4", features = ["impl-serde"] }
 either = { version = "1.5", features = ["serde"] }
 multihash = "0.10"
 num-bigint = { version = "0.2", optional = true }

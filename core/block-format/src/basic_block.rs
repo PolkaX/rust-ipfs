@@ -2,15 +2,20 @@
 
 use bytes::Bytes;
 
-use cid::{AsCidRef, Cid};
+use cid::Cid;
 use multihash::{MultihashRef, Sha2_256};
 
 use crate::error::Result;
 
 /// The trait for getting raw data and cid of block.
-pub trait Block: AsCidRef {
+pub trait Block: AsRef<Cid> {
     /// Get the raw data of block.
     fn raw_data(&self) -> &Bytes;
+
+    /// Get the cid.
+    fn cid(&self) -> &Cid {
+        self.as_ref()
+    }
 }
 
 impl Block for BasicBlock {
@@ -19,8 +24,8 @@ impl Block for BasicBlock {
     }
 }
 
-impl AsCidRef for BasicBlock {
-    fn cid(&self) -> &Cid {
+impl AsRef<Cid> for BasicBlock {
+    fn as_ref(&self) -> &Cid {
         &self.cid
     }
 }

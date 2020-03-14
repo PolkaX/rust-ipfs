@@ -3,7 +3,7 @@
 use std::fs;
 
 use block_format::{BasicBlock, Block};
-use cid::{AsCidRef, Cid, Codec};
+use cid::{Cid, Codec};
 use either::Either;
 use ipld_format::{Node, Resolver};
 use maplit::btreemap;

@@ -241,7 +241,8 @@ mod tests {
     use std::collections::BTreeMap;
     use std::str::FromStr;
 
-    use cid::{AsCidRef, Cid};
+    use block_format::Block;
+    use cid::Cid;
     use num_bigint::BigInt;
     use serde::{Deserialize, Serialize};
 

@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use block_format::{BasicBlock, Block};
 use bytes::Bytes;
-use cid::{AsCidRef, Cid, Codec};
+use cid::{Cid, Codec};
 use either::Either;
 use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 
@@ -105,8 +105,8 @@ impl Block for IpldNode {
     }
 }
 
-impl AsCidRef for IpldNode {
-    fn cid(&self) -> &Cid {
+impl AsRef<Cid> for IpldNode {
+    fn as_ref(&self) -> &Cid {
         &self.cid
     }
 }

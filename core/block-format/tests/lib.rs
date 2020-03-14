@@ -1,6 +1,5 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use cid::AsCidRef;
 use multihash::Sha2_256;
 
 use rust_block_format::{BasicBlock, Block};

@@ -10,7 +10,7 @@ description = "Implementation of the block format"
 keywords = ["ipfs", "block-format"]
 
 [dependencies]
-bytes = { version = "0.5", features = ["serde"] }
-cid = { version = "0.4", features = ["ext"] }
+bytes = "0.5"
+cid = "0.4"
 multihash = "0.10"
 thiserror = "1.0"

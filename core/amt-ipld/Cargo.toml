@@ -10,7 +10,7 @@ description = "Implementation of the ipld amt"
 keywords = ["ipfs", "ipld", "amt"]
 
 [dependencies]
-cid = { version = "0.4", features = ["ext"] }
+cid = { version = "0.4", features = ["impl-serde"] }
 multihash = "0.10"
 serde = "1.0"
 serde_bytes = "0.11"

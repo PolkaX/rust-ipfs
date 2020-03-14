@@ -765,8 +765,8 @@ impl Database {
         // reopen the database and steal handles into self
         let db = Self::open(&self.config, &self.path)?;
         *self.db.write() = mem::replace(&mut *db.db.write(), None);
-        *self.overlay.write() = mem::replace(&mut *db.overlay.write(), Default::default());
-        *self.flushing.write() = mem::replace(&mut *db.flushing.write(), Default::default());
+        *self.overlay.write() = mem::take(&mut *db.overlay.write());
+        *self.flushing.write() = mem::take(&mut *db.flushing.write());
         Ok(())
     }
 

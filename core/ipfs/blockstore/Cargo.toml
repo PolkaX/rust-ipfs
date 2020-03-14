@@ -10,7 +10,7 @@ description = "Implementation of the ipfs blockstore"
 keywords = ["ipfs", "blockstore"]
 
 [dependencies]
-cid = { version = "0.4", features = ["ext"] }
+cid = { version = "0.4", features = ["impl-serde"] }
 thiserror = "1.0"
 
 block-format = { package = "rust-block-format", path = "../../block-format" }
