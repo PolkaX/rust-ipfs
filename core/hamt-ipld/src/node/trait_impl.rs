@@ -96,17 +96,6 @@ impl<'de> de::Deserialize<'de> for Node {
     }
 }
 
-/*
-#[derive(Deserialize)]
-enum ItemRef {
-    #[serde(rename = "0")]
-    #[serde(deserialize_with = "cid::ipld_dag_cbor::deserialize")]
-    Link(Cid),
-    #[serde(rename = "1")]
-    KVs(Vec<KVT>),
-}
-*/
-
 #[derive(Serialize)]
 struct CborCid<'a>(#[serde(serialize_with = "cid::ipld_dag_cbor::serialize")] &'a Cid);
 
