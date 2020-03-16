@@ -14,7 +14,7 @@ pub enum IpldCborError {
     CborErr(#[from] serde_cbor::Error),
     /// CID error.
     #[error("cid error: {0}")]
-    CidErr(#[from] cid::CidError),
+    CidErr(#[from] cid::Error),
     /// Block format error.
     #[error("block format error: {0}")]
     BlockErr(#[from] block_format::BlockFormatError),

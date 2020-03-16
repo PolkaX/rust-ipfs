@@ -3,17 +3,16 @@
 use std::fs;
 
 use block_format::{BasicBlock, Block};
-use cid::{AsCidRef, Cid, Codec};
+use cid::{Cid, Codec};
 use either::Either;
 use ipld_format::{Node, Resolver};
 use maplit::btreemap;
-use multihash::Hash;
 use rust_ipld_cbor::{json_to_obj, obj_to_json, IpldNode, Obj};
 use serde::{Deserialize, Serialize};
 
 #[test]
 fn test_from_object() {
-    let node = IpldNode::from_object(Obj::Text("".to_string()), Hash::SHA2256).unwrap();
+    let node = IpldNode::from_object(Obj::Text("".to_string()), multihash::Code::Sha2_256).unwrap();
     assert_eq!(
         &node.cid().to_string(),
         "bafyreiengp2sbi6ez34a2jctv34bwyjl7yoliteleaswgcwtqzrhmpyt2m"
@@ -65,7 +64,7 @@ fn test_json_roundtrip() {
         ),
     ];
     for (json, expect_cid) in examples {
-        let node = IpldNode::from_json(json, Hash::SHA2256).unwrap();
+        let node = IpldNode::from_json(json, multihash::Code::Sha2_256).unwrap();
         assert_eq!(&node.cid().to_string(), expect_cid);
         let s = node.to_json().unwrap();
         assert_eq!(json, &s);
@@ -74,7 +73,7 @@ fn test_json_roundtrip() {
 
 #[test]
 fn test_cbor_roundtrip() {
-    let node = IpldNode::from_cbor(b"`", Hash::SHA2256).unwrap();
+    let node = IpldNode::from_cbor(b"`", multihash::Code::Sha2_256).unwrap();
     assert_eq!(
         &node.cid().to_string(),
         "bafyreiengp2sbi6ez34a2jctv34bwyjl7yoliteleaswgcwtqzrhmpyt2m"
@@ -96,7 +95,7 @@ fn test_objects() {
             let cbor_file_name = format!("{}{}.cbor", TEST_OBJ_ROOT, key);
             let cbor = fs::read(cbor_file_name).unwrap();
 
-            let node = IpldNode::from_json(&json, Hash::SHA2256).unwrap();
+            let node = IpldNode::from_json(&json, multihash::Code::Sha2_256).unwrap();
             assert_eq!(node.raw_data(), cbor.as_slice());
 
             if let Obj::Cid(cid) = value {
@@ -114,7 +113,7 @@ fn test_objects() {
 fn test_canonicalize() {
     let cbor_file_name = format!("{}non-canon.cbor", TEST_OBJ_ROOT);
     let cbor = fs::read(cbor_file_name).unwrap();
-    let node1 = IpldNode::from_cbor(&cbor, Hash::SHA2256).unwrap();
+    let node1 = IpldNode::from_cbor(&cbor, multihash::Code::Sha2_256).unwrap();
     assert_ne!(node1.raw_data(), cbor.as_slice());
 
     assert_eq!(
@@ -122,7 +121,7 @@ fn test_canonicalize() {
         "bafyreiawx7ona7oa2ptcoh6vwq4q6bmd7x2ibtkykld327bgb7t73ayrqm"
     );
 
-    let node2 = IpldNode::from_cbor(node1.raw_data(), Hash::SHA2256).unwrap();
+    let node2 = IpldNode::from_cbor(node1.raw_data(), multihash::Code::Sha2_256).unwrap();
     assert_eq!(node1, node2);
 }
 
@@ -130,7 +129,7 @@ fn test_canonicalize() {
 fn test_stable_cid() {
     let cbor_file_name = format!("{}non-canon.cbor", TEST_OBJ_ROOT);
     let cbor = fs::read(cbor_file_name).unwrap();
-    let cid = Cid::new_cid_v1(Codec::DagCBOR, util::sha2_256_hash(&cbor)).unwrap();
+    let cid = Cid::new_v1(Codec::DagCBOR, multihash::Sha2_256::digest(&cbor));
     let bad_block = BasicBlock::new_with_cid(cbor.into(), cid).unwrap();
     let bad_node = IpldNode::from_block(&bad_block).unwrap();
     assert_eq!(bad_block.cid(), bad_node.cid());
@@ -156,7 +155,7 @@ fn test_canonical_struct_encoding() {
         cat: true,
     };
     let cbor = serde_cbor::to_vec(&foo1).unwrap();
-    let node = IpldNode::from_cbor(&cbor, Hash::SHA2256).unwrap();
+    let node = IpldNode::from_cbor(&cbor, multihash::Code::Sha2_256).unwrap();
     let expect = hex!("a563636174f563646f670f6463617473fb3ff84dd2f1a9fbe7657768616c65656e65766572657a6562726165736576656e");
     assert_eq!(node.raw_data().as_ref(), &expect[..]);
 
@@ -166,10 +165,10 @@ fn test_canonical_struct_encoding() {
 
 #[test]
 fn test_tree() {
-    let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
-    let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
-    let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
-    let c4 = Cid::new_cid_v0(util::sha2_256_hash(b"something4")).unwrap();
+    let c1 = Cid::new_v0(multihash::Sha2_256::digest(b"something1")).unwrap();
+    let c2 = Cid::new_v0(multihash::Sha2_256::digest(b"something2")).unwrap();
+    let c3 = Cid::new_v0(multihash::Sha2_256::digest(b"something3")).unwrap();
+    let c4 = Cid::new_v0(multihash::Sha2_256::digest(b"something4")).unwrap();
     let obj = Obj::Map(btreemap! {
         "foo".into() => Obj::Cid(c1),
         "baz".into() => Obj::Array(vec![Obj::Cid(c2), Obj::Cid(c3), Obj::Text("c".to_string())]),
@@ -185,7 +184,7 @@ fn test_tree() {
             }),
         }),
     });
-    let node = IpldNode::from_object(obj, Hash::SHA2256).unwrap();
+    let node = IpldNode::from_object(obj, multihash::Code::Sha2_256).unwrap();
     assert_eq!(
         &node.cid().to_string(),
         "bafyreicp66zmx7grdrnweetu23anx3e5zguda7646iwyothju6nhgqykgq"
@@ -243,7 +242,7 @@ fn test_resolved_val_is_jsonable() {
         }
     }"#;
 
-    let node = IpldNode::from_json(json, Hash::SHA2256).unwrap();
+    let node = IpldNode::from_json(json, multihash::Code::Sha2_256).unwrap();
     assert_eq!(
         &node.cid().to_string(),
         "bafyreiahcy6ewqmabbh7lcjhxrillpf72zlu3vqcovckanvj2fwdtenvbe"
@@ -258,18 +257,18 @@ fn test_resolved_val_is_jsonable() {
 
 #[test]
 fn test_basic_marshal() {
-    let cid = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
+    let cid = Cid::new_v0(multihash::Sha2_256::digest(b"something")).unwrap();
     let obj = Obj::Map(btreemap! {
         "name".into() => Obj::Text("foo".to_string()),
         "bar".into() => Obj::Cid(cid.clone()),
     });
-    let node = IpldNode::from_object(obj, Hash::SHA2256).unwrap();
+    let node = IpldNode::from_object(obj, multihash::Code::Sha2_256).unwrap();
     assert_eq!(
         &node.cid().to_string(),
         "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
     );
 
-    let back = IpldNode::from_cbor(node.raw_data(), Hash::SHA2256).unwrap();
+    let back = IpldNode::from_cbor(node.raw_data(), multihash::Code::Sha2_256).unwrap();
     assert_eq!(
         &back.cid().to_string(),
         "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
@@ -281,9 +280,9 @@ fn test_basic_marshal() {
 
 #[test]
 fn test_marshal_roundtrip() {
-    let c1 = Cid::new_cid_v0(util::sha2_256_hash(b"something1")).unwrap();
-    let c2 = Cid::new_cid_v0(util::sha2_256_hash(b"something2")).unwrap();
-    let c3 = Cid::new_cid_v0(util::sha2_256_hash(b"something3")).unwrap();
+    let c1 = Cid::new_v0(multihash::Sha2_256::digest(b"something1")).unwrap();
+    let c2 = Cid::new_v0(multihash::Sha2_256::digest(b"something2")).unwrap();
+    let c3 = Cid::new_v0(multihash::Sha2_256::digest(b"something3")).unwrap();
     let obj = Obj::Map(btreemap! {
         "foo".into() => Obj::Text("bar".to_string()),
         "hello".into() => Obj::Cid(c1.clone()),
@@ -292,7 +291,7 @@ fn test_marshal_roundtrip() {
             "qux".into() => Obj::Cid(c3),
         }),
     });
-    let node1 = IpldNode::from_object(obj, Hash::SHA2256).unwrap();
+    let node1 = IpldNode::from_object(obj, multihash::Code::Sha2_256).unwrap();
     assert_eq!(
         &node1.cid().to_string(),
         "bafyreibgx4rjaqolj7c32c7ibxc5tedhisc4d23ihx5t4tgamuvy2hvwjm"
@@ -313,7 +312,7 @@ fn test_marshal_roundtrip() {
         }),
     );
 
-    let node2 = IpldNode::from_cbor(node1.raw_data(), Hash::SHA2256).unwrap();
+    let node2 = IpldNode::from_cbor(node1.raw_data(), multihash::Code::Sha2_256).unwrap();
     assert_eq!(node1.cid(), node2.cid());
     let (link, rest) = node2.resolve_link(&["baz", "1", "bop"]).unwrap();
     assert_eq!(link.cid, c2);

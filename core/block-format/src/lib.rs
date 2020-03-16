@@ -8,5 +8,9 @@
 mod basic_block;
 mod error;
 
+pub use bytes::{Buf, Bytes};
+pub use cid::Cid;
+pub use multihash::MultihashRef;
+
 pub use self::basic_block::{BasicBlock, Block};
 pub use self::error::{BlockFormatError, Result};

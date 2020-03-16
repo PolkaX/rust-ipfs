@@ -239,27 +239,27 @@ impl BorrowMut<BigInt> for CborBigInt {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::str::FromStr;
 
+    use block_format::Block;
+    use cid::Cid;
+    use num_bigint::BigInt;
     use serde::{Deserialize, Serialize};
-
-    use cid::{AsCidRef, Cid};
-    use multihash::Hash;
 
     use super::{CborBigInt, CborBigUint};
     use crate::node::IpldNode;
     use crate::obj::{Obj, SortedStr};
-    use num_bigint::BigInt;
-    use std::str::FromStr;
 
     #[test]
     fn test_cid_and_bigint() {
         #[derive(PartialEq, Eq, Debug, Serialize, Deserialize)]
         struct Foo {
             big_int: CborBigUint,
+            #[serde(with = "cid::ipld_dag_cbor")]
             cid: Cid,
         }
 
-        let node = IpldNode::from_object(Obj::Null, Hash::SHA2256).unwrap();
+        let node = IpldNode::from_object(Obj::Null, multihash::Code::Sha2_256).unwrap();
         let cid = node.cid().clone();
         let foo1 = Foo {
             big_int: CborBigUint(1_u64.into()),

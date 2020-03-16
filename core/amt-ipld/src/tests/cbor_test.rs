@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn node_test() {
-    let cid = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
+    let cid = Cid::new_v0(multihash::Sha2_256::digest(b"something")).unwrap();
     let b = Item::Link(cid);
     let node = Node::new_from_raw(1, vec![b], vec![]);
     let v = serde_cbor::to_vec(&node).unwrap();
@@ -28,7 +28,7 @@ fn node_test() {
 
 #[test]
 fn root_test() {
-    let cid = Cid::new_cid_v0(util::sha2_256_hash(b"something")).unwrap();
+    let cid = Cid::new_v0(multihash::Sha2_256::digest(b"something")).unwrap();
     let b = Item::Link(cid);
     let node = Node::new_from_raw(1, vec![b], vec![]);
     let db = db();

@@ -4,10 +4,9 @@ use std::str::FromStr;
 
 use block_format::{BasicBlock, Block};
 use bytes::Bytes;
-use cid::{AsCidRef, Cid, Codec};
+use cid::{Cid, Codec};
 use either::Either;
 use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
-use multihash::Hash;
 
 use crate::convert::{
     convert_to_cborish_obj, convert_to_jsonish_obj, hack_convert_float_to_int,
@@ -46,7 +45,7 @@ impl IpldNode {
     }
 
     /// Deserialize the json string to IPLD Node.
-    pub fn from_json(json: &str, hash_type: Hash) -> Result<Self> {
+    pub fn from_json(json: &str, hash_type: multihash::Code) -> Result<Self> {
         let obj = json_to_obj(json)?;
         // need to generate other info
         Self::from_object(obj, hash_type)
@@ -58,32 +57,32 @@ impl IpldNode {
     }
 
     /// Deserialize a CBOR object into an IPLD Node.
-    pub fn from_cbor(bytes: &[u8], hash_type: Hash) -> Result<Self> {
+    pub fn from_cbor(bytes: &[u8], hash_type: multihash::Code) -> Result<Self> {
         let obj = serde_cbor::from_slice::<Obj>(bytes)?;
         Self::from_object(obj, hash_type)
     }
 
     /// Just to match the golang version, it will be `deprecated` in the future.
     /// Please use `from_cbor` method of `IpldNode`.
-    pub fn decode(bytes: &[u8], hash_type: Hash) -> Result<Self> {
+    pub fn decode(bytes: &[u8], hash_type: multihash::Code) -> Result<Self> {
         Self::from_cbor(bytes, hash_type)
     }
 
     /// Creates an IPLD Node with the given value and hash type.
-    pub fn from_object<T: serde::Serialize>(value: T, hash_type: Hash) -> Result<Self> {
+    pub fn from_object<T: serde::Serialize>(value: T, hash_type: multihash::Code) -> Result<Self> {
         Self::from_object_with_codec(value, hash_type, Codec::DagCBOR)
     }
 
     /// Creates an IPLD Node with the given value, hash type and codec.
     pub fn from_object_with_codec<T: serde::Serialize>(
         value: T,
-        hash_type: Hash,
+        hash_type: multihash::Code,
         codec: Codec,
     ) -> Result<Self> {
         let data = serde_cbor::to_vec(&value)?;
         let obj = serde_cbor::from_slice::<Obj>(&data)?;
-        let hash = multihash::encode(hash_type, &data)?;
-        let cid = Cid::new_cid_v1(codec, hash)?;
+        let hash = hash_type.hasher().unwrap().digest(&data);
+        let cid = Cid::new_v1(codec, hash);
         let block = BasicBlock::new_with_cid(data.into(), cid)?;
         Self::new_with_obj(&block, obj)
     }
@@ -106,8 +105,8 @@ impl Block for IpldNode {
     }
 }
 
-impl AsCidRef for IpldNode {
-    fn cid(&self) -> &Cid {
+impl AsRef<Cid> for IpldNode {
+    fn as_ref(&self) -> &Cid {
         &self.cid
     }
 }

@@ -12,7 +12,8 @@ keywords = ["ipfs", "ipld", "hamt"]
 [dependencies]
 bigint = "4.4"
 bytes = { version = "0.5", features = ["serde"] }
-multihash = { package = "parity-multihash", version = "0.2.2" }
+cid = { version = "0.4", features = ["impl-serde"] }
+multihash = "0.10"
 murmur3 = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_bytes = "0.11"
@@ -20,14 +21,12 @@ serde_cbor = { version = "0.11", features = ["tags"] }
 thiserror = "1.0"
 
 block-format = { package = "rust-block-format", path = "../block-format" }
-cid = { package = "rust-cid", path = "../cid", features = ["hascid", "serde_support"] }
 ipld-cbor = { package = "rust-ipld-cbor", path = "../ipld/cbor", features = ["bigint"] }
 
 [dev-dependencies]
 matches = "0.1"
 rand = "0.7"
 serde_json = "1.0"
-util = { package = "rust-ipfs-util", path = "../util" }
 
 [features]
 test-hash = []

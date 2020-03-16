@@ -4,7 +4,6 @@ use std::fmt;
 use std::ops::Deref;
 use std::result;
 
-use cid::Cid;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use serde_cbor::Value;
 
@@ -56,7 +55,7 @@ impl Serialize for Item {
         S: Serializer,
     {
         match self {
-            Item::Link(cid) => cid.serialize(serializer),
+            Item::Link(cid) => cid::ipld_dag_cbor::serialize(cid, serializer),
             Item::Ptr(_) => unreachable!("could not serialize `Ptr`, just allow `Link`"),
         }
     }
@@ -67,7 +66,7 @@ impl<'de> Deserialize<'de> for Item {
     where
         D: Deserializer<'de>,
     {
-        Cid::deserialize(deserializer).map(Item::Link)
+        cid::ipld_dag_cbor::deserialize(deserializer).map(Item::Link)
     }
 }
 

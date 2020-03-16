@@ -1,6 +1,6 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use cid::{Cid, CidError};
+use cid::Cid;
 
 /// Type alias to use this library's [`BlockFormatError`] type in a `Result`.
 pub type Result<T> = std::result::Result<T, BlockFormatError>;
@@ -13,7 +13,7 @@ pub enum BlockFormatError {
     WrongHash(Cid, Cid),
     /// Cid error.
     #[error("cid error: {0}")]
-    CidError(#[from] CidError),
+    CidError(#[from] cid::Error),
     /// Other type error.
     #[error("other err: {0}")]
     Other(#[from] Box<dyn std::error::Error + Send + Sync>),

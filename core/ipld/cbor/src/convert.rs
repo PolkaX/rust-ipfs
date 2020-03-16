@@ -1,8 +1,9 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 
-use cid::ToCid;
+use cid::Cid;
 
 use crate::error::{IpldCborError, Result};
 use crate::obj::Obj;
@@ -58,7 +59,7 @@ pub fn convert_to_cborish_obj(mut value: Obj) -> Result<Obj> {
                 if let Some(link) = map.get("/") {
                     match link {
                         Obj::Text(s) => {
-                            let cid = s.to_cid()?;
+                            let cid = Cid::try_from(s.as_str())?;
                             *obj = Obj::Cid(cid);
                         }
                         Obj::Cid(cid) => {

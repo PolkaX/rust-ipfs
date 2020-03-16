@@ -1,6 +1,7 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use cid::{AsCidRef, Hash};
+use multihash::Sha2_256;
+
 use rust_block_format::{BasicBlock, Block};
 
 #[test]
@@ -25,7 +26,7 @@ fn test_hash() {
     let data = b"some other data";
     let block = BasicBlock::new(data.as_ref().into());
 
-    let hash = multihash::encode(Hash::SHA2256, data.as_ref()).unwrap();
+    let hash = Sha2_256::digest(data.as_ref());
 
     assert_eq!(block.multihash(), hash);
 }
@@ -34,7 +35,7 @@ fn test_hash() {
 fn test_cid() {
     let data = b"yet another data";
     let block = BasicBlock::new(data.as_ref().into());
-    let cid_ref = block.cid();
+    let cid = block.cid();
 
-    assert_eq!(block.multihash(), cid_ref.multihash());
+    assert_eq!(block.multihash(), cid.hash());
 }

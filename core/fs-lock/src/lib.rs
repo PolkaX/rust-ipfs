@@ -22,7 +22,7 @@ pub fn lock(path: &PathBuf, lock_file: &str) -> io::Result<fs::File> {
     let mut path = path.to_owned();
     path.push(lock_file);
 
-    let _ = GLOBAL_LOCK.lock().unwrap();
+    let _lock = GLOBAL_LOCK.lock().unwrap();
     let f = fs::File::create(path.as_path())?;
     f.try_lock_exclusive()?;
     Ok(f)
@@ -31,7 +31,7 @@ pub fn lock(path: &PathBuf, lock_file: &str) -> io::Result<fs::File> {
 /// Unlock the file. if file is not locked, just return Ok(()).
 /// Thus the file could be unlocked more than once.
 pub fn unlock(file: &fs::File) -> io::Result<()> {
-    let _ = GLOBAL_LOCK.lock().unwrap();
+    let _lock = GLOBAL_LOCK.lock().unwrap();
     file.unlock()
 }
 
@@ -44,7 +44,7 @@ pub fn locked(path: &PathBuf, lock_file: &str) -> io::Result<bool> {
         return Ok(false);
     }
 
-    let _ = GLOBAL_LOCK.lock().unwrap();
+    let _lock = GLOBAL_LOCK.lock().unwrap();
     let f = fs::OpenOptions::new().write(true).open(path.as_path())?;
     let r = f.try_lock_exclusive();
     match r {

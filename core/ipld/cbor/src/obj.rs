@@ -5,11 +5,8 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
 
-use cid::{deserialize_cid_from_bytes, Cid, CID_CBOR_TAG};
-use serde::{
-    de::{self, Error as _},
-    Deserialize, Serialize,
-};
+use cid::{Cid, IPLD_DAG_CBOR_TAG_CID, RAW_BINARY_MULTIBASE_IDENTITY};
+use serde::{de, ser, Deserialize, Serialize};
 use serde_cbor::{tags::current_cbor_tag, Value};
 
 use crate::error::IpldCborError;
@@ -121,11 +118,11 @@ pub enum Obj {
     Cid(Cid),
 }
 
-impl serde::Serialize for Obj {
+impl ser::Serialize for Obj {
     #[inline]
-    fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: ser::Serializer,
     {
         match *self {
             Obj::Null => serializer.serialize_unit(),
@@ -136,15 +133,15 @@ impl serde::Serialize for Obj {
             Obj::Text(ref v) => serializer.serialize_str(&v),
             Obj::Array(ref v) => v.serialize(serializer),
             Obj::Map(ref v) => v.serialize(serializer),
-            Obj::Cid(ref v) => v.serialize(serializer),
+            Obj::Cid(ref v) => cid::ipld_dag_cbor::serialize(v, serializer),
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for Obj {
+impl<'de> de::Deserialize<'de> for Obj {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: de::Deserializer<'de>,
     {
         struct ValueVisitor;
 
@@ -272,14 +269,14 @@ impl<'de> serde::Deserialize<'de> for Obj {
 
             fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
             where
-                D: serde::Deserializer<'de>,
+                D: de::Deserializer<'de>,
             {
                 match current_cbor_tag() {
-                    Some(CID_CBOR_TAG) | None => {
-                        let cid = Cid::deserialize(deserializer)?;
+                    Some(IPLD_DAG_CBOR_TAG_CID) | None => {
+                        let cid = cid::ipld_dag_cbor::deserialize(deserializer)?;
                         Ok(Obj::Cid(cid))
                     }
-                    Some(tag) => Err(D::Error::custom(format!("unexpected tag ({})", tag))),
+                    Some(tag) => Err(de::Error::custom(format!("unexpected tag ({})", tag))),
                 }
             }
         }
@@ -329,20 +326,26 @@ fn try_from_map(map: BTreeMap<Value, Value>) -> Result<Obj, IpldCborError> {
 }
 
 fn try_from_tag(tag: u64, value: Value) -> Result<Obj, IpldCborError> {
-    if tag != CID_CBOR_TAG {
+    if tag != IPLD_DAG_CBOR_TAG_CID {
         return Err(IpldCborError::ObjErr(format!(
             "obj only accept tag [{}] to represent cid",
-            CID_CBOR_TAG
+            IPLD_DAG_CBOR_TAG_CID
         )));
     }
 
     if let Value::Bytes(ref bytes) = value {
-        let cid = deserialize_cid_from_bytes(bytes)?;
+        if bytes.is_empty() || bytes[0] != RAW_BINARY_MULTIBASE_IDENTITY {
+            return Err(IpldCborError::ObjErr(format!(
+                "raw binary multibase identity [{}] must not be omitted",
+                RAW_BINARY_MULTIBASE_IDENTITY,
+            )));
+        }
+        let cid = Cid::try_from(&bytes[1..])?;
         Ok(Obj::Cid(cid))
     } else {
         Err(IpldCborError::ObjErr(format!(
             "tag [{}] value must be bytes",
-            CID_CBOR_TAG
+            IPLD_DAG_CBOR_TAG_CID
         )))
     }
 }
