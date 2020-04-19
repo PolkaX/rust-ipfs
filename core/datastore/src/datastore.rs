@@ -28,7 +28,7 @@ pub trait AsyncQuery {
     fn query<R: AsyncQuery>(&self, query: query::Query) -> Result<R>;
 }
 
-pub trait Datastore: Write + Read {
+pub trait Datastore: Write + Read + Send + 'static {
     /// Sync guarantees that any Put or Delete calls under prefix that returned
     /// before Sync(prefix) was called will be observed after Sync(prefix)
     /// returns, even if the program crashes. If Put/Delete operations already
@@ -36,6 +36,10 @@ pub trait Datastore: Write + Read {
     /// If the prefix fails to Sync this method returns an error.
     fn sync(&self, prefix: &Key) -> Result<()>;
 }
+
+pub trait CloneableDatastore: Datastore + Clone {}
+
+impl<T: Datastore + Clone> CloneableDatastore for T {}
 
 // TTLDatastore is an interface that should be implemented by datastores that
 // support expiring entries.
@@ -64,6 +68,10 @@ pub trait Batching: Datastore {
     fn batch(&self) -> Result<Self::Txn>;
     fn commit(&self, txn: Self::Txn) -> Result<()>;
 }
+
+pub trait CloneableBatching: Batching + Clone {}
+
+impl<T: Batching + Clone> CloneableBatching for T {}
 
 pub trait Txn: Read + Batch {
     fn discard(&mut self);

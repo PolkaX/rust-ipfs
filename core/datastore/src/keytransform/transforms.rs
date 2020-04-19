@@ -2,7 +2,7 @@
 
 use crate::key::{Key, LEFT_SLASH_STR};
 
-pub trait KeyTransform: Clone {
+pub trait KeyTransform: Clone + Send + 'static {
     fn convert_key<K: AsRef<Key> + Into<Key>>(&self, k: K) -> Key;
     fn invert_key<K: AsRef<Key> + Into<Key>>(&self, k: K) -> Key;
 }
@@ -11,8 +11,8 @@ pub trait KeyTransform: Clone {
 #[derive(Clone)]
 pub struct Pair<A, B>
 where
-    A: Fn(&Key) -> Key + Clone,
-    B: Fn(&Key) -> Key + Clone,
+    A: Fn(&Key) -> Key + Clone + Send + 'static,
+    B: Fn(&Key) -> Key + Clone + Send + 'static,
 {
     pub convert: A,
     pub invert: B,
@@ -20,8 +20,8 @@ where
 
 impl<A, B> KeyTransform for Pair<A, B>
 where
-    A: Fn(&Key) -> Key + Clone,
-    B: Fn(&Key) -> Key + Clone,
+    A: Fn(&Key) -> Key + Clone + Send + 'static,
+    B: Fn(&Key) -> Key + Clone + Send + 'static,
 {
     fn convert_key<K: AsRef<Key> + Into<Key>>(&self, k: K) -> Key {
         (self.convert)(k.as_ref())
