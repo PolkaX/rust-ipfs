@@ -34,7 +34,7 @@ impl<T: Datastore> Write for SingletonDS<T> {
         self.write().delete(key)
     }
 }
-impl<T: Datastore> Read for SingletonDS<T> {
+impl<T: Datastore + Sync> Read for SingletonDS<T> {
     fn get(&self, key: &Key) -> Result<Vec<u8>> {
         self.read().get(key)
     }
@@ -47,13 +47,13 @@ impl<T: Datastore> Read for SingletonDS<T> {
         self.read().get_size(key)
     }
 }
-impl<T: Datastore> Datastore for SingletonDS<T> {
+impl<T: Datastore + Sync> Datastore for SingletonDS<T> {
     fn sync(&self, prefix: &Key) -> Result<()> {
         self.write().sync(prefix)
     }
 }
 
-impl<T: Batching> Batching for SingletonDS<T> {
+impl<T: Batching + Sync> Batching for SingletonDS<T> {
     type Txn = T::Txn;
 
     fn batch(&self) -> Result<Self::Txn> {
@@ -65,7 +65,7 @@ impl<T: Batching> Batching for SingletonDS<T> {
     }
 }
 
-impl<T: TxnDatastore> TxnDatastore for SingletonDS<T>
+impl<T: TxnDatastore + Sync> TxnDatastore for SingletonDS<T>
 where
     Self::Txn: Txn,
 {
