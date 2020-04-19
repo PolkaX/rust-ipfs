@@ -414,7 +414,7 @@ impl Node {
     where
         B: CborIpldStore,
     {
-        let cid = bs.put(&self)?;
+        let cid = bs.put(&*self)?;
         let node: Node = bs.get(&cid)?;
         let mut total_size = ipld_cbor::dump_object(&node)?.len() as u64;
         for item in self.items.borrow_mut().iter_mut() {
