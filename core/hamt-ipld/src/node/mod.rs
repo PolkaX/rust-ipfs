@@ -57,6 +57,13 @@ pub struct Node {
     items: RefCell<Vec<Item>>,
 }
 
+#[cfg(not(feature = "nightly"))]
+impl<'a> cid_ext::HasCid for &'a Node {
+    fn has_cid(&self) -> Option<&Cid> {
+        None
+    }
+}
+
 #[inline]
 pub fn set_bit(input: &mut U256, n: u32) {
     let one: U256 = 1.into();
@@ -394,7 +401,7 @@ impl Node {
         for item in &mut items[..].iter_mut() {
             if let Item::Ptr(node) = item {
                 node.flush(bs)?;
-                let cid = bs.put(&node)?;
+                let cid = bs.put(&**node)?;
                 // flush current item
                 *item = Item::Link(cid);
             }

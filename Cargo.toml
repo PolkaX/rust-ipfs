@@ -2,6 +2,7 @@
 members = [
     "core/amt-ipld",
     "core/block-format",
+    "core/cid-ext",
     "core/datastore",
     "core/ds/rocksdb",
     "core/fs-lock",
