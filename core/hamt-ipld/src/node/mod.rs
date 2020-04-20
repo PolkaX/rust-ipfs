@@ -57,6 +57,13 @@ pub struct Node {
     items: RefCell<Vec<Item>>,
 }
 
+#[cfg(not(feature = "nightly"))]
+impl<'a> cid_ext::HasCid for &'a Node {
+    fn has_cid(&self) -> Option<&Cid> {
+        None
+    }
+}
+
 #[inline]
 pub fn set_bit(input: &mut U256, n: u32) {
     let one: U256 = 1.into();
@@ -394,7 +401,7 @@ impl Node {
         for item in &mut items[..].iter_mut() {
             if let Item::Ptr(node) = item {
                 node.flush(bs)?;
-                let cid = bs.put(&node)?;
+                let cid = bs.put(&**node)?;
                 // flush current item
                 *item = Item::Link(cid);
             }
@@ -407,7 +414,7 @@ impl Node {
     where
         B: CborIpldStore,
     {
-        let cid = bs.put(&self)?;
+        let cid = bs.put(&*self)?;
         let node: Node = bs.get(&cid)?;
         let mut total_size = ipld_cbor::dump_object(&node)?.len() as u64;
         for item in self.items.borrow_mut().iter_mut() {

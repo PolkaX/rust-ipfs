@@ -2,6 +2,7 @@
 
 use block_format::Block as BlockT;
 use cid::{Cid, Codec};
+use cid_ext::HasCid;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::error::*;
@@ -14,24 +15,6 @@ pub trait Blockstore {
 pub trait CborIpldStore {
     fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T>;
     fn put<T: Serialize + HasCid>(&mut self, v: T) -> Result<Cid>;
-}
-
-/// A trait that represents whether a CID exists.
-pub trait HasCid {
-    /// Whether a CID exists.
-    fn has_cid(&self) -> Option<&Cid>;
-}
-
-impl<T> HasCid for T {
-    default fn has_cid(&self) -> Option<&Cid> {
-        None
-    }
-}
-
-impl<T: AsRef<Cid>> HasCid for T {
-    fn has_cid(&self) -> Option<&Cid> {
-        Some(self.as_ref())
-    }
 }
 
 #[derive(Debug)]
