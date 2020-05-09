@@ -49,15 +49,6 @@ impl BasicBlock {
 
     /// Creates a new `BasicBlock` with given bytes and CID.
     pub fn new_with_cid(data: Bytes, cid: Cid) -> Result<BasicBlock> {
-        #[cfg(debug_assertions)]
-        {
-            use crate::error::BlockFormatError;
-            let checked_cid = Cid::new_from_prefix(&cid.prefix(), data.as_ref());
-            if checked_cid != cid {
-                return Err(BlockFormatError::WrongHash(checked_cid, cid));
-            }
-        }
-
         Ok(BasicBlock { data, cid })
     }
 

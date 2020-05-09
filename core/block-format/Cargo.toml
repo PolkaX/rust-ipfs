@@ -11,6 +11,6 @@ keywords = ["ipfs", "block-format"]
 
 [dependencies]
 bytes = "0.5"
-cid = "0.4"
-multihash = "0.10"
+cid = "0.5"
+multihash = "0.11"
 thiserror = "1.0"
