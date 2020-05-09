@@ -10,9 +10,9 @@ description = "Implementation of the ipld format"
 keywords = ["ipfs", "ipld", "format"]
 
 [dependencies]
-cid = { version = "0.4", features = ["impl-serde"] }
+cid = { version = "0.5", features = ["impl-serde"] }
 lazy_static = "1.4"
-multihash = "0.10"
+multihash = "0.11"
 thiserror = "1.0"
 
 block-format = { package = "rust-block-format", path = "../../block-format" }

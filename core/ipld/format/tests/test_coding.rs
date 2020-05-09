@@ -1,7 +1,7 @@
 mod common;
 
 use block_format::{BasicBlock, Block};
-use cid::{Cid, Codec, Prefix, Version};
+use cid::{Cid, Codec};
 use rust_ipld_format::coding::{decode, register};
 use rust_ipld_format::{Node, Result};
 
@@ -27,13 +27,7 @@ fn init2() {
 #[test]
 fn test_decode() {
     init();
-    let p = Prefix {
-        version: Version::V1,
-        codec: Codec::Raw,
-        mh_type: multihash::Code::Identity,
-        mh_len: 0,
-    };
-    let id = Cid::new_from_prefix(&p, b"");
+    let id = Cid::new_v1(Codec::Raw, multihash::Identity::digest(b""));
     let block = BasicBlock::new_with_cid(vec![].into(), id.clone()).unwrap();
     let node = decode(&block).unwrap();
     assert_eq!(node.cid(), &id);

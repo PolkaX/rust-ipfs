@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use block_format::Block;
 use bytes::Bytes;
-use cid::{Cid, Codec, Prefix, Version};
+use cid::{Cid, Codec};
 
 use rust_ipld_format::{FormatError, Link, NavigableNode, Node, NodeStat, Resolver, Result};
 
@@ -13,14 +13,8 @@ pub struct EmptyNode {
 
 impl Default for EmptyNode {
     fn default() -> Self {
-        let p = Prefix {
-            version: Version::V1,
-            codec: Codec::Raw,
-            mh_type: multihash::Code::Identity,
-            mh_len: 0,
-        };
         EmptyNode {
-            cid: Cid::new_from_prefix(&p, b""),
+            cid: Cid::new_v1(Codec::Raw, multihash::Identity::digest(b"")),
             data: Bytes::from_static(b""),
         }
     }
