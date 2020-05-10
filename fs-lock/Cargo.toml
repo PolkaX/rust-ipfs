@@ -1,0 +1,13 @@
+[package]
+name = "fs-lock"
+version = "0.1.0"
+authors = ["PolkaX <https://github.com/PolkaX>"]
+edition = "2018"
+
+[dependencies]
+fs2 = "0.4"
+lazy_static = "1.4"
+log = "0.4"
+
+[dev-dependencies]
+tempfile = "3.1"
