@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
 
-use cid::{Cid, IPLD_DAG_CBOR_TAG_CID};
+use cid::{Cid, IPLD_DAG_CBOR_TAG_CID, RAW_BINARY_MULTIBASE_IDENTITY};
 use minicbor::{
     data::{Tag, Type},
     decode, encode, Decoder, Encoder,
@@ -102,14 +102,8 @@ impl<'b> decode::Decode<'b> for IpldValue {
                 Ok(IpldValue::Map(map))
             }
             Type::Tag => {
-                if let Tag::Unassigned(IPLD_DAG_CBOR_TAG_CID) = d.tag()? {
-                    Ok(IpldValue::Link(d.decode::<Cid>()?))
-                } else {
-                    Err(decode::Error::TypeMismatch(
-                        IPLD_DAG_CBOR_TAG_CID as u8,
-                        "expected tag 42",
-                    ))
-                }
+                let cid = d.decode::<Cid>()?;
+                Ok(IpldValue::Link(cid))
             }
             Type::Break | Type::Unknown(_) | Type::Undefined | Type::Simple => {
                 Err(decode::Error::Message("unexpected type"))
@@ -127,7 +121,13 @@ impl ser::Serialize for IpldValue {
         match self {
             IpldValue::Null => serializer.serialize_none(),
             IpldValue::Bool(bool) => serializer.serialize_bool(*bool),
-            IpldValue::Integer(i128) => serializer.serialize_i128(*i128),
+            IpldValue::Integer(i128) => {
+                if *i128 > 0 {
+                    serializer.serialize_u64(*i128 as u64)
+                } else {
+                    serializer.serialize_i64(*i128 as i64)
+                }
+            }
             IpldValue::Float(f64) => serializer.serialize_f64(*f64),
             IpldValue::String(string) => serializer.serialize_str(string),
             IpldValue::Bytes(bytes) => serializer.serialize_bytes(bytes),
@@ -171,6 +171,7 @@ impl<'de> de::Visitor<'de> for JsonVisitor {
     {
         Ok(IpldValue::String(value))
     }
+
     #[inline]
     fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
     where
@@ -187,12 +188,14 @@ impl<'de> de::Visitor<'de> for JsonVisitor {
         Ok(IpldValue::Bytes(v))
     }
 
+    // Convert IpldValue::Integer to IpldValue::Float for matching golang version
     #[inline]
     fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Ok(IpldValue::Integer(v.into()))
+        // Ok(IpldValue::Integer(v.into()))
+        Ok(IpldValue::Float(v as f64))
     }
 
     #[inline]
@@ -200,7 +203,8 @@ impl<'de> de::Visitor<'de> for JsonVisitor {
     where
         E: de::Error,
     {
-        Ok(IpldValue::Integer(v.into()))
+        // Ok(IpldValue::Integer(v.into()))
+        Ok(IpldValue::Float(v as f64))
     }
 
     #[inline]
@@ -208,7 +212,8 @@ impl<'de> de::Visitor<'de> for JsonVisitor {
     where
         E: de::Error,
     {
-        Ok(IpldValue::Integer(v))
+        // Ok(IpldValue::Integer(v))
+        Ok(IpldValue::Float(v as f64))
     }
 
     #[inline]
@@ -259,7 +264,7 @@ impl<'de> de::Visitor<'de> for JsonVisitor {
         let mut values = Vec::<(String, IpldValue)>::new();
 
         while let Some((key, value)) = visitor.next_entry()? {
-            values.insert(key, value);
+            values.push((key, value));
         }
 
         // JSON Object represents IPLD Link if it is `{ "/": "...." }`
@@ -280,5 +285,29 @@ impl<'de> de::Visitor<'de> for JsonVisitor {
         E: de::Error,
     {
         Ok(IpldValue::Float(v))
+    }
+}
+
+#[test]
+fn test_ipld_value_cbor_and_json() {
+    const TEST_OBJ_ROOT: &str = "tests/test_objects/";
+
+    let content = std::fs::read_to_string(format!("{}expected.json", TEST_OBJ_ROOT)).unwrap();
+    let value = serde_json::from_str::<IpldValue>(&content).unwrap();
+    if let IpldValue::Map(map) = value {
+        for (key, _value) in map {
+            println!("key: {}", key);
+            let json_file_name = format!("{}{}.json", TEST_OBJ_ROOT, key);
+            let json = std::fs::read_to_string(json_file_name).unwrap();
+            // println!("json: {:?}", json);
+            let json_value = serde_json::from_str::<IpldValue>(&json).unwrap();
+            // println!("value from json: {:?}", json_value);
+            let cbor_file_name = format!("{}{}.cbor", TEST_OBJ_ROOT, key);
+            let cbor = std::fs::read(cbor_file_name).unwrap();
+            // println!("cbor: {:?}", cbor);
+            let cbor_value = minicbor::decode::<IpldValue>(&cbor).unwrap();
+            // println!("value from cbor: {:?}", json_value);
+            assert_eq!(json_value, cbor_value);
+        }
     }
 }

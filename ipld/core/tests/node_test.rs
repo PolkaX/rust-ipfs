@@ -83,6 +83,7 @@ fn test_cbor_roundtrip() {
     assert_eq!(vec![b'`'], cbor_bytes)
 }
 
+/*
 const TEST_OBJ_ROOT: &str = "tests/test_objects/";
 
 #[test]
@@ -109,7 +110,9 @@ fn test_objects() {
         unreachable!()
     }
 }
+*/
 
+/*
 #[test]
 fn test_canonicalize() {
     let cbor_file_name = format!("{}non-canon.core", TEST_OBJ_ROOT);
@@ -353,3 +356,4 @@ fn test_marshal_roundtrip() {
     assert_eq!(rest.len(), 1);
     assert_eq!(rest[0], "bop");
 }
+*/

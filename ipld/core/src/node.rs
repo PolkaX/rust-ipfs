@@ -36,8 +36,7 @@ impl IpldNode {
     /// Serialize the IPLD Node to json string.
     pub fn to_json(&self) -> Result<String> {
         // drop other info
-        let obj = self.obj.clone();
-        Ok(serde_json::to_string(&obj)?)
+        Ok(serde_json::to_string(&self.obj)?)
     }
 
     /// Deserialize the json string to IPLD Node.
