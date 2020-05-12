@@ -49,7 +49,7 @@ impl<B: Blockstore> CborIpldStore for BasicCborIpldStore<B> {
     fn get<T: DeserializeOwned>(&self, c: &Cid) -> Result<T> {
         let blk = self.blocks.get(c)?;
         let data = (*blk).raw_data();
-        let r = ipld_cbor::decode_into(data)?;
+        let r = ipld_core::decode_into(data)?;
         Ok(r)
     }
 
@@ -67,7 +67,7 @@ impl<B: Blockstore> CborIpldStore for BasicCborIpldStore<B> {
             None
         };
 
-        let node = ipld_cbor::IpldNode::from_object_with_codec(v, hash_type, codec)?;
+        let node = ipld_core::IpldNode::from_object_with_codec(v, hash_type, codec)?;
         let cid = node.cid().clone(); // this cid is calc from node
         self.blocks.put(node)?;
 

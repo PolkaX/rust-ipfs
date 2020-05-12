@@ -94,7 +94,7 @@ where
 
     /// set a k/v for Amt tree
     pub fn set<Input: Serialize>(&mut self, k: u64, input: Input) -> Result<()> {
-        let v: Value = ipld_cbor::struct_to_cbor_value(&input)?;
+        let v: Value = ipld_core::struct_to_cbor_value(&input)?;
 
         // extend amt tree first
         // if current key large then tree capacity, create a new root, and move current root be
@@ -136,7 +136,7 @@ where
         let output = self
             .root
             .get(&self.bs, self.height, k, current_shift, |v| {
-                ipld_cbor::cbor_value_to_struct(v.clone()).map_err(AmtIpldError::IpldCbor)
+                ipld_core::cbor_value_to_struct(v.clone()).map_err(AmtIpldError::IpldCbor)
             })?;
         Ok(output)
     }

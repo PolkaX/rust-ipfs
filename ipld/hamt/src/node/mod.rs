@@ -409,7 +409,7 @@ impl Node {
     {
         let cid = bs.put(&self)?;
         let node: Node = bs.get(&cid)?;
-        let mut total_size = ipld_cbor::dump_object(&node)?.len() as u64;
+        let mut total_size = ipld_core::dump_object(&node)?.len() as u64;
         for item in self.items.borrow_mut().iter_mut() {
             item.load_item(bs)?;
             if let Item::Ptr(node) = item {

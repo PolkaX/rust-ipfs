@@ -17,7 +17,7 @@ pub enum AmtIpldError {
     BlockFormat(#[from] block_format::BlockFormatError),
 
     #[error("ipld core error: {0}")]
-    IpldCbor(#[from] ipld_cbor::IpldCborError),
+    IpldCbor(#[from] ipld_core::IpldCoreError),
 
     #[error("not found for key: {0}")]
     NotFound(u64),

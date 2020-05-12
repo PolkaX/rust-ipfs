@@ -1,11 +1,13 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
-use block_format::{BasicBlock, Block as BlockT};
-use blockstore::Blockstore;
-use cid::{Cid, Codec, Prefix, Version};
-use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use cid::{Cid, Codec, Prefix, Version};
+use serde::{de::DeserializeOwned, Serialize};
+
+use block_format::{BasicBlock, Block as BlockT};
+use ipfs_blockstore::Blockstore;
 
 use crate::error::*;
 

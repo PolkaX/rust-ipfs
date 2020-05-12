@@ -15,4 +15,4 @@ members = [
 ]
 
 [replace]
-"cid:0.5.0" = { path = "../ipfs/rust-cid" }
+"cid:0.5.0" = { git = "http://github.com/PolkaX/rust-cid", branch = "impl-cbor-and-json" }

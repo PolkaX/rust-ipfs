@@ -3,7 +3,7 @@
 use std::string::ToString;
 
 use bigint::U256;
-use ipld_cbor::struct_to_cbor_value;
+use ipld_core::struct_to_cbor_value;
 
 use super::*;
 use crate::node::set_bit;
@@ -34,15 +34,15 @@ fn test_roundtrip() {
 #[test]
 fn test_basic_bytes_loading() {
     let b = b"cats and dogs are taking over".to_vec();
-    let o = ipld_cbor::dump_object::<Vec<u8>>(b.as_ref()).unwrap();
-    let s: Vec<u8> = ipld_cbor::decode_into(&o).unwrap();
+    let o = ipld_core::dump_object::<Vec<u8>>(b.as_ref()).unwrap();
+    let s: Vec<u8> = ipld_core::decode_into(&o).unwrap();
     assert_eq!(b, s);
 }
 
 #[cfg(not(feature = "test-hash"))]
 #[test]
 fn test_kv() {
-    use ipld_cbor::Obj;
+    use ipld_core::IpldValue;
     use std::collections::BTreeMap;
 
     let mut cs = new_cbor_store();
@@ -50,19 +50,19 @@ fn test_kv() {
     thingy1.insert("cat".to_string(), "dog".to_string());
     let c1 = cs.put(thingy1).unwrap();
 
-    let c = Obj::Cid(c1);
+    let c = IpldValue::Link(c1);
     let mut hash = BTreeMap::new();
     hash.insert("one".into(), c);
-    hash.insert("foo".into(), Obj::Text("bar".to_string()));
-    let thingy2 = Obj::Map(hash);
+    hash.insert("foo".into(), IpldValue::String("bar".to_string()));
+    let thingy2 = IpldValue::Map(hash);
 
-    let b = ipld_cbor::dump_object(&thingy2).unwrap();
+    let b = ipld_core::dump_object(&thingy2).unwrap();
     println!("{:?}", b);
 
     let mut node = Hamt::new(cs);
     node.set("cat", thingy2).unwrap();
 
-    let b = ipld_cbor::dump_object(node.root()).unwrap();
+    let b = ipld_core::dump_object(node.root()).unwrap();
     println!("{:?} {}", b, b.len());
 
     assert_eq!(

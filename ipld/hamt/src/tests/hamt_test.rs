@@ -272,18 +272,18 @@ fn test_reload_empty() {
 fn test_value_linking() {
     use std::collections::BTreeMap;
 
-    use ipld_cbor::Obj;
+    use ipld_core::IpldValue;
 
     let mut cs = new_cbor_store();
     let mut thingy1 = HashMap::new();
     thingy1.insert("cat".to_string(), "dog".to_string());
     let c1 = cs.put(thingy1).unwrap();
 
-    let c = Obj::Cid(c1);
+    let c = IpldValue::Link(c1);
     let mut hash = BTreeMap::new();
     hash.insert("one".into(), c);
-    hash.insert("foo".into(), Obj::Text("bar".to_string()));
-    let thingy2 = Obj::Map(hash);
+    hash.insert("foo".into(), IpldValue::String("bar".to_string()));
+    let thingy2 = IpldValue::Map(hash);
 
     let mut n = Hamt::new(cs);
     n.set("cat", thingy2).unwrap();

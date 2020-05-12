@@ -4,7 +4,7 @@ use super::*;
 
 use bytes::Bytes;
 use cid::Cid;
-use ipld_cbor::struct_to_cbor_value;
+use ipld_core::struct_to_cbor_value;
 
 #[test]
 fn test_kv() {
