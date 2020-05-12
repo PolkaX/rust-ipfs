@@ -2,13 +2,17 @@
 
 use std::str::FromStr;
 
-use block_format::{BasicBlock, Block};
 use bytes::Bytes;
 use cid::{Cid, Codec};
 use either::Either;
+use minicbor::{encode, Encoder};
+use multihash::Code;
+use serde::ser;
+
+use block_format::{BasicBlock, Block};
 use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 
-use crate::error::{IpldCborError, Result};
+use crate::error::IpldCoreError;
 use crate::value::IpldValue;
 
 /// `IpldNode` represents an IPLD node.
@@ -22,7 +26,7 @@ pub struct IpldNode {
 }
 
 impl IpldNode {
-    fn new_with_obj(block: &dyn Block, obj: IpldValue) -> Result<Self> {
+    fn new_with_obj<B: Block>(block: &B, obj: IpldValue) -> Result<Self, IpldCoreError> {
         let (tree, links) = compute(&obj)?;
         Ok(Self {
             obj,
@@ -33,64 +37,77 @@ impl IpldNode {
         })
     }
 
-    /// Serialize the IPLD Node to json string.
-    pub fn to_json(&self) -> Result<String> {
-        // drop other info
-        Ok(serde_json::to_string(&self.obj)?)
-    }
-
-    /// Deserialize the json string to IPLD Node.
-    pub fn from_json(json: &str, hash_type: multihash::Code) -> Result<Self> {
-        let obj = serde_json::from_str::<IpldValue>(json)?;
-        // need to generate other info
-        Self::from_object(obj, hash_type)
+    /// Deserialize a CBOR object into an IPLD Node.
+    ///
+    /// Equivalent to the `Decode` in `go-ipld-cbor`
+    pub fn from_cbor(cbor: &[u8], hash_type: Code) -> Result<Self, IpldCoreError> {
+        let value = minicbor::decode::<IpldValue>(cbor)?;
+        println!("Value: {:?}", value);
+        Self::wrap_object(&value, hash_type)
     }
 
     /// Serialize the object of IPLD Node into its CBOR serialized byte representation.
-    pub fn to_cbor(&self) -> Result<Vec<u8>> {
+    pub fn to_cbor(&self) -> Result<Vec<u8>, IpldCoreError> {
         Ok(minicbor::to_vec(&self.obj)?)
     }
 
-    /// Deserialize a CBOR object into an IPLD Node.
-    pub fn from_cbor(bytes: &[u8], hash_type: multihash::Code) -> Result<Self> {
-        let obj = minicbor::decode::<IpldValue>(bytes)?;
-        Self::from_object(obj, hash_type)
+    /// Deserialize the JSON object into IPLD Node.
+    pub fn from_json(json: &str, hash_type: Code) -> Result<Self, IpldCoreError> {
+        let value = serde_json::from_str::<IpldValue>(json)?;
+        Self::wrap_object(&value, hash_type)
     }
 
-    /// Just to match the golang version, it will be `deprecated` in the future.
-    /// Please use `from_cbor` method of `IpldNode`.
-    pub fn decode(bytes: &[u8], hash_type: multihash::Code) -> Result<Self> {
-        Self::from_cbor(bytes, hash_type)
+    /// Serialize the object of IPLD Node into its json string representation.
+    pub fn to_json(&self) -> Result<String, IpldCoreError> {
+        Ok(serde_json::to_string(&self.obj)?)
     }
 
-    /// Creates an IPLD Node with the given value and hash type.
-    pub fn from_object<T: minicbor::Encode>(value: T, hash_type: multihash::Code) -> Result<Self> {
-        Self::from_object_with_codec(value, hash_type, Codec::DagCBOR)
-    }
-
-    /// Creates an IPLD Node with the given value, hash type and codec.
-    pub fn from_object_with_codec<T: minicbor::Encode>(
-        value: T,
-        hash_type: multihash::Code,
-        codec: Codec,
-    ) -> Result<Self> {
-        let data = minicbor::to_vec(&value)?;
-        let obj = minicbor::decode::<IpldValue>(&data)?;
+    /// Convert an CBOR object into IPLD Node.
+    pub fn wrap_object<T: minicbor::Encode>(
+        value: &T,
+        hash_type: Code,
+    ) -> Result<Self, IpldCoreError> {
+        let data = minicbor::to_vec(value)?;
+        // println!("{:?}", data);
+        let value = minicbor::decode::<IpldValue>(&data)?;
         let hash = hash_type.digest(&data);
-        let cid = Cid::new_v1(codec, hash);
+        // println!("Hash: {:?}", hash.as_bytes());
+        let cid = Cid::new_v1(Codec::DagCBOR, hash);
         let block = BasicBlock::new_with_cid(data.into(), cid)?;
-        Self::new_with_obj(&block, obj)
+        Self::new_with_obj(&block, value)
     }
 
-    /// Creates an IPLD Node with the given block.
-    pub fn from_block(block: &dyn Block) -> Result<Self> {
-        let obj = minicbor::decode::<IpldValue>(block.raw_data())?;
-        Self::new_with_obj(block, obj)
+    /// Decode a CBOR encoded Block into an IPLD Node.
+    ///
+    /// In general, you should not be calling this method directly.
+    /// Instead, you should be calling the `from_cbor` or `from_json`` method.
+    pub fn from_block<B: Block>(block: &B) -> Result<Self, IpldCoreError> {
+        let value = minicbor::decode::<IpldValue>(block.raw_data())?;
+        Self::new_with_obj(block, value)
     }
 
     /// Returns obj of the IPLD Node.
     pub fn obj(&self) -> &IpldValue {
         &self.obj
+    }
+}
+
+// Implement JSON serialization for IpldNode.
+// Equivalent to the `to_json`  of `IpldNode`.
+impl ser::Serialize for IpldNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        self.obj.serialize(serializer)
+    }
+}
+
+// Implement CBOR serialization for IpldNode.
+// Equivalent to the `to_cbor`  of `IpldNode`.
+impl encode::Encode for IpldNode {
+    fn encode<W: encode::Write>(&self, e: &mut Encoder<W>) -> Result<(), encode::Error<W::Error>> {
+        e.encode(&self.obj)?.ok()
     }
 }
 
@@ -117,14 +134,14 @@ impl Resolver for IpldNode {
             match cur {
                 IpldValue::Map(m) => {
                     cur = m.get::<str>(val).ok_or_else(|| {
-                        FormatError::Other(Box::new(IpldCborError::NoSuchLink((*val).to_string())))
+                        FormatError::Other(Box::new(IpldCoreError::NoSuchLink((*val).to_string())))
                     })?;
                 }
                 IpldValue::List(arr) => {
                     let index =
                         usize::from_str(val).map_err(|e| FormatError::Other(Box::new(e)))?;
                     cur = arr.get(index).ok_or_else(|| {
-                        FormatError::Other(Box::new(IpldCborError::NoSuchLink(format!(
+                        FormatError::Other(Box::new(IpldCoreError::NoSuchLink(format!(
                             "array index out of range[{}]",
                             index
                         ))))
@@ -137,7 +154,7 @@ impl Resolver for IpldNode {
                         path.iter().skip(index).map(|s| (*s).to_string()).collect(),
                     ));
                 }
-                _ => return Err(FormatError::Other(Box::new(IpldCborError::NoLinks))),
+                _ => return Err(FormatError::Other(Box::new(IpldCoreError::NoLinks))),
             }
         }
         if let IpldValue::Link(cid) = cur {
@@ -153,7 +170,7 @@ impl Resolver for IpldNode {
             return self.tree.clone();
         }
         let mut out = vec![];
-        for t in self.tree.iter() {
+        for t in &self.tree {
             if !t.starts_with(path) {
                 continue;
             }
@@ -201,7 +218,7 @@ impl Node for IpldNode {
 
         match either {
             Either::Left(link) => Ok((link, rest)),
-            Either::Right(_) => Err(FormatError::Other(Box::new(IpldCborError::NonLink))),
+            Either::Right(_) => Err(FormatError::Other(Box::new(IpldCoreError::NonLink))),
         }
     }
 
@@ -221,7 +238,7 @@ impl Node for IpldNode {
     }
 }
 
-fn compute(obj: &IpldValue) -> Result<(Vec<String>, Vec<Link>)> {
+fn compute(obj: &IpldValue) -> Result<(Vec<String>, Vec<Link>), IpldCoreError> {
     let mut tree = vec![];
     let mut links = vec![];
     let mut func = |name: &str, obj: &IpldValue| {
@@ -239,9 +256,9 @@ fn compute(obj: &IpldValue) -> Result<(Vec<String>, Vec<Link>)> {
     Ok((tree, links))
 }
 
-fn traverse<F>(obj: &IpldValue, cur: &str, f: &mut F) -> Result<()>
+fn traverse<F>(obj: &IpldValue, cur: &str, f: &mut F) -> Result<(), IpldCoreError>
 where
-    F: FnMut(&str, &IpldValue) -> Result<()>,
+    F: FnMut(&str, &IpldValue) -> Result<(), IpldCoreError>,
 {
     f(cur, obj)?;
     match obj {
@@ -262,25 +279,3 @@ where
         _ => Ok(()),
     }
 }
-
-/*
-/// Convert obj into json string.
-/// Just for testing. Please use the `to_json` method of `IpldNode`.
-#[inline]
-pub fn obj_to_json(obj: IpldValue) -> Result<String> {
-    let json_obj = convert_to_jsonish_obj(obj)?;
-    // hack handle for rust, to match go
-    let json_obj = hack_convert_float_to_int(json_obj)?;
-    Ok(serde_json::to_string(&json_obj)?)
-}
-
-/// Convert json string into Obj.
-/// Just for testing. Please use the `from_json` method of `IpldNode`.
-#[inline]
-pub fn json_to_obj(json: &str) -> Result<IpldValue> {
-    let obj = serde_json::from_str::<IpldValue>(json)?;
-    // hack handle for rust, to match go
-    let obj = hack_convert_int_to_float(obj)?;
-    convert_to_cborish_obj(obj)
-}
-*/

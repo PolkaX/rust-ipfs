@@ -1,11 +1,11 @@
 // Copyright 2019-2020 PolkaX. Licensed under MIT or Apache-2.0.
 
 /// Type alias to use this library's [`IpldCborError`] type in a `Result`.
-pub type Result<T> = std::result::Result<T, IpldCborError>;
+pub type Result<T> = std::result::Result<T, IpldCoreError>;
 
 /// Errors generated from this library.
 #[derive(Debug, thiserror::Error)]
-pub enum IpldCborError {
+pub enum IpldCoreError {
     /// JSON serialization/deserialization error.
     #[error("json de/serialize error: {0}")]
     JsonCodecErr(#[from] serde_json::Error),

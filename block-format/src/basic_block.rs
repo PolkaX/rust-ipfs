@@ -49,6 +49,15 @@ impl BasicBlock {
 
     /// Creates a new `BasicBlock` with given bytes and CID.
     pub fn new_with_cid(data: Bytes, cid: Cid) -> Result<BasicBlock> {
+        use crate::error::BlockFormatError;
+        let hash1 = cid.hash();
+        let hash2 = hash1.algorithm().digest(data.as_ref());
+        if hash1 != hash2 {
+            return Err(BlockFormatError::WrongHash(
+                hash1.as_bytes().to_vec(),
+                hash2.as_bytes().to_vec(),
+            ));
+        }
         Ok(BasicBlock { data, cid })
     }
 

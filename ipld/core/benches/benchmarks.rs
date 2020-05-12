@@ -48,20 +48,19 @@ fn test_struct_obj() -> IpldValue {
     serde_json::from_str::<IpldValue>(&json).unwrap()
 }
 
-fn bench_from_object(c: &mut Criterion) {
+fn bench_wrap_object(c: &mut Criterion) {
     let obj = test_struct_obj();
 
-    c.bench_function("from_obj", |b| {
+    c.bench_function("wrap_object", |b| {
         b.iter(|| {
-            let _ =
-                black_box(IpldNode::from_object(obj.clone(), multihash::Code::Sha2_256).unwrap());
+            let _ = black_box(IpldNode::wrap_object(&obj, multihash::Code::Sha2_256).unwrap());
         })
     });
 }
 
 fn bench_from_block(c: &mut Criterion) {
     let obj = test_struct_obj();
-    let node = IpldNode::from_object(obj, multihash::Code::Sha2_256).unwrap();
+    let node = IpldNode::wrap_object(&obj, multihash::Code::Sha2_256).unwrap();
 
     c.bench_function("from_block", |b| {
         b.iter(|| {
@@ -73,7 +72,7 @@ fn bench_from_block(c: &mut Criterion) {
 
 fn bench_to_cbor(c: &mut Criterion) {
     let obj = test_struct_obj();
-    let node = IpldNode::from_object(obj, multihash::Code::Sha2_256).unwrap();
+    let node = IpldNode::wrap_object(&obj, multihash::Code::Sha2_256).unwrap();
 
     c.bench_function("to_cbor", |b| {
         b.iter(|| {
@@ -82,5 +81,5 @@ fn bench_to_cbor(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_from_object, bench_from_block, bench_to_cbor);
+criterion_group!(benches, bench_wrap_object, bench_from_block, bench_to_cbor);
 criterion_main!(benches);

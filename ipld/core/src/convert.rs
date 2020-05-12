@@ -8,7 +8,6 @@ use cid::Cid;
 use crate::error::{IpldCborError, Result};
 use crate::value::IpldValue;
 
-/*
 /// Convert structure to CBOR Value.
 pub fn struct_to_cbor_value<S: serde::Serialize>(v: &S) -> Result<serde_cbor::Value> {
     let s = serde_cbor::to_vec(&v)?;
@@ -20,7 +19,6 @@ pub fn struct_to_cbor_value<S: serde::Serialize>(v: &S) -> Result<serde_cbor::Va
 pub fn cbor_value_to_struct<O: serde::de::DeserializeOwned>(v: serde_cbor::Value) -> Result<O> {
     Ok(serde_cbor::value::from_value(v)?)
 }
-*/
 
 /// Convert Obj Integer to Obj Float for matching golang version.
 pub fn hack_convert_int_to_float(value: IpldValue) -> Result<IpldValue> {
@@ -131,4 +129,24 @@ where
         }
         _ => Ok(()),
     }
+}
+
+/// Convert obj into json string.
+/// Just for testing. Please use the `to_json` method of `IpldNode`.
+#[inline]
+pub fn obj_to_json(obj: IpldValue) -> Result<String> {
+    let json_obj = convert_to_jsonish_obj(obj)?;
+    // hack handle for rust, to match go
+    let json_obj = hack_convert_float_to_int(json_obj)?;
+    Ok(serde_json::to_string(&json_obj)?)
+}
+
+/// Convert json string into Obj.
+/// Just for testing. Please use the `from_json` method of `IpldNode`.
+#[inline]
+pub fn json_to_obj(json: &str) -> Result<IpldValue> {
+    let obj = serde_json::from_str::<IpldValue>(json)?;
+    // hack handle for rust, to match go
+    let obj = hack_convert_int_to_float(obj)?;
+    convert_to_cborish_obj(obj)
 }

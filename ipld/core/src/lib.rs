@@ -10,6 +10,6 @@ mod value;
 
 pub use ipld_format::{FormatError, Link, Node, NodeStat, Resolver};
 
-pub use self::error::{IpldCborError, Result};
+pub use self::error::{IpldCoreError, Result};
 pub use self::node::IpldNode;
 pub use self::value::IpldValue;
