@@ -146,14 +146,14 @@ impl encode::Encode for IpldValue {
             IpldValue::Bytes(bytes) => e.bytes(bytes)?.ok(),
             IpldValue::String(string) => e.str(string)?.ok(),
             IpldValue::List(list) => {
-                let e = e.array(list.len())?;
+                let e = e.array(list.len() as u64)?;
                 for value in list {
                     e.encode(value)?;
                 }
                 e.ok()
             }
             IpldValue::Map(map) => {
-                let e = e.map(map.len())?;
+                let e = e.map(map.len() as u64)?;
                 for (key, value) in map {
                     e.encode(key)?.encode(value)?;
                 }
