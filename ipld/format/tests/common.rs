@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use block_format::Block;
 use bytes::Bytes;
-use cid::{Cid, Codec};
+use cid::{Cid, Codec, IntoExt};
 
 use ipld_format::{FormatError, Link, NavigableNode, Node, NodeStat, Resolver, Result};
 
@@ -14,7 +14,7 @@ pub struct EmptyNode {
 impl Default for EmptyNode {
     fn default() -> Self {
         EmptyNode {
-            cid: Cid::new_v1(Codec::Raw, multihash::Identity::digest(b"")),
+            cid: Cid::new_v1(Codec::Raw, multihash::Identity::digest(b"").into_ext()),
             data: Bytes::from_static(b""),
         }
     }

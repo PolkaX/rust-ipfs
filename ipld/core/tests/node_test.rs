@@ -2,7 +2,7 @@
 
 use std::fs;
 
-use cid::{Cid, Codec};
+use cid::{Cid, Codec, IntoExt};
 use either::Either;
 use maplit::btreemap;
 use multihash::Code;
@@ -14,12 +14,12 @@ use ipld_format::{Node, Resolver};
 #[test]
 fn test_non_object() {
     let value = IpldValue::String("".into());
-    let node = IpldNode::wrap_object(&value, Code::Sha2_256).unwrap();
+    let node = IpldNode::wrap_object(&value, Code::Sha2_256.into()).unwrap();
     assert_eq!(
         node.cid().to_string(),
         "bafyreiengp2sbi6ez34a2jctv34bwyjl7yoliteleaswgcwtqzrhmpyt2m"
     );
-    let back = IpldNode::from_cbor(node.raw_data(), Code::Sha2_256).unwrap();
+    let back = IpldNode::from_cbor(node.raw_data(), Code::Sha2_256.into()).unwrap();
     assert_eq!(
         back.cid().to_string(),
         "bafyreiengp2sbi6ez34a2jctv34bwyjl7yoliteleaswgcwtqzrhmpyt2m"
@@ -35,7 +35,7 @@ fn test_from_cbor() {
         IpldValue::String("foobar".to_string()),
     ];
     for value in cases {
-        let node = IpldNode::wrap_object(&value, Code::Sha2_256).unwrap();
+        let node = IpldNode::wrap_object(&value, Code::Sha2_256.into()).unwrap();
         let de = minicbor::decode::<IpldValue>(node.raw_data()).unwrap();
         assert_eq!(de, value);
     }
@@ -43,18 +43,18 @@ fn test_from_cbor() {
 
 #[test]
 fn test_basic_marshal() {
-    let cid = Cid::new_v0(Code::Sha2_256.digest(b"something")).unwrap();
+    let cid = Cid::new_v0(Code::Sha2_256.digest(b"something").into_ext()).unwrap();
     let value = IpldValue::Map(btreemap! {
         "name".into() => IpldValue::String("foo".to_string()),
         "bar".into() => IpldValue::Link(cid.clone()),
     });
-    let node = IpldNode::wrap_object(&value, Code::Sha2_256).unwrap();
+    let node = IpldNode::wrap_object(&value, Code::Sha2_256.into()).unwrap();
     assert_eq!(
         node.cid().to_string(),
         "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
     );
 
-    let back = IpldNode::from_cbor(node.raw_data(), Code::Sha2_256).unwrap();
+    let back = IpldNode::from_cbor(node.raw_data(), Code::Sha2_256.into()).unwrap();
     assert_eq!(
         back.cid().to_string(),
         "bafyreib4hmpkwa7zyzoxmpwykof6k7akxnvmsn23oiubsey4e2tf6gqlui"
@@ -66,9 +66,9 @@ fn test_basic_marshal() {
 
 #[test]
 fn test_marshal_roundtrip() {
-    let c1 = Cid::new_v0(Code::Sha2_256.digest(b"something1")).unwrap();
-    let c2 = Cid::new_v0(Code::Sha2_256.digest(b"something2")).unwrap();
-    let c3 = Cid::new_v0(Code::Sha2_256.digest(b"something3")).unwrap();
+    let c1 = Cid::new_v0(Code::Sha2_256.digest(b"something1").into_ext()).unwrap();
+    let c2 = Cid::new_v0(Code::Sha2_256.digest(b"something2").into_ext()).unwrap();
+    let c3 = Cid::new_v0(Code::Sha2_256.digest(b"something3").into_ext()).unwrap();
     let value = IpldValue::Map(btreemap! {
         "foo".into() => IpldValue::String("bar".to_string()),
         "hello".into() => IpldValue::Link(c1.clone()),
@@ -78,7 +78,7 @@ fn test_marshal_roundtrip() {
         }),
     });
 
-    let node1 = IpldNode::wrap_object(&value, Code::Sha2_256).unwrap();
+    let node1 = IpldNode::wrap_object(&value, Code::Sha2_256.into()).unwrap();
     assert_eq!(
         node1.cid().to_string(),
         "bafyreibgx4rjaqolj7c32c7ibxc5tedhisc4d23ihx5t4tgamuvy2hvwjm"
@@ -99,7 +99,7 @@ fn test_marshal_roundtrip() {
         }"
     );
 
-    let node2 = IpldNode::from_cbor(node1.raw_data(), Code::Sha2_256).unwrap();
+    let node2 = IpldNode::from_cbor(node1.raw_data(), Code::Sha2_256.into()).unwrap();
     assert_eq!(node1.cid(), node2.cid());
 
     let (link, rest) = node2.resolve_link(&["baz", "1", "bop"]).unwrap();
@@ -110,10 +110,10 @@ fn test_marshal_roundtrip() {
 
 #[test]
 fn test_tree() {
-    let c1 = Cid::new_v0(Code::Sha2_256.digest(b"something1")).unwrap();
-    let c2 = Cid::new_v0(Code::Sha2_256.digest(b"something2")).unwrap();
-    let c3 = Cid::new_v0(Code::Sha2_256.digest(b"something3")).unwrap();
-    let c4 = Cid::new_v0(Code::Sha2_256.digest(b"something4")).unwrap();
+    let c1 = Cid::new_v0(Code::Sha2_256.digest(b"something1").into_ext()).unwrap();
+    let c2 = Cid::new_v0(Code::Sha2_256.digest(b"something2").into_ext()).unwrap();
+    let c3 = Cid::new_v0(Code::Sha2_256.digest(b"something3").into_ext()).unwrap();
+    let c4 = Cid::new_v0(Code::Sha2_256.digest(b"something4").into_ext()).unwrap();
     let obj = IpldValue::Map(btreemap! {
         "foo".into() => IpldValue::Link(c1),
         "baz".into() => IpldValue::List(vec![IpldValue::Link(c2), IpldValue::Link(c3), IpldValue::String("c".to_string())]),
@@ -129,7 +129,7 @@ fn test_tree() {
             }),
         }),
     });
-    let node = IpldNode::wrap_object(&obj, Code::Sha2_256).unwrap();
+    let node = IpldNode::wrap_object(&obj, Code::Sha2_256.into()).unwrap();
     assert_eq!(
         &node.cid().to_string(),
         "bafyreicp66zmx7grdrnweetu23anx3e5zguda7646iwyothju6nhgqykgq"
@@ -187,7 +187,7 @@ fn test_resolved_val_is_jsonable() {
         }
     }"#;
 
-    let node = IpldNode::from_json(json, Code::Sha2_256).unwrap();
+    let node = IpldNode::from_json(json, Code::Sha2_256.into()).unwrap();
     assert_eq!(
         &node.cid().to_string(),
         "bafyreiahcy6ewqmabbh7lcjhxrillpf72zlu3vqcovckanvj2fwdtenvbe"
@@ -248,7 +248,7 @@ fn test_json_roundtrip() {
         ),
     ];
     for (json, expect_cid) in examples {
-        let node = IpldNode::from_json(json, Code::Sha2_256).unwrap();
+        let node = IpldNode::from_json(json, Code::Sha2_256.into()).unwrap();
         assert_eq!(node.cid().to_string(), expect_cid);
         let ser = node.to_json().unwrap();
         assert_eq!(ser, json);
@@ -257,7 +257,7 @@ fn test_json_roundtrip() {
 
 #[test]
 fn test_cbor_roundtrip() {
-    let node = IpldNode::from_cbor(b"`", Code::Sha2_256).unwrap();
+    let node = IpldNode::from_cbor(b"`", Code::Sha2_256.into()).unwrap();
     assert_eq!(
         node.cid().to_string(),
         "bafyreiengp2sbi6ez34a2jctv34bwyjl7yoliteleaswgcwtqzrhmpyt2m"
@@ -279,7 +279,7 @@ fn test_objects() {
             let cbor_file_name = format!("{}{}.cbor", TEST_OBJ_ROOT, key);
             let cbor = fs::read(cbor_file_name).unwrap();
 
-            let node = IpldNode::from_json(&json, Code::Sha2_256).unwrap();
+            let node = IpldNode::from_json(&json, Code::Sha2_256.into()).unwrap();
             assert_eq!(node.raw_data(), cbor.as_slice());
 
             if let IpldValue::Link(cid) = value {
@@ -297,7 +297,7 @@ fn test_objects() {
 fn test_canonicalize() {
     let cbor_file_name = format!("{}non-canon.cbor", TEST_OBJ_ROOT);
     let cbor = fs::read(cbor_file_name).unwrap();
-    let node1 = IpldNode::from_cbor(&cbor, Code::Sha2_256).unwrap();
+    let node1 = IpldNode::from_cbor(&cbor, Code::Sha2_256.into()).unwrap();
     assert_ne!(node1.raw_data(), cbor.as_slice());
 
     assert_eq!(
@@ -305,7 +305,7 @@ fn test_canonicalize() {
         "bafyreiawx7ona7oa2ptcoh6vwq4q6bmd7x2ibtkykld327bgb7t73ayrqm"
     );
 
-    let node2 = IpldNode::from_cbor(node1.raw_data(), Code::Sha2_256).unwrap();
+    let node2 = IpldNode::from_cbor(node1.raw_data(), Code::Sha2_256.into()).unwrap();
     assert_eq!(node1, node2);
 }
 
@@ -313,7 +313,7 @@ fn test_canonicalize() {
 fn test_stable_cid() {
     let cbor_file_name = format!("{}non-canon.cbor", TEST_OBJ_ROOT);
     let cbor = fs::read(cbor_file_name).unwrap();
-    let cid = Cid::new_v1(Codec::DagCBOR, Code::Sha2_256.digest(&cbor));
+    let cid = Cid::new_v1(Codec::DagCBOR, Code::Sha2_256.digest(&cbor).into_ext());
     let bad_block = BasicBlock::new_with_cid(cbor.into(), cid).unwrap();
     let bad_node = IpldNode::from_block(&bad_block).unwrap();
     assert_eq!(bad_block.cid(), bad_node.cid());
@@ -392,7 +392,7 @@ fn test_canonical_struct_encoding() {
     };
     let cbor = minicbor::to_vec(&foo1).unwrap();
     println!("CBOR: {:?}", cbor);
-    let node = IpldNode::from_cbor(&cbor, Code::Sha2_256).unwrap();
+    let node = IpldNode::from_cbor(&cbor, Code::Sha2_256.into()).unwrap();
     let expect = hex::decode("a563636174f563646f670f6463617473fb3ff84dd2f1a9fbe7657768616c65656e65766572657a6562726165736576656e").unwrap();
     assert_eq!(node.raw_data().as_ref(), expect.as_slice());
 

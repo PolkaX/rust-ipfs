@@ -3,7 +3,7 @@
 use super::*;
 
 use bytes::Bytes;
-use cid::Cid;
+use cid::{Cid, IntoExt};
 use ipld_core::struct_to_cbor_value;
 
 #[test]
@@ -39,7 +39,7 @@ fn test_pointer_and_node() {
     let p2: Item = serde_cbor::from_slice(&r).unwrap();
     assert_eq!(p2, pointer);
 
-    let cid = Cid::new_v0(multihash::Sha2_256::digest(b"something")).unwrap();
+    let cid = Cid::new_v0(multihash::Sha2_256::digest(b"something").into_ext()).unwrap();
     let pointer2 = Item::from_link(cid);
     let r = serde_cbor::to_vec(&pointer2).unwrap();
     println!("{:?}", r);
