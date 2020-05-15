@@ -53,14 +53,15 @@ fn bench_wrap_object(c: &mut Criterion) {
 
     c.bench_function("wrap_object", |b| {
         b.iter(|| {
-            let _ = black_box(IpldNode::wrap_object(&obj, multihash::Code::Sha2_256).unwrap());
+            let _ =
+                black_box(IpldNode::wrap_object(&obj, multihash::Code::Sha2_256.into()).unwrap());
         })
     });
 }
 
 fn bench_from_block(c: &mut Criterion) {
     let obj = test_struct_obj();
-    let node = IpldNode::wrap_object(&obj, multihash::Code::Sha2_256).unwrap();
+    let node = IpldNode::wrap_object(&obj, multihash::Code::Sha2_256.into()).unwrap();
 
     c.bench_function("from_block", |b| {
         b.iter(|| {
@@ -72,7 +73,7 @@ fn bench_from_block(c: &mut Criterion) {
 
 fn bench_to_cbor(c: &mut Criterion) {
     let obj = test_struct_obj();
-    let node = IpldNode::wrap_object(&obj, multihash::Code::Sha2_256).unwrap();
+    let node = IpldNode::wrap_object(&obj, multihash::Code::Sha2_256.into()).unwrap();
 
     c.bench_function("to_cbor", |b| {
         b.iter(|| {
