@@ -12,7 +12,7 @@ keywords = ["ipfs", "ipld", "hamt"]
 [dependencies]
 bigint = "4.4"
 bytes = { version = "0.5", features = ["serde"] }
-cid = { version = "0.5", features = ["impl-serde"] }
+cid = { version = "0.5", features = ["cbor", "json"] }
 multihash = "0.11"
 murmur3 = "0.5"
 serde = { version = "1.0", features = ["derive"] }

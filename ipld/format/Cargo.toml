@@ -10,7 +10,7 @@ description = "Implementation of the ipld format"
 keywords = ["ipfs", "ipld", "format"]
 
 [dependencies]
-cid = { version = "0.5", features = ["impl-serde"] }
+cid = { version = "0.5", features = ["cbor", "json"] }
 lazy_static = "1.4"
 multihash = "0.11"
 thiserror = "1.0"

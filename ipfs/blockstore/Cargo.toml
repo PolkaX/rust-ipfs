@@ -10,7 +10,7 @@ description = "Implementation of the ipfs blockstore"
 keywords = ["ipfs", "blockstore"]
 
 [dependencies]
-cid = { version = "0.5", features = ["impl-serde"] }
+cid = { version = "0.5", features = ["cbor", "json"] }
 thiserror = "1.0"
 
 block-format = { path = "../../block-format" }
