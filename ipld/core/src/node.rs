@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use bytes::Bytes;
-use cid::{Cid, Codec};
+use cid::{Cid, Codec, IntoExt};
 use either::Either;
 use minicbor::{encode, Encoder};
 use multihash::Code;
@@ -72,7 +72,7 @@ impl IpldNode {
         let value = minicbor::decode::<IpldValue>(&data)?;
         let hash = hash_type.digest(&data);
         // println!("Hash: {:?}", hash.as_bytes());
-        let cid = Cid::new_v1(Codec::DagCBOR, hash);
+        let cid = Cid::new_v1(Codec::DagCBOR, hash.into_ext());
         let block = BasicBlock::new_with_cid(data.into(), cid)?;
         Self::new_with_obj(&block, value)
     }

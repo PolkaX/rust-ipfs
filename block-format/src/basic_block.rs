@@ -2,8 +2,8 @@
 
 use bytes::Bytes;
 
-use cid::Cid;
-use multihash::{MultihashRef, Sha2_256};
+use cid::{Cid, IntoExt, ExtMultihashRef};
+use multihash::Sha2_256;
 
 use crate::error::Result;
 
@@ -43,7 +43,7 @@ impl BasicBlock {
         let sha256_hash = Sha2_256::digest(data.as_ref());
         BasicBlock {
             data,
-            cid: Cid::new_v0(sha256_hash).expect("invalid hash for CIDv0"),
+            cid: Cid::new_v0(sha256_hash.into_ext()).expect("invalid hash for CIDv0"),
         }
     }
 
@@ -62,7 +62,7 @@ impl BasicBlock {
     }
 
     /// Get the multihash of cid of the basic block.
-    pub fn multihash(&self) -> MultihashRef {
+    pub fn multihash(&self) -> ExtMultihashRef {
         self.cid.hash()
     }
 }
