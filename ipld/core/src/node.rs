@@ -3,10 +3,9 @@
 use std::str::FromStr;
 
 use bytes::Bytes;
-use cid::{Cid, Codec, IntoExt};
+use cid::{Cid, Codec, ExtCode};
 use either::Either;
 use minicbor::{encode, Encoder};
-use multihash::Code;
 use serde::ser;
 
 use block_format::{BasicBlock, Block};
@@ -40,7 +39,7 @@ impl IpldNode {
     /// Deserialize a CBOR object into an IPLD Node.
     ///
     /// Equivalent to the `Decode` in `go-ipld-cbor`
-    pub fn from_cbor(cbor: &[u8], hash_type: Code) -> Result<Self, IpldCoreError> {
+    pub fn from_cbor(cbor: &[u8], hash_type: ExtCode) -> Result<Self, IpldCoreError> {
         let value = minicbor::decode::<IpldValue>(cbor)?;
         println!("Value: {:?}", value);
         Self::wrap_object(&value, hash_type)
@@ -52,7 +51,7 @@ impl IpldNode {
     }
 
     /// Deserialize the JSON object into IPLD Node.
-    pub fn from_json(json: &str, hash_type: Code) -> Result<Self, IpldCoreError> {
+    pub fn from_json(json: &str, hash_type: ExtCode) -> Result<Self, IpldCoreError> {
         let value = serde_json::from_str::<IpldValue>(json)?;
         Self::wrap_object(&value, hash_type)
     }
@@ -65,14 +64,14 @@ impl IpldNode {
     /// Convert an CBOR object into IPLD Node.
     pub fn wrap_object<T: minicbor::Encode>(
         value: &T,
-        hash_type: Code,
+        hash_type: ExtCode,
     ) -> Result<Self, IpldCoreError> {
         let data = minicbor::to_vec(value)?;
         // println!("{:?}", data);
         let value = minicbor::decode::<IpldValue>(&data)?;
         let hash = hash_type.digest(&data);
         // println!("Hash: {:?}", hash.as_bytes());
-        let cid = Cid::new_v1(Codec::DagCBOR, hash.into_ext());
+        let cid = Cid::new_v1(Codec::DagCBOR, hash);
         let block = BasicBlock::new_with_cid(data.into(), cid)?;
         Self::new_with_obj(&block, value)
     }

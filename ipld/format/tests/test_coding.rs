@@ -1,7 +1,7 @@
 mod common;
 
 use block_format::{BasicBlock, Block};
-use cid::{Cid, Codec};
+use cid::{Cid, Codec, IntoExt};
 use ipld_format::coding::{decode, register};
 use ipld_format::{Node, Result};
 
@@ -27,7 +27,7 @@ fn init2() {
 #[test]
 fn test_decode() {
     init();
-    let id = Cid::new_v1(Codec::Raw, multihash::Identity::digest(b""));
+    let id = Cid::new_v1(Codec::Raw, multihash::Identity::digest(b"").into_ext());
     let block = BasicBlock::new_with_cid(vec![].into(), id.clone()).unwrap();
     let node = decode(&block).unwrap();
     assert_eq!(node.cid(), &id);

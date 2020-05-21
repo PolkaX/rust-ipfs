@@ -3,6 +3,7 @@
 use multihash::Sha2_256;
 
 use block_format::{BasicBlock, Block};
+use cid::IntoExt;
 
 #[test]
 fn test_blocks_basic() {
@@ -26,7 +27,7 @@ fn test_hash() {
     let data = b"some other data";
     let block = BasicBlock::new(data.as_ref().into());
 
-    let hash = Sha2_256::digest(data.as_ref());
+    let hash = Sha2_256::digest(data.as_ref()).into_ext();
 
     assert_eq!(block.multihash(), hash);
 }

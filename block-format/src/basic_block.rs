@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 
-use cid::{Cid, IntoExt, ExtMultihashRef};
+use cid::{Cid, ExtMultihashRef, IntoExt};
 use multihash::Sha2_256;
 
 use crate::error::Result;
@@ -40,10 +40,10 @@ pub struct BasicBlock {
 impl BasicBlock {
     /// Creates a new `BasicBlock` with given bytes, and its CID is version 0.
     pub fn new(data: Bytes) -> BasicBlock {
-        let sha256_hash = Sha2_256::digest(data.as_ref());
+        let sha256_hash = Sha2_256::digest(data.as_ref()).into_ext();
         BasicBlock {
             data,
-            cid: Cid::new_v0(sha256_hash.into_ext()).expect("invalid hash for CIDv0"),
+            cid: Cid::new_v0(sha256_hash).expect("invalid hash for CIDv0"),
         }
     }
 
